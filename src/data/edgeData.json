@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "title": "Quantum Computing Milestone Reached",
+    "summary": "Researchers achieve 99.9% fidelity in a 100-qubit system.",
+    "category": "Tech",
+    "sourceLabel": "Tech Review",
+    "time": "2 hours ago",
+    "status": "Demo",
+    "whatHappened": "A major university research team has successfully demonstrated a quantum computing operation with 99.9% fidelity across a 100-qubit array. This is a significant jump from the previous 95% threshold.",
+    "whyItMatters": "High fidelity in quantum operations is the primary roadblock to achieving practical, scalable quantum computers capable of solving complex problems like drug discovery and advanced materials simulation.",
+    "keyFacts": [
+      "Fidelity reached 99.9%.",
+      "System utilized 100 qubits.",
+      "Maintained coherence for over 10 milliseconds."
+    ],
+    "whatIsUnclear": "It remains to be seen if this specific architecture can scale beyond 1,000 qubits without exponential increases in error rates.",
+    "sources": ["Science Journal (Demo)", "Tech Review (Demo)"]
+  },
+  {
+    "id": 2,
+    "title": "Global Climate Accord Revised",
+    "summary": "New targets set for 2035 aiming for net-zero emissions.",
+    "category": "World",
+    "sourceLabel": "Global News",
+    "time": "5 hours ago",
+    "status": "Demo",
+    "whatHappened": "Leaders from 50 nations have signed an updated accord pushing the net-zero emission target forward by five years, now aiming for 2035 instead of 2040.",
+    "whyItMatters": "Accelerated timelines indicate a higher urgency and will force massive structural changes across energy and transportation sectors worldwide within the next decade.",
+    "keyFacts": [
+      "Target moved from 2040 to 2035.",
+      "50 nations signed the new accord.",
+      "Includes strict penalties for non-compliance."
+    ],
+    "whatIsUnclear": "Funding mechanisms to support developing nations in achieving these new targets have not yet been fully detailed.",
+    "sources": ["Global News (Demo)", "Climate Watch (Demo)"]
+  },
+  {
+    "id": 3,
+    "title": "New Scholarship Fund for STEM Students",
+    "summary": "National program allocates $50M for undergraduate STEM degrees.",
+    "category": "Students",
+    "sourceLabel": "EduWire",
+    "time": "1 day ago",
+    "status": "Demo",
+    "whatHappened": "A joint government-private initiative has announced a $50 million scholarship fund dedicated entirely to incoming undergraduate students pursuing STEM degrees.",
+    "whyItMatters": "This aims to close the talent gap in the engineering and software sectors and provide debt-free education to thousands of students.",
+    "keyFacts": [
+      "Total fund size: $50 Million.",
+      "Target: Incoming undergraduates.",
+      "Fields: Science, Technology, Engineering, Math."
+    ],
+    "whatIsUnclear": "The exact application process and eligibility criteria regarding income thresholds have not been published yet.",
+    "sources": ["EduWire (Demo)", "University Press (Demo)"]
+  }
+]

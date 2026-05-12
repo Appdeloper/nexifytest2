@@ -1,0 +1,24 @@
+.empty-state {
+  padding: var(--spacing-4) var(--spacing-2);
+  text-align: center;
+  flex: 1;
+}
+
+.empty-state-icon {
+  color: var(--primary);
+  opacity: 0.5;
+  margin-bottom: var(--spacing-3);
+  filter: drop-shadow(var(--neon-glow));
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-1);
+}
+
+.empty-state-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  max-width: 250px;
+}

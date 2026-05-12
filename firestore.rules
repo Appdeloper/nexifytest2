@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ── Helper functions ─────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isOwner() {
+      return isSignedIn() && (getUserData().role == 'owner' || request.auth.token.email == 'iamwe@nexify.com');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
+    }
+    
+    function isStaff() {
+      return isOwner() || isAdmin();
+    }
+
+    // ── Users collection ──────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      
+      // Strict update rules: users can only edit non-sensitive fields
+      allow update: if (isSignedIn() && request.auth.uid == userId 
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                           .hasAny(['role', 'rank', 'xp', 'level', 'verified', 'badges', 'banned'])
+                       )
+                    || (isStaff() 
+                        // Staff can update mostly anything, but only owner can assign owner/admin
+                        && (request.resource.data.role != 'owner' || isOwner())
+                        && (resource.data.role != 'owner' || isOwner())
+                       );
+    }
+    
+    // ── Roles & Ranks ─────────────────────────────────────────────
+    match /roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+    
+    match /ranks/{rankId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+    
+    // ── Leaderboards ──────────────────────────────────────────────
+    match /leaderboards/{lbId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+      
+      match /users/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isStaff() || (isSignedIn() && request.auth.uid == userId);
+      }
+    }
+    
+    // ── Admin Logs & XP Events ────────────────────────────────────
+    match /adminLogs/{logId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+    }
+
+    match /xpEvents/{eventId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+    }
+
+    // ── Rooms & Chats ─────────────────────────────────────────────
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isStaff());
+    }
+    
+    match /chats/{chatId} {
+      allow read, update: if isSignedIn() && request.auth.uid in resource.data.members;
+      allow create: if isSignedIn();
+      
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow delete: if isStaff() || (isSignedIn() && resource.data.senderId == request.auth.uid);
+      }
+    }
+
+    // ── Friends & Requests ────────────────────────────────────────
+    match /friends/{friendId} {
+      allow read: if isSignedIn() && (resource.data.userMap[request.auth.uid] == true || isStaff());
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.userMap[request.auth.uid] == true || isStaff());
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
+      allow create: if isSignedIn() && request.resource.data.from == request.auth.uid;
+      allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
+    }
+
+    // ── Catch-all ────────────────────────────────────────────────
+    match /{path=**} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+  }
+}

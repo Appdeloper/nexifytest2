@@ -1,0 +1,26 @@
+.gradient-button {
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.gradient-button:active {
+  transform: scale(0.98);
+}
+.gradient-button:hover {
+  box-shadow: var(--neon-glow);
+}
+.gradient-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

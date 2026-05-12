@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if file is an image (under 5MB)
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') 
+             && request.resource.size < 5 * 1024 * 1024;
+    }
+    
+    // Check if file is valid document (under 10MB)
+    function isValidDocument() {
+      return request.resource.contentType.matches('application/pdf') 
+             || request.resource.contentType.matches('application/msword')
+             || request.resource.contentType.matches('text/plain')
+             && request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Profile Images
+    match /profileImages/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      // Only owner can upload their profile picture, must be an image
+      allow write: if isAuthenticated() && request.auth.uid == userId && isValidImage();
+    }
+    
+    // Room Icons
+    match /roomIcons/{roomId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidImage();
+    }
+
+    // Chat Uploads
+    match /chatUploads/{chatId}/{fileName} {
+      allow read: if isAuthenticated(); // In a real app, verify they are in the chat, but storage rules can't query firestore easily without custom claims or storing metadata
+      // For basic protection, only authenticated users can write, must be an image or document
+      allow write: if isAuthenticated() && (isValidImage() || isValidDocument());
+    }
+
+    // Room Uploads
+    match /roomUploads/{roomId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isValidImage() || isValidDocument());
+    }
+    
+    // Block all other access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
