@@ -37,12 +37,17 @@ export const updateFocusStats = async (uid, minutes) => {
   
   const data = snap.data() || { focusMinutes: 0, focusSessions: 0, focusStreak: 0 };
   
+  const totalFocus = (data.focusMinutes || 0) + minutes;
   await updateDoc(ref, {
-    focusMinutes: (data.focusMinutes || 0) + minutes,
+    focusMinutes: totalFocus,
     focusSessions: (data.focusSessions || 0) + 1,
     lastSessionAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+
+  // Sync to leaderboard
+  const lbRef = doc(db, 'leaderboards', 'global', 'users', uid);
+  await setDoc(lbRef, { focusMinutes: totalFocus, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
 
   // Award XP
   import('./xp').then(({ addXP }) => addXP(uid, 'focusSession')).catch(() => {});

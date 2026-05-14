@@ -42,4 +42,14 @@ export const updateFitnessData = async (uid, data) => {
     ...data,
     lastUpdated: serverTimestamp()
   }, { merge: true });
+
+  const lbData = {};
+  if (data.steps !== undefined) lbData.steps = data.steps;
+  if (data.workoutsCompleted !== undefined) lbData.workoutsCompleted = data.workoutsCompleted;
+  if (data.streak !== undefined) lbData.streak = data.streak;
+  
+  if (Object.keys(lbData).length > 0) {
+    const lbRef = doc(db, 'leaderboards', 'global', 'users', uid);
+    await setDoc(lbRef, { ...lbData, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+  }
 };

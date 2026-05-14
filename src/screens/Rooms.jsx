@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { subscribeMyRooms, subscribePublicRooms, joinRoom } from '../services/rooms';
 import GlassCard from '../components/GlassCard';
 import GradientButton from '../components/GradientButton';
+import { RoleBadge, RankBadge } from '../components/Badges';
 
 const TABS = ['My Rooms', 'Public', 'Study', 'Gaming', 'Focus'];
 
@@ -59,12 +60,20 @@ const Rooms = () => {
           position: 'sticky', top: 0, zIndex: 100
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
           <div style={{ position: 'relative' }}>
-            <img src="/logo.png" alt="Logo" style={{ width: 36, height: 36, borderRadius: 8 }} />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 36, height: 36, borderRadius: 8 }} />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', borderRadius: '50%', border: '2px solid black' }} />
           </div>
-          <h1 className="header-title" style={{ fontSize: 20 }}>Nexify Rooms</h1>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <h1 className="header-title" style={{ fontSize: 20 }}>Nexify Rooms</h1>
+            {currentUser && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                <RoleBadge role={currentUser.role} size="xs" hideLabel />
+                <RankBadge rankId={currentUser.rank} size="xs" />
+              </div>
+            )}
+          </div>
         </div>
         <motion.button
           whileHover={{ scale: 1.1, rotate: 90 }}

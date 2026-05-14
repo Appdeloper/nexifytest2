@@ -63,10 +63,19 @@ const ProfileCustomization = React.lazy(() => import('./screens/ProfileCustomiza
 const Notifications = React.lazy(() => import('./screens/Notifications'));
 
 import { ensureAIUser } from './services/users';
+import { subscribeSystemConfig } from './services/xp';
 
 const App = () => {
   useEffect(() => {
+    const splash = document.getElementById('splash');
+    if (splash) {
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 500);
+    }
+
+    const unsubSystem = subscribeSystemConfig();
     ensureAIUser().catch(console.error);
+    return () => { if (unsubSystem) unsubSystem(); };
   }, []);
 
   return (

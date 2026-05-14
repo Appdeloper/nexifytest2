@@ -93,7 +93,7 @@ const NexifyAI = () => {
               borderRadius: '24px',
               borderBottomRightRadius: msg.sender === 'user' ? '4px' : '24px',
               borderBottomLeftRadius: msg.sender === 'ai' ? '4px' : '24px',
-              background: msg.sender === 'user' ? 'var(--grad-premium)' : 'var(--bg-glass-heavy)',
+              background: msg.sender === 'user' ? 'var(--gradient-primary)' : 'var(--bg-glass-heavy)',
               border: msg.sender === 'ai' ? '1px solid var(--border-glass)' : 'none',
               color: msg.sender === 'user' ? 'black' : 'white',
               boxShadow: msg.sender === 'user' ? '0 10px 30px rgba(0,223,216,0.3)' : '0 10px 30px rgba(0,0,0,0.4)',
@@ -157,7 +157,7 @@ const NexifyAI = () => {
             whileTap={{ scale: 0.9 }}
             onClick={() => handleSend()} 
             disabled={!text.trim() || isTyping} 
-            style={{ background: text.trim() ? 'var(--grad-premium)' : 'rgba(255,255,255,0.05)', color: text.trim() ? 'black' : 'var(--text-dim)', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', transition: 'all 0.3s' }}
+            style={{ background: text.trim() ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)', color: text.trim() ? 'black' : 'var(--text-dim)', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', transition: 'all 0.3s' }}
           >
             <Send size={20} strokeWidth={2.5} />
           </motion.button>

@@ -34,6 +34,8 @@ export const listenForIncomingCalls = (uid, callback) => {
         callback(change.doc.data());
       }
     });
+  }, (err) => {
+    console.warn('listenForIncomingCalls error:', err.message);
   });
 };
 
@@ -42,7 +44,7 @@ export const listenToCallDocument = (callId, callback) => {
     if (docSnap.exists()) {
       callback(docSnap.data());
     }
-  });
+  }, (err) => console.warn('listenToCallDocument error:', err.message));
 };
 
 export const acceptCall = async (callId) => {
@@ -97,7 +99,7 @@ export const subscribeIceCandidates = (callId, excludeFrom, callback) => {
         callback(change.doc.data().candidate);
       }
     });
-  });
+  }, (err) => console.warn('subscribeIceCandidates error:', err.message));
 };
 
 export const loadCallHistory = async (uid, callback) => {
@@ -138,12 +140,12 @@ export const loadCallHistory = async (uid, callback) => {
   const unsub1 = onSnapshot(qCaller, (s) => {
     snap1 = s;
     updateCombined(snap1, snap2);
-  });
+  }, (err) => console.warn('loadCallHistory qCaller error:', err.message));
   
   const unsub2 = onSnapshot(qReceiver, (s) => {
     snap2 = s;
     updateCombined(snap1, snap2);
-  });
+  }, (err) => console.warn('loadCallHistory qReceiver error:', err.message));
   
   return () => {
     unsub1();

@@ -77,7 +77,15 @@ service cloud.firestore {
     match /rooms/{roomId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isStaff());
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isStaff());
+      
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn();
+        allow delete: if isStaff() || (isSignedIn() && resource.data.senderId == request.auth.uid);
+      }
     }
     
     match /chats/{chatId} {
@@ -87,6 +95,7 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isSignedIn();
         allow create: if isSignedIn();
+        allow update: if isSignedIn();
         allow delete: if isStaff() || (isSignedIn() && resource.data.senderId == request.auth.uid);
       }
     }
@@ -102,6 +111,46 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
       allow create: if isSignedIn() && request.resource.data.from == request.auth.uid;
       allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
+    }
+
+    // ── Calls ─────────────────────────────────────────────────────
+    match /calls/{callId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isStaff();
+      match /iceCandidates/{id} {
+        allow read, create: if isSignedIn();
+      }
+    }
+
+    // ── Music ─────────────────────────────────────────────────────
+    match /musicRooms/{roomId} {
+      allow read, create, update: if isSignedIn();
+    }
+    match /userMusicStatus/{uid} {
+      allow read, create, update: if isSignedIn();
+    }
+    match /musicActivity/{id} {
+      allow read, create: if isSignedIn();
+    }
+
+    // ── Activity, Focus, Tasks ────────────────────────────────────
+    match /activityFeed/{activityId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+    match /focusStats/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+    match /users/{userId}/data/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ── Catch-all ────────────────────────────────────────────────

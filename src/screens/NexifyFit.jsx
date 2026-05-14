@@ -145,7 +145,7 @@ const NexifyFit = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }}>
         <button onClick={() => navigate('/home')} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}><ArrowLeft size={20} /></button>
         <div style={{ position: 'relative' }}>
-          <img src="/logo.png" alt="Logo" style={{ width: 36, height: 36, borderRadius: 8 }} />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 36, height: 36, borderRadius: 8 }} />
           <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', borderRadius: '50%', border: '2px solid black' }} />
         </div>
         <h1 style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>Nexify Fit</h1>

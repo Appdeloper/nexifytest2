@@ -22,6 +22,8 @@ const Chats = () => {
   const [activeTab, setActiveTab] = useState('All');
   const [chatUsersMap, setChatUsersMap] = useState({});
 
+  const fetchedIds = React.useRef(new Set());
+
   useEffect(() => {
     if (!currentUser) return;
     const unsub = subscribeUserChats(currentUser.uid, async (fetchedChats) => {
@@ -29,15 +31,18 @@ const Chats = () => {
       const map = {};
       for (const chat of fetchedChats) {
         const otherUserId = chat.members.find(id => id !== currentUser.uid);
-        if (otherUserId && !chatUsersMap[otherUserId]) {
+        if (otherUserId && !fetchedIds.current.has(otherUserId)) {
+          fetchedIds.current.add(otherUserId);
           const userData = await getUserData(otherUserId);
           if (userData) map[otherUserId] = userData;
         }
       }
-      setChatUsersMap(prev => ({ ...prev, ...map }));
+      if (Object.keys(map).length > 0) {
+        setChatUsersMap(prev => ({ ...prev, ...map }));
+      }
     });
     return () => unsub();
-  }, [currentUser, chatUsersMap]);
+  }, [currentUser]);
 
   const filteredChats = chats.filter(chat => {
     if (activeTab === 'DMs' && chat.type !== 'dm') return false;
@@ -144,7 +149,7 @@ const Chats = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <img src="/logo.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Logo" />
           </div>
           <h1 style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>Conversations</h1>
         </div>

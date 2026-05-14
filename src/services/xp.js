@@ -2,10 +2,11 @@
 import { db } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, increment, 
-  serverTimestamp, addDoc, collection 
+  serverTimestamp, addDoc, collection, onSnapshot
 } from 'firebase/firestore';
+import { logActivity, ACTIVITY_TYPES } from './activity';
 
-export const RANKS = [
+export let RANKS = [
   { id: 'rookie',      name: 'Rookie',       xpRequired: 0,     icon: '🌱', color: '#ffffff', glow: 'white',  priority: 1 },
   { id: 'explorer',    name: 'Explorer',     xpRequired: 250,   icon: '🧭', color: '#38bdf8', glow: 'cyan',   priority: 2 },
   { id: 'signal',      name: 'Signal',       xpRequired: 750,   icon: '📡', color: '#00d4ff', glow: 'blue',   priority: 3 },
@@ -18,7 +19,7 @@ export const RANKS = [
   { id: 'nexusLegend', name: 'Nexus Legend', xpRequired: 50000, icon: '🏆', color: '#facc15', glow: 'gold',   priority: 10 },
 ];
 
-export const ROLES = {
+export let ROLES = {
   owner: {
     id: 'owner', label: 'OWNER', icon: '👑', color: '#ff3df2', glow: 'purple', priority: 100,
     permissions: ["manageRoles","manageUsers","manageRooms","deleteMessages","viewAdminPanel","verifyUsers"]
@@ -57,6 +58,24 @@ const XP_COOLDOWNS = {
   sendMessage: 5000, // 5 seconds
 };
 const DAILY_XP_LIMIT = 1000;
+
+export const subscribeSystemConfig = (onUpdate) => {
+  const unsubRanks = onSnapshot(collection(db, 'ranks'), (snap) => {
+    if (!snap.empty) {
+      RANKS = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.xpRequired - b.xpRequired);
+      if (onUpdate) onUpdate();
+    }
+  });
+  const unsubRoles = onSnapshot(collection(db, 'roles'), (snap) => {
+    if (!snap.empty) {
+      const newRoles = {};
+      snap.docs.forEach(d => newRoles[d.id] = { id: d.id, ...d.data() });
+      ROLES = newRoles;
+      if (onUpdate) onUpdate();
+    }
+  });
+  return () => { unsubRanks(); unsubRoles(); };
+};
 
 export const calculateRankFromXP = (xp = 0) => {
   let rank = RANKS[0];
@@ -146,6 +165,18 @@ export const addXP = async (uid, reason, amountOverride = null) => {
     await updateDoc(userRef, updates);
     await logXPEvent(uid, finalAmount, reason);
     await syncLeaderboard(uid);
+
+    // Log public activity for notable milestones
+    if (reason === 'completeTask' || reason === 'workout' || reason === 'focusSession' || (data.rank !== newRank.id)) {
+      await logActivity({
+        userId: uid,
+        userName: data.displayName,
+        userPhoto: data.photoURL,
+        type: data.rank !== newRank.id ? ACTIVITY_TYPES.RANK_UP : (reason === 'completeTask' ? ACTIVITY_TYPES.COMPLETE_TASK : (reason === 'workout' ? ACTIVITY_TYPES.COMPLETE_WORKOUT : ACTIVITY_TYPES.FINISH_FOCUS)),
+        text: data.rank !== newRank.id ? `Ranked up to ${newRank.name}!` : `Earned ${finalAmount} XP for ${reason}`,
+      });
+    }
+
     return { amount: finalAmount, newXP, newRank };
   } catch (e) {
     console.warn('XP award failed:', e.message);

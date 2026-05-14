@@ -16,7 +16,7 @@ export const askNexifyAI = async (prompt, history = []) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const chat = model.startChat({
       history: history.map(msg => ({
@@ -80,7 +80,7 @@ export const summarizeChats = async (chats) => {
   const prompt = `Summarize the following chat messages concisely. Highlight important action items or topics: \n\n${chatContext}`;
   
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (e) {

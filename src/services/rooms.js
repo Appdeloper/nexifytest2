@@ -9,12 +9,12 @@ import { compressImage } from './chat';
 export const subscribeMyRooms = (uid, callback) => {
   const q = query(
     collection(db, 'rooms'),
-    where(`memberMap.${uid}`, '==', true),
-    orderBy('updatedAt', 'desc')
+    where(`memberMap.${uid}`, '==', true)
   );
   
   return onSnapshot(q, (snapshot) => {
-    const rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    rooms.sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0));
     callback(rooms);
   }, (err) => {
     console.warn("My Rooms subscription failed:", err);
@@ -26,12 +26,12 @@ export const subscribeMyRooms = (uid, callback) => {
 export const subscribePublicRooms = (callback) => {
   const q = query(
     collection(db, 'rooms'),
-    where('privacy', '==', 'public'),
-    orderBy('createdAt', 'desc')
+    where('privacy', '==', 'public')
   );
   
   return onSnapshot(q, (snapshot) => {
-    const rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    rooms.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
     callback(rooms);
   }, (err) => {
     console.warn("Public Rooms subscription failed:", err);

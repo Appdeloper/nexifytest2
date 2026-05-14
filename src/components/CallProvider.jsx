@@ -43,15 +43,20 @@ export const CallProvider = ({ children }) => {
     if (!currentUser) return;
     
     const unsub = listenForIncomingCalls(currentUser.uid, async (callData) => {
-      if (callState === 'idle') {
-        const caller = await getUserData(callData.callerId);
-        setPeerUser(caller);
-        setCurrentCall(callData);
-        setCallState('incoming');
-      }
+      setCallState((prev) => {
+        if (prev === 'idle') {
+          // fetch caller data without awaiting here to prevent async bugs inside setCallState
+          getUserData(callData.callerId).then(caller => {
+            setPeerUser(caller);
+            setCurrentCall(callData);
+          }).catch(console.error);
+          return 'incoming';
+        }
+        return prev;
+      });
     });
     return () => unsub();
-  }, [currentUser, callState]);
+  }, [currentUser]);
 
   // Handle stream attachment to refs
   useEffect(() => {

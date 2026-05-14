@@ -61,6 +61,13 @@ const Friends = () => {
 
   const [loadingActions, setLoadingActions] = useState({});
   const [statuses, setStatuses] = useState({});
+  const [allUsers, setAllUsers] = useState([]);
+
+  useEffect(() => {
+    if (currentUser) {
+      getAllUsers(currentUser.uid).then(setAllUsers).catch(console.error);
+    }
+  }, [currentUser]);
 
   /* subscriptions */
   useEffect(() => {
@@ -101,18 +108,24 @@ const Friends = () => {
     if (!searchQ || searchQ.length < 2) { setSearchResults([]); return; }
     setSearching(true);
     const t = setTimeout(async () => {
-      const results = await searchUsers(searchQ, currentUser.uid);
+      const lower = searchQ.toLowerCase();
+      const results = allUsers.filter(u => 
+        u.displayName?.toLowerCase().includes(lower) || 
+        u.email?.toLowerCase().includes(lower) ||
+        u.username?.toLowerCase().includes(lower)
+      ).slice(0, 50); // limit to 50
+      
       // Fetch friendship status for each
       const statusMap = {};
       for (const u of results) {
         statusMap[u.uid] = await getFriendshipStatus(currentUser.uid, u.uid);
       }
-      setStatuses(statusMap);
+      setStatuses(p => ({ ...p, ...statusMap }));
       setSearchResults(results);
       setSearching(false);
-    }, 400);
+    }, 300);
     return () => clearTimeout(t);
-  }, [searchQ, tab]);
+  }, [searchQ, tab, allUsers]);
 
   const withLoading = async (key, fn) => {
     setLoadingActions(p => ({ ...p, [key]: true }));
@@ -170,7 +183,7 @@ const Friends = () => {
             <ArrowLeft size={18} />
           </button>
           <div style={{ position: 'relative' }}>
-            <img src="/logo.png" style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: '#10b981', borderRadius: '50%', border: '1.5px solid black' }} />
           </div>
         </div>

@@ -15,7 +15,7 @@ const Header = ({ title, showBack = false, rightElement }) => {
           </button>
         ) : (
           <div style={{ position: 'relative' }}>
-            <img src="/logo.png" style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: '#10b981', borderRadius: '50%', border: '1.5px solid black' }} />
           </div>
         )}

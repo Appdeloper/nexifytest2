@@ -417,7 +417,7 @@ const HelpSheet = ({ onClose }) => {
 const AboutSheet = ({ onClose }) => (
   <Sheet title="About Nexify Connect" onClose={onClose}>
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <img src="/logo.png" alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', filter: 'drop-shadow(0 0 12px rgba(0,223,216,0.5))' }} />
+      <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', filter: 'drop-shadow(0 0 12px rgba(0,223,216,0.5))' }} />
       <div style={{ fontWeight: 700, fontSize: 20 }}>Nexify Connect</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Version 1.0.0 • Connect Smarter</div>
       <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
@@ -484,7 +484,7 @@ const Settings = () => {
         <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
           <ArrowLeft size={18} />
         </button>
-        <img src="/logo.png" alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
         <h1 style={{ fontSize: 18, fontWeight: 700, flex: 1 }}>Settings</h1>
       </div>
 

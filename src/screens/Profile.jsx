@@ -16,6 +16,8 @@ import { RoleBadge, RankBadge } from '../components/Badges';
 import { getRankForXP, getNextRank, getRankProgress } from '../services/xp';
 import { uploadAvatar } from '../services/profile';
 import { subscribeUserMusicStatus } from '../services/waves';
+import { useFitness } from '../hooks/useFitness';
+import { subscribeFocusData } from '../services/focus';
 
 const ProfileRow = ({ icon: Icon, color, label, onClick, delay = 0 }) => (
   <motion.div
@@ -56,10 +58,13 @@ const Profile = () => {
     if (!currentUser) return;
     const unsub = subscribeFriends(currentUser.uid, list => setFriendCount(list.length));
     const unsubMusic = subscribeUserMusicStatus(currentUser.uid, setMusicStatus);
-    return () => { unsub(); unsubMusic(); };
+    const unsubFocus = subscribeFocusData(currentUser.uid, setFocusStats);
+    return () => { unsub(); unsubMusic(); unsubFocus(); };
   }, [currentUser]);
 
   const [musicStatus, setMusicStatus] = useState(null);
+  const { stats: fitStats } = useFitness();
+  const [focusStats, setFocusStats] = useState({ focusMinutes: 0 });
 
   const handleStatusUpdate = async (updates) => {
     try {
@@ -82,9 +87,6 @@ const Profile = () => {
       showToast(err.message || 'Upload failed');
     }
   };
-
-  const fitStats = JSON.parse(localStorage.getItem('fitProgress') || '{"workoutsCompleted":0}');
-  const focusStats = JSON.parse(localStorage.getItem('focusStats') || '{"focusMinutes":0}');
 
   const rank = getRankForXP(currentUser?.xp || 0);
   const nextRank = getNextRank(currentUser?.xp || 0);
@@ -163,7 +165,7 @@ const Profile = () => {
             <ArrowLeft size={18} />
           </button>
           <div style={{ position: 'relative' }}>
-            <img src="/logo.png" style={{ width: 36, height: 36, borderRadius: 8 }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 36, height: 36, borderRadius: 8 }} alt="Logo" />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', borderRadius: '50%', border: '2px solid black' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>

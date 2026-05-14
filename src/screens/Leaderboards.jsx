@@ -9,11 +9,10 @@ import EmptyState from '../components/EmptyState';
 import GlassCard from '../components/GlassCard';
 
 const TABS = [
-  { id: 'global', label: 'Global XP', icon: Zap },
-  { id: 'weekly', label: 'Weekly', icon: Clock },
-  { id: 'fitness', label: 'Fitness', icon: Dumbbell },
-  { id: 'focus', label: 'Focus', icon: Target },
-  { id: 'rooms', label: 'Rooms', icon: Users },
+  { id: 'global', label: 'Global XP', icon: Zap, sortKey: 'xp', unit: 'XP' },
+  { id: 'fitness', label: 'Steps', icon: Dumbbell, sortKey: 'steps', unit: 'Steps' },
+  { id: 'focus', label: 'Focus', icon: Target, sortKey: 'focusMinutes', unit: 'Mins' },
+  { id: 'streak', label: 'Streaks', icon: Clock, sortKey: 'streak', unit: 'Days' },
 ];
 
 const Leaderboards = () => {
@@ -24,21 +23,18 @@ const Leaderboards = () => {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    // Only 'global' is fully implemented with Firestore sync for now
-    if (activeTab === 'global') {
-      const unsub = subscribeLeaderboard((data) => {
-        setUsers(data);
-        setLoading(false);
-      });
-      return () => unsub();
-    } else {
-      // Mock loading for other tabs until implemented
-      setLoading(true);
-      setTimeout(() => {
-        setUsers([]);
-        setLoading(false);
-      }, 500);
-    }
+    setLoading(true);
+    const tabData = TABS.find(t => t.id === activeTab);
+    const sortKey = tabData ? tabData.sortKey : 'xp';
+    const unsub = subscribeLeaderboard((data) => {
+      // filter out users with 0 or missing values for this metric
+      const validUsers = data.filter(u => (u[sortKey] || 0) > 0);
+      // sort manually just in case firestore composite index is missing initially
+      validUsers.sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
+      setUsers(validUsers);
+      setLoading(false);
+    }, sortKey);
+    return () => unsub();
   }, [activeTab]);
 
   const filteredUsers = users.filter(u => 
@@ -77,7 +73,7 @@ const Leaderboards = () => {
             <ArrowLeft size={18} />
           </button>
           <div style={{ position: 'relative' }}>
-            <img src="/logo.png" style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: '#10b981', borderRadius: '50%', border: '1.5px solid black' }} />
           </div>
         </div>
@@ -252,8 +248,12 @@ const Leaderboards = () => {
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--primary)', textShadow: '0 0 10px rgba(0,223,216,0.3)' }}>{user.xp.toLocaleString()}</div>
-                    <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--text-dim)', letterSpacing: 1 }}>XP</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--primary)', textShadow: '0 0 10px rgba(0,223,216,0.3)' }}>
+                      {Number(user[TABS.find(t => t.id === activeTab)?.sortKey || 'xp'] || 0).toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--text-dim)', letterSpacing: 1 }}>
+                      {TABS.find(t => t.id === activeTab)?.unit || 'XP'}
+                    </div>
                   </div>
                 </div>
               </motion.div>

@@ -3,6 +3,10 @@ import Header from '../components/Header';
 import { Search, Sparkles, Clock, ArrowRight, MessageSquare, Users, Dumbbell, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/GlassCard';
+import { useAuth } from '../hooks/useAuth';
+import { getAllUsers } from '../services/users';
+import { db } from '../services/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 const RECENT_SEARCHES = ['Deep work pod', 'React developers', 'State updates', 'Morning mobility'];
 const QUICK_FILTERS = ['All', 'Chats', 'Rooms', 'Edge', 'Fit', 'Pods'];
@@ -14,6 +18,28 @@ const GlobalSearch = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState([]);
 
+  const { currentUser } = useAuth();
+  const [allUsers, setAllUsers] = useState([]);
+  const [allRooms, setAllRooms] = useState([]);
+
+  useEffect(() => {
+    // Pre-fetch data for fast filtering
+    const loadData = async () => {
+      try {
+        const users = await getAllUsers(currentUser?.uid);
+        setAllUsers(users);
+
+        const q = query(collection(db, 'rooms'), where('privacy', '==', 'public'));
+        const roomsSnap = await getDocs(q);
+        const rooms = roomsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllRooms(rooms);
+      } catch (e) {
+        console.error("Search data load error:", e);
+      }
+    };
+    if (currentUser) loadData();
+  }, [currentUser]);
+
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -23,32 +49,54 @@ const GlobalSearch = () => {
     
     setIsSearching(true);
     const timeout = setTimeout(() => {
-      // Mock global search results based on query
       const lowerQuery = query.toLowerCase();
-      const mockResults = [];
+      const matched = [];
       
-      if ('react developers'.includes(lowerQuery) || lowerQuery === 'react') {
-        mockResults.push({ id: 1, type: 'Rooms', title: 'React Developers', desc: 'Public community room', icon: Users });
-      }
-      if ('morning mobility'.includes(lowerQuery) || lowerQuery === 'morning') {
-        mockResults.push({ id: 2, type: 'Fit', title: 'Morning Mobility', desc: '15 min Beginner Routine', icon: Dumbbell });
-      }
-      if ('deep work pod'.includes(lowerQuery) || lowerQuery === 'deep') {
-        mockResults.push({ id: 3, type: 'Pods', title: 'Deep Work Pod', desc: '60 min Focus Session', icon: Clock });
-      }
-      if ('state updates'.includes(lowerQuery) || lowerQuery === 'state') {
-        mockResults.push({ id: 4, type: 'Edge', title: 'State Elections 2026', desc: 'Latest updates on local politics', icon: Zap });
-      }
-      if (mockResults.length === 0) {
-        mockResults.push({ id: 5, type: 'Chats', title: `Discussion: ${query}`, desc: 'AI Suggested Group', icon: MessageSquare });
+      // Match users
+      allUsers.forEach(u => {
+        if (u.displayName?.toLowerCase().includes(lowerQuery) || u.username?.toLowerCase().includes(lowerQuery)) {
+          matched.push({
+            id: `user_${u.uid}`,
+            navId: u.uid,
+            type: 'Users',
+            title: u.displayName,
+            desc: `@${u.username} • ${u.role || 'Member'}`,
+            icon: Users,
+            path: `/friends`
+          });
+        }
+      });
+
+      // Match rooms
+      allRooms.forEach(r => {
+        if (r.name?.toLowerCase().includes(lowerQuery) || r.description?.toLowerCase().includes(lowerQuery)) {
+          matched.push({
+            id: `room_${r.id}`,
+            navId: r.id,
+            type: 'Rooms',
+            title: r.name,
+            desc: `${r.members?.length || 0} members • Public`,
+            icon: MessageSquare,
+            path: `/room-chat/${r.id}`
+          });
+        }
+      });
+
+      // Default quick actions if no matches
+      if (matched.length === 0) {
+        if (lowerQuery.includes('fit') || lowerQuery.includes('step')) {
+          matched.push({ id: 'quick_fit', type: 'Fit', title: 'Nexify Fit', desc: 'Track your steps', icon: Dumbbell, path: '/fit' });
+        } else if (lowerQuery.includes('pod') || lowerQuery.includes('focus')) {
+          matched.push({ id: 'quick_pod', type: 'Pods', title: 'Focus Pods', desc: 'Join a deep work session', icon: Clock, path: '/focus-pods' });
+        }
       }
 
-      setResults(mockResults.filter(r => activeFilter === 'All' || r.type === activeFilter));
+      setResults(matched.filter(r => activeFilter === 'All' || r.type === activeFilter));
       setIsSearching(false);
-    }, 600);
+    }, 300);
 
     return () => clearTimeout(timeout);
-  }, [query, activeFilter]);
+  }, [query, activeFilter, allUsers, allRooms]);
 
   return (
     <div className="fade-in col" style={{ height: '100dvh', background: 'var(--bg-main)' }}>
@@ -119,7 +167,12 @@ const GlobalSearch = () => {
               </div>
             ) : (
               results.map(result => (
-                <GlassCard key={result.id} className="row align-center flex-between p-3 ripple" style={{ cursor: 'pointer', animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+                <GlassCard 
+                  key={result.id} 
+                  className="row align-center flex-between p-3 ripple" 
+                  onClick={() => navigate(result.path)}
+                  style={{ cursor: 'pointer', animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}
+                >
                   <div className="row gap-3 align-center">
                     <div className="flex-center" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(0,223,216,0.1)' }}>
                       <result.icon size={20} className="text-primary" />

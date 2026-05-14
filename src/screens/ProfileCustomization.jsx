@@ -23,6 +23,8 @@ const ProfileCustomization = () => {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(currentUser?.profileTheme || 'default');
+  const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [status, setStatus] = useState(currentUser?.status || '');
 
   const handleUpdate = async (updates) => {
     setLoading(true);
@@ -91,6 +93,29 @@ const ProfileCustomization = () => {
               <h3 style={{ fontSize: 18, fontWeight: 800, marginTop: 8 }}>{currentUser?.displayName}</h3>
               <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>@{currentUser?.username}</p>
             </div>
+          </div>
+        </div>
+
+        {/* Basic Info Section */}
+        <div style={{ marginBottom: 32 }}>
+          <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1, display: 'block', marginBottom: 12 }}>BASIC INFO</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input 
+              type="text" 
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Display Name"
+              onBlur={() => handleUpdate({ displayName })}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', outline: 'none' }}
+            />
+            <input 
+              type="text" 
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              placeholder="Status (e.g. In the zone)"
+              onBlur={() => handleUpdate({ status })}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', outline: 'none' }}
+            />
           </div>
         </div>
 

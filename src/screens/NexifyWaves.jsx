@@ -37,10 +37,22 @@ const NexifyWaves = () => {
   const [activeAmbience, setActiveAmbience] = useState([]);
   const [showPlayer, setShowPlayer] = useState(false);
 
+  const audioRef = useRef(null);
+
   useEffect(() => {
     const unsub = subscribeMusicRooms(setRooms);
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.error("Playback failed:", e));
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying, currentTrack]);
 
   const toggleAmbience = (id) => {
     setActiveAmbience(prev => 
@@ -61,6 +73,18 @@ const NexifyWaves = () => {
           </button>
         } 
       />
+
+      <audio ref={audioRef} src={currentTrack.url} loop />
+      
+      {AMBIENCE_SOUNDS.map(sound => (
+        <audio 
+          key={sound.id}
+          src={sound.url} 
+          loop 
+          autoPlay={activeAmbience.includes(sound.id)} 
+          muted={!activeAmbience.includes(sound.id)}
+        />
+      ))}
 
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 160, zIndex: 1 }}>
         {/* Hero Section */}

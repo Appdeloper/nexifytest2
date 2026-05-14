@@ -66,7 +66,7 @@ const Calls = () => {
         position: 'sticky', top: 0, zIndex: 10
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/logo.png" alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
           <h1 style={{ fontSize: 18, fontWeight: 700 }}>Calls</h1>
         </div>
         <button

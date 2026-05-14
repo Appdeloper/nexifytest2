@@ -35,7 +35,7 @@ const Splash = () => {
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}
       >
         <motion.img
-          src="/logo.png"
+          src={`${import.meta.env.BASE_URL}logo.png`}
           alt="Nexify Connect"
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}

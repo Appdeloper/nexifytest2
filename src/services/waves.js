@@ -59,16 +59,16 @@ export const leaveMusicRoom = async (roomId, uid) => {
 };
 
 export const AMBIENCE_SOUNDS = [
-  { id: 'rain', label: 'Heavy Rain', icon: '🌧️', url: '/sounds/rain.mp3' },
-  { id: 'cafe', label: 'Cyber Cafe', icon: '☕', url: '/sounds/cafe.mp3' },
-  { id: 'city', label: 'Night City', icon: '🌃', url: '/sounds/city.mp3' },
-  { id: 'thunder', label: 'Thunderstorm', icon: '⛈️', url: '/sounds/thunder.mp3' },
-  { id: 'keyboard', label: 'Mechanical Keyboard', icon: '⌨️', url: '/sounds/keyboard.mp3' },
+  { id: 'rain', label: 'Heavy Rain', icon: '🌧️', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
+  { id: 'cafe', label: 'Cyber Cafe', icon: '☕', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
+  { id: 'city', label: 'Night City', icon: '🌃', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
+  { id: 'thunder', label: 'Thunderstorm', icon: '⛈️', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
+  { id: 'keyboard', label: 'Mechanical Keyboard', icon: '⌨️', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
 ];
 
 export const MOCK_TRACKS = [
-  { id: 't1', title: 'Midnight Signals', artist: 'DZ', cover: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300', duration: '3:45', mood: 'night' },
-  { id: 't2', title: 'Neon Dreams', artist: 'Cyberspace', cover: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300', duration: '4:20', mood: 'chill' },
-  { id: 't3', title: 'Focus Flow', artist: 'Nexify Records', cover: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=300', duration: '2:30', mood: 'focus' },
-  { id: 't4', title: 'Phonk Legend', artist: 'Drift King', cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?w=300', duration: '3:15', mood: 'gaming' },
+  { id: 't1', title: 'Midnight Signals', artist: 'DZ', cover: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300', duration: '3:45', mood: 'night', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+  { id: 't2', title: 'Neon Dreams', artist: 'Cyberspace', cover: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300', duration: '4:20', mood: 'chill', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { id: 't3', title: 'Focus Flow', artist: 'Nexify Records', cover: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=300', duration: '2:30', mood: 'focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { id: 't4', title: 'Phonk Legend', artist: 'Drift King', cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?w=300', duration: '3:15', mood: 'gaming', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
 ];

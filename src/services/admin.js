@@ -129,10 +129,10 @@ export const unbanUser = async (actorUid, actorRole, targetUid) => {
 
 
 // ── Leaderboard Fetch ───────────────────────────────────────
-export const subscribeLeaderboard = (callback) => {
+export const subscribeLeaderboard = (callback, sortKey = 'xp') => {
   const q = query(
     collection(db, 'leaderboards', 'global', 'users'),
-    orderBy('xp', 'desc'),
+    orderBy(sortKey, 'desc'),
     limit(100)
   );
   return onSnapshot(q, (snap) => {

@@ -50,7 +50,7 @@ const Login = () => {
       <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(0,223,216,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div className="w-full flex-center col" style={{ maxWidth: '400px', zIndex: 1 }}>
-        <img src="/logo.png" alt="Nexify Connect Logo" style={{ width: '120px', objectFit: 'contain', marginBottom: '24px', filter: 'drop-shadow(var(--neon-glow))' }} />
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Nexify Connect Logo" style={{ width: '120px', objectFit: 'contain', marginBottom: '24px', filter: 'drop-shadow(var(--neon-glow))' }} />
 
         <div className="col w-full glass-panel p-4" style={{ borderRadius: '24px' }}>
           <h2 style={{ textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}>Login to continue</h2>
