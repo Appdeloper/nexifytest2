@@ -5,7 +5,8 @@ import {
   signInWithPopup, 
   signOut 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { logActivity, ACTIVITY_TYPES } from './activity';
 
 const OWNER_EMAIL = "iamwe@nexify.com";
 
@@ -42,6 +43,16 @@ export const ensureUserProfile = async (user) => {
     };
     
     await setDoc(userRef, profileData);
+    
+    // Log signup activity
+    await logActivity({
+      userId: user.uid,
+      userName: profileData.displayName,
+      userPhoto: profileData.photoURL,
+      type: ACTIVITY_TYPES.JOIN_NEXUS,
+      text: "just joined the Nexify Nexus! 👋",
+    });
+
     return profileData;
   } else {
     const data = snap.data();

@@ -18,10 +18,11 @@ import {
 
 const REACTION_EMOJIS = ['❤️', '🔥', '😂', '😮', '😢', '💯'];
 
-const MOCK_GIFS = [
-  'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJndXIzYXJtN2Z0Z3ZueXp3Y2Z6Z3B3Z3B3Z3B3Z3B3Z3B3JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKSjPPrTVf9661G/giphy.gif',
-  'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJndXIzYXJtN2Z0Z3ZueXp3Y2Z6Z3B3Z3B3Z3B3Z3B3JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/l0HlS0mY8v9z3H7G8/giphy.gif',
-  'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJndXIzYXJtN2Z0Z3ZueXp3Y2Z6Z3B3Z3B3Z3B3Z3B3JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKDkDbIDJieKbVm/giphy.gif'
+const TRENDING_GIFS = [
+  "https://media.tenor.com/yS7a4vB8HkUAAAAM/thumbs-up-gold.gif",
+  "https://media.tenor.com/X_S8HqB-0nQAAAAM/let-go.gif",
+  "https://media.tenor.com/mO_eLpG0fSAAAAAM/excited-party.gif",
+  "https://media.tenor.com/5O8qR_2f8kMAAAAM/congratulations-congrats.gif",
 ];
 
 const SMART_REPLIES = ['Hey!', 'How are you?', 'Great work!', 'Love this room', 'LFG! 🚀'];
@@ -169,16 +170,10 @@ const RoomChat = () => {
           }));
           setMemberProfiles(profiles);
         }
-      } else {
-        showToast('Room not found');
-        navigate('/rooms');
-      }
-    });
-
-    const unsubMessages = subscribeRoomMessages(roomId, (msgs) => {
+    const unsub = subscribeRoomMessages(roomId, msgs => {
       setMessages(msgs);
       setLoadingMsg(false);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 150);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       
       // AI Tag Detection
       import('../services/ai').then(({ processAITag }) => {
@@ -186,11 +181,35 @@ const RoomChat = () => {
       });
     });
 
-    return () => {
-      unsubRoom();
-      unsubMessages();
-    };
-  }, [roomId, currentUser]);
+    const unsubRoom = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setRoom(data);
+        const typingData = data.typing || {};
+        const typingList = Object.entries(typingData)
+          .filter(([uid, typing]) => typing && uid !== currentUser.uid)
+          .map(([uid]) => uid);
+        setTypingUsers(typingList);
+      } else {
+        showToast('Room not found');
+        navigate('/rooms');
+      }
+    });
+
+    return () => { unsub(); unsubRoom(); };
+  }, [roomId, currentUser?.uid]);
+
+  /* typing indicator */
+  const typingTimer = useRef(null);
+  const handleTyping = (val) => {
+    setText(val);
+    if (!val.trim()) return;
+    clearTimeout(typingTimer.current);
+    updateDoc(doc(db, 'rooms', roomId), { [`typing.${currentUser.uid}`]: true }).catch(() => {});
+    typingTimer.current = setTimeout(() => {
+      updateDoc(doc(db, 'rooms', roomId), { [`typing.${currentUser.uid}`]: false }).catch(() => {});
+    }, 2000);
+  };
 
   const pinnedMessages = messages.filter(m => m.isPinned);
 
@@ -311,7 +330,7 @@ const RoomChat = () => {
       const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notifications');
       await sendNotification(uid, {
         title: 'Room Invitation',
-        body: `You've been invited to join ${roomData?.name || 'a room'}.`,
+        body: `You've been invited to join ${room?.name || 'a room'}.`,
         type: NOTIFICATION_TYPES.ROOM_INVITE,
         roomId: roomId
       });
@@ -327,9 +346,9 @@ const RoomChat = () => {
       <AnimatePresence>
         {showMembers && (
           <MemberManagementSheet 
-            members={roomData?.members || []}
+            members={room?.members || []}
             profiles={memberProfiles}
-            roomData={roomData}
+            roomData={room}
             currentUser={currentUser}
             onRemove={handleRemoveMember}
             onInvite={handleInviteMember}
@@ -350,13 +369,13 @@ const RoomChat = () => {
           </motion.button>
           <div onClick={() => setShowMembers(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
             <div style={{ position: 'relative' }}>
-               <img src={roomData?.iconURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${roomId}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', objectFit: 'cover' }} />
+               <img src={room?.iconURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${roomId}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', objectFit: 'cover' }} />
                 {inVoice && <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, background: '#10b981', border: '2px solid #000', borderRadius: '50%' }} />}
             </div>
             <div className="col">
-              <span style={{ fontWeight: 800, fontSize: 14 }}>{roomData?.name || 'Loading...'}</span>
+              <span style={{ fontWeight: 800, fontSize: 14 }}>{room?.name || 'Loading...'}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{roomData?.members?.length || 0} MEMBERS</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{room?.members?.length || 0} MEMBERS</span>
                 {pinnedMessages.length > 0 && (
                   <div onClick={(e) => { e.stopPropagation(); setShowPins(true); }} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,223,216,0.1)', padding: '2px 6px', borderRadius: 10, cursor: 'pointer' }}>
                     <Pin size={8} color="var(--primary)" />
@@ -493,7 +512,6 @@ const RoomChat = () => {
         })}
 
         <AnimatePresence>
-          {showPins && <PinnedMessagesSheet pins={pinnedMessages} onClose={() => setShowPins(false)} />}
           {activeMenu && (
             <>
               <div onClick={() => setActiveMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
@@ -547,53 +565,52 @@ const RoomChat = () => {
             <button className="icon-btn" onClick={() => setShowGifs(false)}>✕</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-            {MOCK_GIFS.map((g, i) => (
+            {TRENDING_GIFS.map((g, i) => (
               <img key={i} src={g} alt="" style={{ width: '100%', borderRadius: '8px', cursor: 'pointer' }} onClick={() => handleGifSelect(g)} />
             ))}
           </div>
         </div>
       )}
 
-      {/* AI Smart Replies */}
-      {messages.length > 0 && !text.trim() && !isUploading && (
-        <div className="row gap-2 px-2 pb-2 fade-in" style={{ overflowX: 'auto', whiteSpace: 'nowrap', zIndex: 10 }}>
-          <span className="text-xs text-primary font-bold flex-center ml-1 mr-1"><Sparkles size={14} /></span>
-          {SMART_REPLIES.map((reply, i) => (
-            <button
-              key={i}
-              onClick={() => setText(reply)}
-              className="ripple"
-              style={{ padding: '6px 12px', borderRadius: '16px', background: 'rgba(0, 223, 216, 0.1)', border: '1px solid rgba(0,223,216,0.3)', color: 'var(--primary)', fontSize: '11px', whiteSpace: 'nowrap' }}
-            >
-              {reply}
+      {/* Composer Container */}
+      <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)' }}>
+        {typingUsers.length > 0 && (
+          <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="typing-dots"><span></span><span></span><span></span></div>
+            Someone is typing...
+          </div>
+        )}
+
+        {/* Smart replies */}
+        {!text.trim() && messages.length > 0 && (
+          <div style={{ overflowX: 'auto', display: 'flex', gap: 8, padding: '8px 12px', flexShrink: 0 }}>
+            {["Awesome!", "Count me in!", "Nice work!", "Let's go!", "🔥"].map((r, i) => (
+              <button key={i} onClick={() => setText(r)}
+                style={{ whiteSpace: 'nowrap', padding: '6px 14px', borderRadius: 20, background: 'rgba(0,223,216,0.08)', border: '1px solid rgba(0,223,216,0.25)', color: 'var(--primary)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+              >{r}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Composer */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 8px))', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+          <button onClick={() => setShowGifs(!showGifs)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--text-muted)' }}><Smile size={20} /></button>
+          <label style={{ cursor: 'pointer', padding: 6, color: 'var(--text-muted)', display: 'flex' }}>
+            <Paperclip size={20} />
+            <input type="file" hidden onChange={handleFileUpload} accept="image/*,video/*,.pdf,.doc,.docx,.txt" />
+          </label>
+          <input
+            type="text"
+            placeholder="Message..."
+            value={text}
+            onChange={e => handleTyping(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 14px', borderRadius: 22, color: 'white', outline: 'none', fontSize: 14 }}
+          />
+          {text.trim() || isSending ? (
+            <button onClick={handleSend} disabled={isSending} style={{ background: 'var(--primary)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'black' }}>
+              <Send size={16} />
             </button>
-          ))}
-        </div>
-      )}
-
-      {/* Composer */}
-      <div className="glass-panel row align-center p-2" style={{ borderBottom: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0, paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 20px))', zIndex: 10 }}>
-        <button className="icon-btn" onClick={() => showToast('More actions disabled in beta')}><Plus size={20} className="text-muted" /></button>
-        <button className="icon-btn" onClick={() => setShowGifs(!showGifs)}><Smile size={20} className="text-muted" /></button>
-
-        <label className="icon-btn" style={{ cursor: 'pointer', margin: 0 }}>
-          <Paperclip size={20} className="text-muted" />
-          <input type="file" hidden onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.txt" />
-        </label>
-
-        <input
-          type="text"
-          placeholder="Message room..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: 'none', padding: '10px 16px', borderRadius: 'var(--radius-full)', color: 'white', outline: 'none', marginLeft: '4px', marginRight: '4px' }}
-        />
-
-        {text.trim() || isSending ? (
-          <button className="icon-btn ripple" onClick={handleSend} disabled={isSending} style={{ background: 'var(--gradient-primary)', color: 'white', opacity: isSending ? 0.5 : 1 }}>
-            <Send size={18} style={{ marginLeft: '-2px' }} />
-          </button>
         ) : (
           <button className="icon-btn" onClick={() => showToast('Voice notes disabled in beta')}>
             <Mic size={20} className="text-muted" />

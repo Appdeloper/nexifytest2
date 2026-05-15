@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import { 
   collection, doc, setDoc, updateDoc, 
-  onSnapshot, query, where, orderBy, serverTimestamp, getDocs, deleteField, arrayUnion, arrayRemove
+  onSnapshot, query, where, orderBy, serverTimestamp, getDoc, deleteField, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { uploadToCloudinary } from './cloudinary';
 import { compressImage } from './chat';

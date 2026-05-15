@@ -14,6 +14,9 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("Nexify Error Boundary:", error, errorInfo);
+    // Remove static splash screen if it's still there
+    const splash = document.getElementById('splash');
+    if (splash) splash.remove();
   }
 
   render() {
@@ -53,7 +56,7 @@ class ErrorBoundary extends React.Component {
               <RefreshCw size={18} /> Reload Application
             </button>
             <button 
-              onClick={() => window.location.href = '/'}
+              onClick={() => window.location.href = '#/home'}
               style={{ 
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', 
                 borderRadius: 14, padding: '16px', color: 'white', fontWeight: 700, 

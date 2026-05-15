@@ -3,6 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ensureUserProfile } from '../services/auth';
+import { ensureAIUser } from '../services/users';
 
 const AuthContext = createContext();
 
@@ -21,8 +22,9 @@ export const AuthProvider = ({ children }) => {
         // Ensure profile exists before subscribing or updating status
         try {
           await ensureUserProfile(user);
+          await ensureAIUser().catch(() => {});
         } catch (e) {
-          console.error("Failed to ensure user profile:", e);
+          console.error("Auth Setup Error:", e);
         }
 
         // Subscribe to full Firestore profile for live role/rank/xp updates
@@ -131,7 +133,7 @@ export const AuthProvider = ({ children }) => {
         gap: '20px'
       }}>
         <img 
-          src="logo.png" 
+          src={`${import.meta.env.BASE_URL}logo.png`} 
           alt="Nexify" 
           style={{ 
             width: 80, 

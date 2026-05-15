@@ -1,6 +1,6 @@
 import { db } from './firebase';
 import { 
-  collection, doc, setDoc, updateDoc, 
+  collection, doc, setDoc, updateDoc, getDoc,
   serverTimestamp, onSnapshot, query, orderBy, limit 
 } from 'firebase/firestore';
 import { handleAIMention } from './gemini';
@@ -12,16 +12,36 @@ export const processAITag = async (chatId, isRoom = false, messages = []) => {
   if (!lastMsg || lastMsg.senderId === AI_UID) return;
 
   const text = lastMsg.text || '';
-  if (text.toLowerCase().includes('@nexifyai')) {
-    // Show typing status (simulated by not sending immediately)
-    // In a real app, you'd have a 'typing' collection
-    
+  const isTagged = text.toLowerCase().includes('@nexifyai');
+  
+  if (isTagged) {
+    // ── PROD NOTE: Move this to Firebase Cloud Functions ──
+    // This logic should be triggered by a Firestore onCreate trigger 
+    // to keep API keys secure and prevent client-side manipulation.
+
+    const parentRef = doc(db, isRoom ? 'rooms' : 'chats', chatId);
+    const parentSnap = await getDoc(parentRef);
+    if (!parentSnap.exists()) return;
+    const parentData = parentSnap.data();
+
+    // AI Cooldown Check (e.g., once every 3 seconds per chat)
+    const now = Date.now();
+    const lastAIAt = parentData.lastAIPulse?.toMillis() || 0;
+    if (now - lastAIAt < 3000) return;
+
     try {
+      // Mark AI as typing in the parent doc
+      await updateDoc(parentRef, { 
+        [`typing.${AI_UID}`]: true,
+        lastAIPulse: serverTimestamp() 
+      });
+
       const history = messages.slice(-10).map(m => ({
         sender: m.senderId === AI_UID ? 'ai' : 'user',
         text: m.text
       }));
 
+      // Injects AI Personality Context
       const response = await handleAIMention(text, history);
       
       const targetPath = isRoom ? `rooms/${chatId}/messages` : `chats/${chatId}/messages`;
@@ -38,16 +58,17 @@ export const processAITag = async (chatId, isRoom = false, messages = []) => {
         isAI: true
       });
 
-      // Update last message
-      const parentRef = doc(db, isRoom ? 'rooms' : 'chats', chatId);
+      // Update parent last message and clear typing
       await updateDoc(parentRef, {
         lastMessage: response,
         lastMessageAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        [`typing.${AI_UID}`]: false
       });
 
     } catch (error) {
       console.error("AI Reply Error:", error);
+      await updateDoc(parentRef, { [`typing.${AI_UID}`]: false }).catch(() => {});
     }
   }
 };

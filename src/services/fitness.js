@@ -29,10 +29,10 @@ export const subscribeFitnessData = (uid, callback) => {
     if (docSnap.exists()) {
       callback(docSnap.data());
     } else {
-      initializeFitnessData(uid).then(() => {
-        // Will trigger next snapshot
-      });
+      initializeFitnessData(uid).then(() => {});
     }
+  }, (err) => {
+    console.warn("Fitness data subscription failed:", err);
   });
 };
 

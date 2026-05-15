@@ -53,8 +53,8 @@ export const useAIEngine = () => {
         createdAt: serverTimestamp(),
         read: false
       });
-    } catch (e) {
-      console.error("AI Proactive Save Error:", e);
+    } catch (err) {
+      console.error("AI Proactive Save Error:", err);
     }
   };
 };

@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import { 
   collection, doc, setDoc, updateDoc, 
-  onSnapshot, query, where, orderBy, serverTimestamp, getDocs, addDoc
+  onSnapshot, query, where, serverTimestamp, addDoc
 } from 'firebase/firestore';
 
 export const createCallDocument = async (callerId, receiverId, type) => {

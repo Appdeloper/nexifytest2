@@ -63,3 +63,12 @@ export const saveUserPrefs = async (uid, prefs) => {
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, { prefs, updatedAt: serverTimestamp() });
 };
+
+export const setProfileAnthem = async (uid, anthemData) => {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    anthem: anthemData,
+    updatedAt: serverTimestamp()
+  });
+};
+

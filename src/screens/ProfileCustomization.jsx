@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Palette, Image as ImageIcon, Sparkles, 
-  Check, Shield, Zap, Star, Trophy, Camera
+  Check, Shield, Zap, Star, Trophy, Camera, Music
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
-import { updateUserProfile, uploadBanner, uploadAvatar } from '../services/profile';
+import { updateUserProfile, uploadBanner, uploadAvatar, setProfileAnthem } from '../services/profile';
 
 const THEMES = [
   { id: 'default', name: 'Nexify Dark', primary: '#00dfd8', gradient: 'linear-gradient(135deg, #050a1a, #000)' },
@@ -192,6 +192,29 @@ const ProfileCustomization = () => {
                 {selectedTheme === theme.id && <Check size={18} color={theme.primary} />}
               </motion.button>
             ))}
+          </div>
+        </div>
+
+        {/* Profile Anthem Section */}
+        <div style={{ marginBottom: 32 }}>
+          <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1, display: 'block', marginBottom: 12 }}>PROFILE ANTHEM</span>
+          <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.05)', padding: 16 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+               <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(30,215,96,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 <Music size={18} color="#1db954" />
+               </div>
+               <div>
+                 <div style={{ fontSize: 13, fontWeight: 700 }}>Profile Music</div>
+                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Paste a Spotify or YouTube link</div>
+               </div>
+            </div>
+            <input 
+              type="text" 
+              placeholder="https://open.spotify.com/track/..."
+              value={currentUser?.anthem?.url || ''}
+              onChange={(e) => setProfileAnthem(currentUser.uid, { url: e.target.value, type: 'spotify' })}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', padding: '12px', borderRadius: '12px', color: 'white', outline: 'none', fontSize: 13 }}
+            />
           </div>
         </div>
 

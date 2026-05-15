@@ -1,13 +1,11 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ToastProvider } from './components/ToastProvider';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { CallProvider } from './components/CallProvider';
 import { FitnessProvider } from './hooks/useFitness';
 import AppShell from './components/AppShell';
-
-
 
 import Splash from './screens/Splash';
 import Login from './screens/Login';
@@ -35,6 +33,8 @@ const Leaderboards = React.lazy(() => import('./screens/Leaderboards'));
 const Tasks = React.lazy(() => import('./screens/Tasks'));
 const AdminPanel = React.lazy(() => import('./screens/AdminPanel'));
 const NexifyWaves = React.lazy(() => import('./screens/NexifyWaves'));
+const ProfileCustomization = React.lazy(() => import('./screens/ProfileCustomization'));
+const Notifications = React.lazy(() => import('./screens/Notifications'));
 
 const LoadingFallback = () => (
   <div style={{ height: '100dvh', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#000' }}>
@@ -59,15 +59,11 @@ const AuthRoute = ({ children }) => {
   return children;
 };
 
-const ProfileCustomization = React.lazy(() => import('./screens/ProfileCustomization'));
-const Notifications = React.lazy(() => import('./screens/Notifications'));
-
-import { ensureAIUser } from './services/users';
+// import { ensureAIUser } from './services/users'; // Removed from here
 import { subscribeSystemConfig } from './services/xp';
-
 import { NotificationProvider } from './components/NotificationProvider';
 
-const App = () => {
+const AppContent = () => {
   useEffect(() => {
     const splash = document.getElementById('splash');
     if (splash) {
@@ -76,57 +72,62 @@ const App = () => {
     }
 
     const unsubSystem = subscribeSystemConfig();
-    ensureAIUser().catch(console.error);
     return () => { if (unsubSystem) unsubSystem(); };
   }, []);
 
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Splash />} />
+        <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
+        <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
+
+        <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+          <Route path="/home" element={<React.Suspense fallback={<LoadingFallback />}><Home /></React.Suspense>} />
+          <Route path="/chats" element={<React.Suspense fallback={<LoadingFallback />}><Chats /></React.Suspense>} />
+          <Route path="/chat-conversation/:chatId" element={<React.Suspense fallback={<LoadingFallback />}><ChatConversation /></React.Suspense>} />
+          <Route path="/calls" element={<React.Suspense fallback={<LoadingFallback />}><Calls /></React.Suspense>} />
+          <Route path="/rooms" element={<React.Suspense fallback={<LoadingFallback />}><Rooms /></React.Suspense>} />
+          <Route path="/create-room" element={<React.Suspense fallback={<LoadingFallback />}><CreateRoom /></React.Suspense>} />
+          <Route path="/room-chat/:roomId" element={<React.Suspense fallback={<LoadingFallback />}><RoomChat /></React.Suspense>} />
+          <Route path="/focus-pods" element={<React.Suspense fallback={<LoadingFallback />}><FocusPods /></React.Suspense>} />
+          <Route path="/nexify-fit" element={<React.Suspense fallback={<LoadingFallback />}><NexifyFit /></React.Suspense>} />
+          <Route path="/nexify-edge" element={<React.Suspense fallback={<LoadingFallback />}><NexifyEdge /></React.Suspense>} />
+          <Route path="/nexify-ai" element={<React.Suspense fallback={<LoadingFallback />}><NexifyAI /></React.Suspense>} />
+          <Route path="/global-search" element={<React.Suspense fallback={<LoadingFallback />}><GlobalSearch /></React.Suspense>} />
+          <Route path="/profile" element={<React.Suspense fallback={<LoadingFallback />}><Profile /></React.Suspense>} />
+          <Route path="/profile-customization" element={<React.Suspense fallback={<LoadingFallback />}><ProfileCustomization /></React.Suspense>} />
+          <Route path="/settings" element={<React.Suspense fallback={<LoadingFallback />}><Settings /></React.Suspense>} />
+          <Route path="/settings/:type" element={<React.Suspense fallback={<LoadingFallback />}><SettingsDetail /></React.Suspense>} />
+          <Route path="/appearance" element={<React.Suspense fallback={<LoadingFallback />}><Appearance /></React.Suspense>} />
+          <Route path="/friends" element={<React.Suspense fallback={<LoadingFallback />}><Friends /></React.Suspense>} />
+          <Route path="/leaderboards" element={<React.Suspense fallback={<LoadingFallback />}><Leaderboards /></React.Suspense>} />
+          <Route path="/tasks" element={<React.Suspense fallback={<LoadingFallback />}><Tasks /></React.Suspense>} />
+          <Route path="/admin" element={<React.Suspense fallback={<LoadingFallback />}><AdminPanel /></React.Suspense>} />
+          <Route path="/nexify-waves" element={<React.Suspense fallback={<LoadingFallback />}><NexifyWaves /></React.Suspense>} />
+          <Route path="/notifications" element={<React.Suspense fallback={<LoadingFallback />}><Notifications /></React.Suspense>} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Route>
+      </Routes>
+    </Router>
+  );
+};
+
+const App = () => {
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <ThemeProvider>
           <NotificationProvider>
             <FitnessProvider>
               <CallProvider>
-                <Router>
-                  <Routes>
-                    <Route path="/" element={<Splash />} />
-                    <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
-                    <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
-
-                    <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-                      <Route path="/home" element={<React.Suspense fallback={<LoadingFallback />}><Home /></React.Suspense>} />
-                      <Route path="/chats" element={<React.Suspense fallback={<LoadingFallback />}><Chats /></React.Suspense>} />
-                      <Route path="/chat-conversation/:chatId" element={<React.Suspense fallback={<LoadingFallback />}><ChatConversation /></React.Suspense>} />
-                      <Route path="/calls" element={<React.Suspense fallback={<LoadingFallback />}><Calls /></React.Suspense>} />
-                      <Route path="/rooms" element={<React.Suspense fallback={<LoadingFallback />}><Rooms /></React.Suspense>} />
-                      <Route path="/create-room" element={<React.Suspense fallback={<LoadingFallback />}><CreateRoom /></React.Suspense>} />
-                      <Route path="/room-chat/:roomId" element={<React.Suspense fallback={<LoadingFallback />}><RoomChat /></React.Suspense>} />
-                      <Route path="/focus-pods" element={<React.Suspense fallback={<LoadingFallback />}><FocusPods /></React.Suspense>} />
-                      <Route path="/nexify-fit" element={<React.Suspense fallback={<LoadingFallback />}><NexifyFit /></React.Suspense>} />
-                      <Route path="/nexify-edge" element={<React.Suspense fallback={<LoadingFallback />}><NexifyEdge /></React.Suspense>} />
-                      <Route path="/nexify-ai" element={<React.Suspense fallback={<LoadingFallback />}><NexifyAI /></React.Suspense>} />
-                      <Route path="/global-search" element={<React.Suspense fallback={<LoadingFallback />}><GlobalSearch /></React.Suspense>} />
-                      <Route path="/profile" element={<React.Suspense fallback={<LoadingFallback />}><Profile /></React.Suspense>} />
-                      <Route path="/profile-customization" element={<React.Suspense fallback={<LoadingFallback />}><ProfileCustomization /></React.Suspense>} />
-                      <Route path="/settings" element={<React.Suspense fallback={<LoadingFallback />}><Settings /></React.Suspense>} />
-                      <Route path="/settings/:type" element={<React.Suspense fallback={<LoadingFallback />}><SettingsDetail /></React.Suspense>} />
-                      <Route path="/appearance" element={<React.Suspense fallback={<LoadingFallback />}><Appearance /></React.Suspense>} />
-                      <Route path="/friends" element={<React.Suspense fallback={<LoadingFallback />}><Friends /></React.Suspense>} />
-                      <Route path="/leaderboards" element={<React.Suspense fallback={<LoadingFallback />}><Leaderboards /></React.Suspense>} />
-                      <Route path="/tasks" element={<React.Suspense fallback={<LoadingFallback />}><Tasks /></React.Suspense>} />
-                      <Route path="/admin" element={<React.Suspense fallback={<LoadingFallback />}><AdminPanel /></React.Suspense>} />
-                      <Route path="/nexify-waves" element={<React.Suspense fallback={<LoadingFallback />}><NexifyWaves /></React.Suspense>} />
-                      <Route path="/notifications" element={<React.Suspense fallback={<LoadingFallback />}><Notifications /></React.Suspense>} />
-                      <Route path="*" element={<Navigate to="/home" replace />} />
-                    </Route>
-                  </Routes>
-                </Router>
+                <AppContent />
               </CallProvider>
             </FitnessProvider>
           </NotificationProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+        </ThemeProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 };
 

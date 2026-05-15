@@ -25,6 +25,9 @@ export const subscribeFocusData = (uid, callback) => {
     } else {
       initializeFocusData(uid);
     }
+  }, (err) => {
+    console.warn("Focus data subscription failed:", err);
+    callback({ focusMinutes: 0 });
   });
 };
 
@@ -50,7 +53,7 @@ export const updateFocusStats = async (uid, minutes) => {
   await setDoc(lbRef, { focusMinutes: totalFocus, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
 
   // Award XP
-  import('./xp').then(({ addXP }) => addXP(uid, 'focusSession')).catch(() => {});
+  import('./xp').then(({ addXP }) => addXP(uid, 'finishFocusSession')).catch(() => {});
 };
 
 export const createFocusPod = async (uid, data) => {

@@ -95,6 +95,9 @@ export const subscribeIncomingRequests = (uid, callback) => {
   );
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.warn("Incoming requests subscription failed:", err);
+    callback([]);
   });
 };
 
@@ -107,6 +110,9 @@ export const subscribeSentRequests = (uid, callback) => {
   );
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.warn("Sent requests subscription failed:", err);
+    callback([]);
   });
 };
 
@@ -149,4 +155,12 @@ export const searchUsers = async (queryText, currentUid) => {
     .filter(u => u.uid !== currentUid &&
       (u.displayName?.toLowerCase().includes(lower) ||
        u.email?.toLowerCase().includes(lower)));
+};
+// ── Get all users (demo-friendly version) ─────────────────────
+export const getAllUsers = async (currentUid) => {
+  const q = query(collection(db, 'users'), limit(100));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map(d => d.data())
+    .filter(u => u.uid !== currentUid);
 };

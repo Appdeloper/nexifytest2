@@ -1,16 +1,30 @@
-# React + Vite
+# Nexify Connect — Beta Launch Ready 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Nexify Connect is a next-generation social productivity ecosystem built for elite performers. It combines real-time communication, fitness tracking, and AI-driven insights into a premium mobile experience.
 
-Currently, two official plugins are available:
+## ✨ Core Features (Beta v1.0)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Real-Time Social**: Discord-style rooms and private chats with message threading, reactions, and pinning.
+- **Neural Uplink (AI)**: Integrated Gemini 1.5 Pro AI for summarizing chats, suggesting workouts, and focus coaching.
+- **The Arena (Leaderboards)**: Global XP rankings, step-count tracking, and focus streaks.
+- **Nexify Fit**: Automated fitness tracking with step goals, hydration logs, and workout routines.
+- **Nexify Waves**: Immersive focus pods with synchronized music and ambient sounds (Rain, Cyber Cafe, Night City).
+- **Nexify Edge**: AI-summarized global news and student-centric updates to keep you ahead.
+- **Cyber-Premium UI**: Fully responsive, mobile-first design with multiple themes (Cyber Blue, Neon Purple, Matrix).
 
-## React Compiler
+## 🛠️ Technology Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React + Vite + Framer Motion (Animations)
+- **Backend**: Firebase (Firestore, Auth, Storage)
+- **AI**: Google Gemini Pro (Neural Core)
+- **Styling**: Vanilla CSS (Cyber-Premium Design System)
 
-## Expanding the ESLint configuration
+## 🚀 Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Clone the repository.
+2. Install dependencies: `npm install`
+3. Configure `.env` with your Firebase and Gemini API keys.
+4. Run development server: `npm run dev`
+
+---
+**Status**: Production-Ready Beta. All mock data has been migrated to real-time Firestore listeners.

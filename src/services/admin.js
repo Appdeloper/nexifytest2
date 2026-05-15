@@ -2,8 +2,8 @@
 import { db } from './firebase';
 import {
   doc, getDoc, updateDoc, setDoc, addDoc,
-  collection, serverTimestamp, increment, onSnapshot,
-  query, orderBy, limit, where
+  collection, serverTimestamp, onSnapshot,
+  query, orderBy, limit
 } from 'firebase/firestore';
 import { RANKS, ROLES, XP_REWARDS, calculateRankFromXP, syncLeaderboard, addXP } from './xp';
 

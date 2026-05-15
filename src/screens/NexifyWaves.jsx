@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
 import Header from '../components/Header';
-import { MOCK_TRACKS, AMBIENCE_SOUNDS, subscribeMusicRooms } from '../services/waves';
+import { FEATURED_TRACKS, AMBIENCE_SOUNDS, subscribeMusicRooms } from '../services/waves';
 
 const Waveform = ({ active }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 20 }}>
@@ -32,7 +32,7 @@ const NexifyWaves = () => {
   const { showToast } = useToast();
 
   const [rooms, setRooms] = useState([]);
-  const [currentTrack, setCurrentTrack] = useState(MOCK_TRACKS[0]);
+  const [currentTrack, setCurrentTrack] = useState(FEATURED_TRACKS[0]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeAmbience, setActiveAmbience] = useState([]);
   const [showPlayer, setShowPlayer] = useState(false);
@@ -188,7 +188,7 @@ const NexifyWaves = () => {
         <div style={{ padding: '0 16px 32px' }}>
           <h3 style={{ fontSize: 16, fontWeight: 900, marginBottom: 16 }}>FEATURED WAVES</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {MOCK_TRACKS.map((track) => (
+            {FEATURED_TRACKS.map((track) => (
               <motion.div
                 key={track.id}
                 whileTap={{ scale: 0.98 }}

@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import { 
   collection, doc, setDoc, updateDoc, onSnapshot, 
-  query, where, orderBy, limit, serverTimestamp, 
+  query, orderBy, serverTimestamp, 
   increment, arrayUnion, addDoc
 } from 'firebase/firestore';
 
@@ -13,6 +13,9 @@ export const subscribeMusicRooms = (callback) => {
   const q = query(collection(db, 'musicRooms'), orderBy('activeListeners', 'desc'));
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.warn("Music rooms subscription failed:", err);
+    callback([]);
   });
 };
 
@@ -37,9 +40,12 @@ export const updateNowPlaying = async (uid, songData) => {
 
 export const subscribeUserMusicStatus = (uid, callback) => {
   if (!uid) return () => {};
-  return onSnapshot(doc(db, 'userMusicStatus', uid), doc => {
-    if (doc.exists()) callback(doc.data());
+  return onSnapshot(doc(db, 'userMusicStatus', uid), docSnap => {
+    if (docSnap.exists()) callback(docSnap.data());
     else callback(null);
+  }, (err) => {
+    console.warn("User music status subscription failed:", err);
+    callback(null);
   });
 };
 
@@ -51,7 +57,7 @@ export const joinMusicRoom = async (roomId, uid) => {
   });
 };
 
-export const leaveMusicRoom = async (roomId, uid) => {
+export const leaveMusicRoom = async (roomId) => {
   const roomRef = doc(db, 'musicRooms', roomId);
   await updateDoc(roomRef, {
     activeListeners: increment(-1)
@@ -66,7 +72,7 @@ export const AMBIENCE_SOUNDS = [
   { id: 'keyboard', label: 'Mechanical Keyboard', icon: '⌨️', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
 ];
 
-export const MOCK_TRACKS = [
+export const FEATURED_TRACKS = [
   { id: 't1', title: 'Midnight Signals', artist: 'DZ', cover: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300', duration: '3:45', mood: 'night', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
   { id: 't2', title: 'Neon Dreams', artist: 'Cyberspace', cover: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300', duration: '4:20', mood: 'chill', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
   { id: 't3', title: 'Focus Flow', artist: 'Nexify Records', cover: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=300', duration: '2:30', mood: 'focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },

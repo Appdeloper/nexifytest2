@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import {
   collection, doc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, where, orderBy, serverTimestamp, getDoc
+  onSnapshot, query, orderBy, serverTimestamp, getDoc
 } from 'firebase/firestore';
 
 export const TASK_TYPES = {

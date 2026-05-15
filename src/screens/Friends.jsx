@@ -10,7 +10,7 @@ import {
   searchUsers, sendFriendRequest, cancelFriendRequest,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   subscribeIncomingRequests, subscribeSentRequests, subscribeFriends,
-  getFriendshipStatus,
+  getFriendshipStatus, getAllUsers
 } from '../services/friends';
 import { getUserData } from '../services/users';
 import { createOrGetDMChat } from '../services/chat';

@@ -17,12 +17,13 @@ import { doc, getDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/fi
 import { db } from '../services/firebase';
 import { useCall } from '../components/CallProvider';
 import { RoleBadge, RankBadge } from '../components/Badges';
+import PresenceIndicator from '../components/PresenceIndicator';
 
-const MOCK_GIFS = [
-  "https://media.giphy.com/media/VbnUQpnihPSIgIXuZv/giphy.gif",
-  "https://media.giphy.com/media/3o7aD2saalEvTehEXm/giphy.gif",
-  "https://media.giphy.com/media/l41YkxvU8c7J7Bba0/giphy.gif",
-  "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",
+const TRENDING_GIFS = [
+  "https://media.tenor.com/yS7a4vB8HkUAAAAM/thumbs-up-gold.gif",
+  "https://media.tenor.com/X_S8HqB-0nQAAAAM/let-go.gif",
+  "https://media.tenor.com/mO_eLpG0fSAAAAAM/excited-party.gif",
+  "https://media.tenor.com/5O8qR_2f8kMAAAAM/congratulations-congrats.gif",
 ];
 const SMART_REPLIES = ["Got it! 👍", "Sounds good!", "On my way!", "Can we talk later?"];
 const REACTIONS = ['👍','❤️','😂','😮','😢','🔥'];
@@ -476,7 +477,7 @@ const ChatConversation = () => {
             <button onClick={() => setShowGifs(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {MOCK_GIFS.map((g, i) => (
+            {TRENDING_GIFS.map((g, i) => (
               <img key={i} src={g} alt="" style={{ width: '100%', borderRadius: 8, cursor: 'pointer', maxHeight: 100, objectFit: 'cover' }} onClick={() => handleGifSelect(g)} />
             ))}
           </div>

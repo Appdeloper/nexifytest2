@@ -4,6 +4,8 @@ import GradientButton from '../components/GradientButton';
 import GlassCard from '../components/GlassCard';
 import { loginUser, loginWithGoogle } from '../services/auth';
 import { useToast } from '../components/ToastProvider';
+import { auth } from '../services/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -42,6 +44,21 @@ const Login = () => {
       setLoading(false);
     }
   };
+  const handleForgotPassword = async () => {
+    if (!email) {
+      showToast('Please enter your email address first.');
+      return;
+    }
+    try {
+      setLoading(true);
+      await sendPasswordResetEmail(auth, email);
+      showToast('Password reset email sent! Check your inbox.');
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="col p-4 flex-center fade-in slide-up" style={{ height: '100dvh', position: 'relative' }}>
@@ -73,9 +90,12 @@ const Login = () => {
               className="w-full" 
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-glass)', padding: '14px', borderRadius: '12px', color: 'white', outline: 'none' }} 
             />
-            <button type="submit" disabled={loading} className="ripple mt-2" style={{ width: '100%', background: 'var(--primary-gradient)', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px' }}>
-              {loading ? 'Signing in...' : 'Continue with Email'}
+            <button type="submit" disabled={loading} className="ripple mt-2" style={{ width: '100%', background: 'var(--primary-gradient)', color: 'black', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '900', fontSize: '14px', textTransform: 'uppercase', letterSpacing: 1 }}>
+              {loading ? 'Signing in...' : 'Continue'}
             </button>
+            <div style={{ textAlign: 'right', marginTop: 4 }}>
+              <span onClick={handleForgotPassword} style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>Forgot password?</span>
+            </div>
           </form>
 
           <div className="flex-center mb-4 text-muted text-xs" style={{ position: 'relative' }}>

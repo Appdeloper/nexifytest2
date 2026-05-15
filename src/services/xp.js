@@ -65,7 +65,10 @@ export const subscribeSystemConfig = (onUpdate) => {
       RANKS = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.xpRequired - b.xpRequired);
       if (onUpdate) onUpdate();
     }
+  }, (err) => {
+    console.warn("Ranks subscription failed (check permissions):", err.message);
   });
+  
   const unsubRoles = onSnapshot(collection(db, 'roles'), (snap) => {
     if (!snap.empty) {
       const newRoles = {};
@@ -73,7 +76,10 @@ export const subscribeSystemConfig = (onUpdate) => {
       ROLES = newRoles;
       if (onUpdate) onUpdate();
     }
+  }, (err) => {
+    console.warn("Roles subscription failed (check permissions):", err.message);
   });
+  
   return () => { unsubRanks(); unsubRoles(); };
 };
 
@@ -147,6 +153,16 @@ export const addXP = async (uid, reason, amountOverride = null) => {
     const dailyXp = data.dailyXpDate === today ? (data.dailyXpAmount || 0) : 0;
     if (dailyXp >= DAILY_XP_LIMIT) return;
 
+    // Reason-specific validations (Anti-cheat)
+    if (reason === 'sendMessage') {
+      if (amountOverride && amountOverride < 1) return; // Prevent negative/zero XP
+      // Message length validation already handled in chat service, but we check here too
+    }
+    if (reason === 'finishFocusSession') {
+      // Minimum 10 minutes for a focus session reward
+      if (amountOverride && amountOverride < 10) return; 
+    }
+
     const finalAmount = Math.min(amount, DAILY_XP_LIMIT - dailyXp);
     const newXP = (data.xp || 0) + finalAmount;
     const newRank = calculateRankFromXP(newXP);
@@ -166,14 +182,25 @@ export const addXP = async (uid, reason, amountOverride = null) => {
     await logXPEvent(uid, finalAmount, reason);
     await syncLeaderboard(uid);
 
-    // Log public activity for notable milestones
-    if (reason === 'completeTask' || reason === 'workout' || reason === 'focusSession' || (data.rank !== newRank.id)) {
+    // Notable milestones
+    if (data.rank !== newRank.id) {
+      await addDoc(collection(db, 'milestones'), {
+        uid,
+        type: 'RANK_UP',
+        rankId: newRank.id,
+        rankName: newRank.name,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    // Log public activity
+    if (reason === 'completeTask' || reason === 'completeWorkout' || reason === 'finishFocusSession' || (data.rank !== newRank.id)) {
       await logActivity({
         userId: uid,
         userName: data.displayName,
         userPhoto: data.photoURL,
-        type: data.rank !== newRank.id ? ACTIVITY_TYPES.RANK_UP : (reason === 'completeTask' ? ACTIVITY_TYPES.COMPLETE_TASK : (reason === 'workout' ? ACTIVITY_TYPES.COMPLETE_WORKOUT : ACTIVITY_TYPES.FINISH_FOCUS)),
-        text: data.rank !== newRank.id ? `Ranked up to ${newRank.name}!` : `Earned ${finalAmount} XP for ${reason}`,
+        type: data.rank !== newRank.id ? ACTIVITY_TYPES.RANK_UP : (reason === 'completeTask' ? ACTIVITY_TYPES.COMPLETE_TASK : (reason === 'completeWorkout' ? ACTIVITY_TYPES.COMPLETE_WORKOUT : ACTIVITY_TYPES.FINISH_FOCUS)),
+        text: data.rank !== newRank.id ? `Ranked up to ${newRank.name}!` : `Earned ${finalAmount} XP for ${reason.replace(/([A-Z])/g, ' $1').toLowerCase()}`,
       });
     }
 

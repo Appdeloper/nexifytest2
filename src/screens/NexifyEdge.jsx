@@ -182,7 +182,7 @@ const NexifyEdge = () => {
     <div className="fade-in col" style={{ height: '100%', position: 'relative' }}>
       <Header title="Nexify Edge" showBack={true} />
       
-      <div style={{ position: 'absolute', top: 16, right: 16, background: '#ff4444', color: 'white', fontSize: 10, fontWeight: 900, padding: '4px 8px', borderRadius: 8, letterSpacing: 1, zIndex: 100 }}>DEMO DATA</div>
+
       
       <div className="p-4" style={{ paddingBottom: '0' }}>
         <div className="row flex-between align-center mb-4">
