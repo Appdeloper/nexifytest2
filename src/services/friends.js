@@ -173,15 +173,30 @@ export const getAllUsers = async (currentUid) => {
     .filter(u => u.uid !== currentUid);
 };
 
-export const subscribeAllUsers = (currentUid, callback) => {
-  const q = query(collection(db, 'users'));
-  return onSnapshot(q, (snap) => {
+export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
+  if (!searchQuery || searchQuery.length < 1) {
+    callback([]);
+    return () => {};
+  }
+
+  const lower = searchQuery.toLowerCase();
+  const qName = query(
+    collection(db, 'users'),
+    where('displayName', '>=', searchQuery),
+    where('displayName', '<=', searchQuery + '\uf8ff'),
+    limit(20)
+  );
+
+  // Note: Firestore doesn't support OR queries across different fields easily with onSnapshot 
+  // and prefix matching without complex indexes. For now, we'll combine results.
+  
+  return onSnapshot(qName, (snap) => {
     const users = snap.docs
       .map(d => ({ uid: d.id, ...d.data() }))
       .filter(u => u.uid !== currentUid);
     callback(users);
   }, (err) => {
-    console.error("subscribeAllUsers error:", err);
+    console.error("subscribeSearchUsers error:", err);
     callback([]);
   });
 };

@@ -10,7 +10,7 @@ import {
   searchUsers, sendFriendRequest, cancelFriendRequest,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   subscribeIncomingRequests, subscribeSentRequests, subscribeFriends,
-  getFriendshipStatus, getAllUsers, subscribeAllUsers
+  getFriendshipStatus, getAllUsers, subscribeSearchUsers
 } from '../services/friends';
 import { getUserData } from '../services/users';
 import { createOrGetDMChat } from '../services/chat';
@@ -70,12 +70,10 @@ const Friends = () => {
     return 'none';
   }, [friends, incoming, sent]);
 
+  // No longer using global allUsers subscription for performance
   useEffect(() => {
-    if (currentUser) {
-      const unsub = subscribeAllUsers(currentUser.uid, setAllUsers);
-      return () => unsub();
-    }
-  }, [currentUser?.uid]);
+    // We fetch current results via subscribeSearchUsers effect below
+  }, []);
 
   /* subscriptions */
   useEffect(() => {
@@ -115,15 +113,16 @@ const Friends = () => {
   }, [currentUser?.uid]);
 
   /* search results */
-  const results = React.useMemo(() => {
-    if (!searchQ || searchQ.length < 1) return [];
-    const lower = searchQ.toLowerCase();
-    return allUsers.filter(u => 
-      u.displayName?.toLowerCase()?.includes(lower) || 
-      u.email?.toLowerCase()?.includes(lower) ||
-      u.username?.toLowerCase()?.includes(lower)
-    ).slice(0, 50);
-  }, [searchQ, allUsers]);
+  const [results, setResults] = useState([]);
+  
+  useEffect(() => {
+    if (!currentUser || tab !== 'Find' || !searchQ) {
+      setResults([]);
+      return;
+    }
+    const unsub = subscribeSearchUsers(searchQ, currentUser.uid, setResults);
+    return () => unsub();
+  }, [searchQ, tab, currentUser?.uid]);
 
   const withLoading = async (key, fn) => {
     setLoadingActions(p => ({ ...p, [key]: true }));
