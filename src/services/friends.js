@@ -98,11 +98,13 @@ export const removeFriend = async (uid1, uid2) => {
 export const subscribeIncomingRequests = (uid, callback) => {
   const q = query(
     collection(db, 'friendRequests'),
-    where('to', '==', uid),
-    where('status', '==', 'pending')
+    where('to', '==', uid)
   );
   return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(r => r.status === 'pending');
+    callback(list);
   }, (err) => {
     console.warn("Incoming requests subscription failed:", err);
     callback([]);
@@ -113,11 +115,13 @@ export const subscribeIncomingRequests = (uid, callback) => {
 export const subscribeSentRequests = (uid, callback) => {
   const q = query(
     collection(db, 'friendRequests'),
-    where('from', '==', uid),
-    where('status', '==', 'pending')
+    where('from', '==', uid)
   );
   return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(r => r.status === 'pending');
+    callback(list);
   }, (err) => {
     console.warn("Sent requests subscription failed:", err);
     callback([]);
@@ -128,7 +132,7 @@ export const subscribeSentRequests = (uid, callback) => {
 export const subscribeFriends = (uid, callback) => {
   const q = query(
     collection(db, 'friends'),
-    where(`userMap.${uid}`, '==', true)
+    where('users', 'array-contains', uid)
   );
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -136,7 +140,6 @@ export const subscribeFriends = (uid, callback) => {
     console.warn("Friends subscription failed:", err);
     callback([]);
   });
-
 };
 
 // ── Check friendship status ────────────────────────────────────
@@ -180,23 +183,47 @@ export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
   }
 
   const lower = searchQuery.toLowerCase();
+  
+  // We'll create two queries: one for name, one for email
   const qName = query(
     collection(db, 'users'),
-    where('displayName', '>=', searchQuery),
-    where('displayName', '<=', searchQuery + '\uf8ff'),
+    where('displayNameLower', '>=', lower),
+    where('displayNameLower', '<=', lower + '\uf8ff'),
     limit(20)
   );
 
-  // Note: Firestore doesn't support OR queries across different fields easily with onSnapshot 
-  // and prefix matching without complex indexes. For now, we'll combine results.
-  
-  return onSnapshot(qName, (snap) => {
-    const users = snap.docs
-      .map(d => ({ uid: d.id, ...d.data() }))
-      .filter(u => u.uid !== currentUid);
-    callback(users);
-  }, (err) => {
-    console.error("subscribeSearchUsers error:", err);
-    callback([]);
-  });
+  const qEmail = query(
+    collection(db, 'users'),
+    where('emailLower', '>=', lower),
+    where('emailLower', '<=', lower + '\uf8ff'),
+    limit(20)
+  );
+
+  // Since we can't easily merge two onSnapshot streams into one clean callback with deduplication
+  // without state management, we'll use a combined listener approach.
+  let resultsName = [];
+  let resultsEmail = [];
+
+  const update = () => {
+    const combined = [...resultsName];
+    resultsEmail.forEach(u => {
+      if (!combined.find(c => c.uid === u.uid)) combined.push(u);
+    });
+    callback(combined.filter(u => u.uid !== currentUid));
+  };
+
+  const unsubName = onSnapshot(qName, (snap) => {
+    resultsName = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    update();
+  }, (err) => console.error("Search name failed:", err));
+
+  const unsubEmail = onSnapshot(qEmail, (snap) => {
+    resultsEmail = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    update();
+  }, (err) => console.error("Search email failed:", err));
+
+  return () => {
+    unsubName();
+    unsubEmail();
+  };
 };

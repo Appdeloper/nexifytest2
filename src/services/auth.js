@@ -26,8 +26,10 @@ export const ensureUserProfile = async (user) => {
     const profileData = {
       uid: user.uid,
       displayName: user.displayName || 'Nexify Citizen',
+      displayNameLower: (user.displayName || 'Nexify Citizen').toLowerCase(),
       username: user.email.split('@')[0],
       email: user.email,
+      emailLower: user.email.toLowerCase(),
       photoURL: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
       bio: isOwner ? "Founder & Lead Architect of Nexify Connect" : "Hey, I'm using Nexify Connect",
       role: isOwner ? "owner" : "member",
