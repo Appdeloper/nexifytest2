@@ -20,7 +20,6 @@ const Leaderboards = () => {
   const [activeTab, setActiveTab] = useState('global');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -37,10 +36,7 @@ const Leaderboards = () => {
     return () => unsub();
   }, [activeTab]);
 
-  const filteredUsers = users.filter(u => 
-    u.displayName?.toLowerCase().includes(search.toLowerCase()) || 
-    u.username?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = users;
 
   const { currentUser } = useAuth();
   const userRank = users.findIndex(u => u.uid === currentUser?.uid) + 1;
@@ -108,25 +104,8 @@ const Leaderboards = () => {
           ))}
         </div>
 
-      {/* List Container */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-        {/* Search */}
-        <div style={{ 
-          background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: '12px 16px',
-          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20,
-          border: '1px solid rgba(255,255,255,0.08)'
-        }}>
-          <Search size={16} color="rgba(255,255,255,0.3)" />
-          <input 
-            placeholder="Search users..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ 
-              background: 'transparent', border: 'none', color: 'white', 
-              outline: 'none', fontSize: 14, flex: 1 
-            }} 
-          />
-        </div>
+        {/* List Container */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -142,69 +121,6 @@ const Leaderboards = () => {
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 24 }}>
-            {/* ── Legendary Podium ── */}
-            {filteredUsers.length >= 3 && search === '' && (
-              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, marginBottom: 40, paddingTop: 40 }}>
-                {/* 2nd Place */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                >
-                  <div style={{ position: 'relative', marginBottom: 12 }}>
-                    <img src={filteredUsers[1].photoURL || `https://api.dicebear.com/7.x/big-smile/svg?seed=${filteredUsers[1].uid}`} style={{ width: 64, height: 64, borderRadius: '50%', border: '3px solid #c0c0c0', boxShadow: '0 0 20px rgba(192,192,192,0.2)' }} />
-                    <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)' }}><Medal size={22} color="#c0c0c0" /></div>
-                  </div>
-                  <div style={{ background: 'rgba(192,192,192,0.1)', border: '1px solid rgba(192,192,192,0.2)', width: 85, height: 70, borderRadius: '20px 20px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(192,192,192,0.1), transparent)' }} />
-                    <span style={{ fontSize: 32, fontWeight: 900, color: '#c0c0c0', zIndex: 1 }}>2</span>
-                  </div>
-                </motion.div>
-
-                {/* 1st Place - The King */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 40 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                >
-                  <div style={{ position: 'relative', marginBottom: 12 }}>
-                    <motion.div 
-                      animate={{ 
-                        boxShadow: [`0 0 20px rgba(255,215,0,0.3)`, `0 0 50px rgba(255,215,0,0.6)`, `0 0 20px rgba(255,215,0,0.3)`]
-                      }}
-                      transition={{ duration: 3, repeat: Infinity }}
-                      style={{ borderRadius: '50%', padding: 4, background: 'linear-gradient(135deg, #ffd700, #fff)' }}
-                    >
-                      <img src={filteredUsers[0].photoURL || `https://api.dicebear.com/7.x/big-smile/svg?seed=${filteredUsers[0].uid}`} style={{ width: 90, height: 90, borderRadius: '50%', border: '4px solid #000' }} />
-                    </motion.div>
-                    <div style={{ position: 'absolute', top: -20, left: '50%', transform: 'translateX(-50%)' }}><Crown size={32} color="#ffd700" fill="#ffd700" className="animate-float" /></div>
-                  </div>
-                  <div style={{ background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.4)', width: 110, height: 110, borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(255,215,0,0.2), transparent)' }} />
-                    <span style={{ fontSize: 48, fontWeight: 900, color: '#ffd700', zIndex: 1 }}>1</span>
-                  </div>
-                </motion.div>
-
-                {/* 3rd Place */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                >
-                  <div style={{ position: 'relative', marginBottom: 12 }}>
-                    <img src={filteredUsers[2].photoURL || `https://api.dicebear.com/7.x/big-smile/svg?seed=${filteredUsers[2].uid}`} style={{ width: 64, height: 64, borderRadius: '50%', border: '3px solid #cd7f32', boxShadow: '0 0 20px rgba(205,127,50,0.2)' }} />
-                    <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)' }}><Medal size={22} color="#cd7f32" /></div>
-                  </div>
-                  <div style={{ background: 'rgba(205,127,50,0.1)', border: '1px solid rgba(205,127,50,0.2)', width: 85, height: 50, borderRadius: '20px 20px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(205,127,50,0.1), transparent)' }} />
-                    <span style={{ fontSize: 28, fontWeight: 900, color: '#cd7f32', zIndex: 1 }}>3</span>
-                  </div>
-                </motion.div>
-              </div>
-            )}
             {filteredUsers.map((user, index) => (
               <motion.div
                 key={user.uid}

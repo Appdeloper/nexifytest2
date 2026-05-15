@@ -12,7 +12,7 @@ import {
   subscribeToMessages, sendTextMessage, sendMediaMessage,
   uploadChatAttachment, sendGifMessage, deleteMessage, addReaction
 } from '../services/chat';
-import { getUserData } from '../services/users';
+import { getUserData, subscribeUserData } from '../services/users';
 import { doc, getDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useCall } from '../components/CallProvider';
@@ -159,7 +159,17 @@ const ChatConversation = () => {
       }
     });
 
-    return () => { unsub(); unsubChat(); };
+    let unsubUser;
+    const initOtherUser = async () => {
+      const chatDoc = await getDoc(doc(db, 'chats', chatId));
+      if (chatDoc.exists()) {
+        const otherId = chatDoc.data().members?.find(id => id !== currentUser.uid);
+        if (otherId) unsubUser = subscribeUserData(otherId, setOtherUser);
+      }
+    };
+    initOtherUser();
+
+    return () => { unsub(); unsubChat(); if (unsubUser) unsubUser(); };
   }, [chatId, currentUser]);
 
   /* typing indicator */

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, UserPlus, UserCheck, UserX, ArrowLeft, Users,
   Clock, CheckCircle, X, MessageSquare, ChevronRight, Loader
@@ -10,7 +10,7 @@ import {
   searchUsers, sendFriendRequest, cancelFriendRequest,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   subscribeIncomingRequests, subscribeSentRequests, subscribeFriends,
-  getFriendshipStatus, getAllUsers
+  getFriendshipStatus, getAllUsers, subscribeAllUsers
 } from '../services/friends';
 import { getUserData } from '../services/users';
 import { createOrGetDMChat } from '../services/chat';
@@ -44,13 +44,12 @@ const TABS = ['Friends', 'Requests', 'Find'];
 
 const Friends = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
 
-  const [tab, setTab] = useState('Friends');
-  const [searchQ, setSearchQ] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
+  const [tab, setTab] = useState(location.state?.tab || 'Friends');
+  const [searchQ, setSearchQ] = useState(location.state?.query || '');
 
   const [friends, setFriends] = useState([]);
   const [friendProfiles, setFriendProfiles] = useState({});
@@ -59,13 +58,22 @@ const Friends = () => {
   const [sent, setSent] = useState([]);
   const [sentProfiles, setSentProfiles] = useState({});
 
-  const [loadingActions, setLoadingActions] = useState({});
-  const [statuses, setStatuses] = useState({});
   const [allUsers, setAllUsers] = useState([]);
+  const [loadingActions, setLoadingActions] = useState({});
+
+  const getStatus = useCallback((uid) => {
+    try {
+      if (friends?.some(f => f.users?.includes(uid))) return 'friends';
+      if (incoming?.some(r => r.from === uid)) return 'received';
+      if (sent?.some(r => r.to === uid)) return 'sent';
+    } catch (e) { console.error("Status derivation error:", e); }
+    return 'none';
+  }, [friends, incoming, sent]);
 
   useEffect(() => {
     if (currentUser) {
-      getAllUsers(currentUser.uid).then(setAllUsers).catch(console.error);
+      const unsub = subscribeAllUsers(currentUser.uid, setAllUsers);
+      return () => unsub();
     }
   }, [currentUser?.uid]);
 
@@ -87,7 +95,9 @@ const Friends = () => {
       setIncoming(list);
       const profiles = {};
       for (const r of list) {
-        if (!profiles[r.from]) profiles[r.from] = await getUserData(r.from);
+        if (!profiles[r.from]) {
+          try { profiles[r.from] = await getUserData(r.from); } catch(e) {}
+        }
       }
       setIncomingProfiles(profiles);
     });
@@ -95,37 +105,25 @@ const Friends = () => {
       setSent(list);
       const profiles = {};
       for (const r of list) {
-        if (!profiles[r.to]) profiles[r.to] = await getUserData(r.to);
+        if (!profiles[r.to]) {
+          try { profiles[r.to] = await getUserData(r.to); } catch(e) {}
+        }
       }
       setSentProfiles(profiles);
     });
     return () => { unsubFr(); unsubIn(); unsubSent(); };
   }, [currentUser?.uid]);
 
-  /* search */
-  useEffect(() => {
-    if (tab !== 'Find') return;
-    if (!searchQ || searchQ.length < 2) { setSearchResults([]); return; }
-    setSearching(true);
-    const t = setTimeout(async () => {
-      const lower = searchQ.toLowerCase();
-      const results = allUsers.filter(u => 
-        u.displayName?.toLowerCase().includes(lower) || 
-        u.email?.toLowerCase().includes(lower) ||
-        u.username?.toLowerCase().includes(lower)
-      ).slice(0, 50); // limit to 50
-      
-      // Fetch friendship status for each
-      const statusMap = {};
-      for (const u of results) {
-        statusMap[u.uid] = await getFriendshipStatus(currentUser.uid, u.uid);
-      }
-      setStatuses(p => ({ ...p, ...statusMap }));
-      setSearchResults(results);
-      setSearching(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchQ, tab, allUsers]);
+  /* search results */
+  const results = React.useMemo(() => {
+    if (!searchQ || searchQ.length < 1) return [];
+    const lower = searchQ.toLowerCase();
+    return allUsers.filter(u => 
+      u.displayName?.toLowerCase()?.includes(lower) || 
+      u.email?.toLowerCase()?.includes(lower) ||
+      u.username?.toLowerCase()?.includes(lower)
+    ).slice(0, 50);
+  }, [searchQ, allUsers]);
 
   const withLoading = async (key, fn) => {
     setLoadingActions(p => ({ ...p, [key]: true }));
@@ -135,13 +133,11 @@ const Friends = () => {
 
   const handleAddFriend = (uid) => withLoading(uid, async () => {
     await sendFriendRequest(currentUser.uid, uid);
-    setStatuses(p => ({ ...p, [uid]: 'sent' }));
-    showToast('Friend request sent!');
+    showToast('Success!');
   });
 
   const handleCancelRequest = (uid) => withLoading(uid, async () => {
     await cancelFriendRequest(currentUser.uid, uid);
-    setStatuses(p => ({ ...p, [uid]: 'none' }));
     showToast('Request cancelled.');
   });
 
@@ -354,7 +350,6 @@ const Friends = () => {
                 autoFocus
                 style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', flex: 1, fontSize: 14 }}
               />
-              {searching && <Loader size={14} color="var(--text-muted)" style={{ animation: 'spin 1s linear infinite' }} />}
               {searchQ && <button onClick={() => setSearchQ('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}><X size={14} /></button>}
             </div>
           </div>
@@ -370,14 +365,14 @@ const Friends = () => {
               </div>
             )}
 
-            {searchQ && !searching && searchResults.length === 0 && (
+            {searchQ && results.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 14 }}>
                 No users found for "{searchQ}"
               </div>
             )}
 
-            {searchResults.map(user => {
-              const status = statuses[user.uid] || 'none';
+            {results.map(user => {
+              const status = getStatus(user.uid);
               return (
                 <div key={user.uid} style={{
                   background: 'var(--bg-card)', borderRadius: 16, padding: '12px 14px',
@@ -409,9 +404,14 @@ const Friends = () => {
                     </Btn>
                   )}
                   {status === 'friends' && (
-                    <Btn color="#00dfd8" border="1px solid rgba(0,223,216,0.25)">
-                      <UserCheck size={13} /> Friends
-                    </Btn>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn onClick={() => handleMessage(user.uid)} bg="rgba(0,223,216,0.1)" color="#00dfd8" border="1.5px solid rgba(0,223,216,0.3)">
+                        <MessageSquare size={13} />
+                      </Btn>
+                      <Btn color="#00dfd8" border="1px solid rgba(0,223,216,0.15)">
+                        <UserCheck size={13} />
+                      </Btn>
+                    </div>
                   )}
                 </div>
               );

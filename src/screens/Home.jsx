@@ -16,9 +16,9 @@ import { subscribeTasks, completeTask } from '../services/tasks';
 import { getRankForXP, getNextRank, getRankProgress } from '../services/xp';
 import { subscribeActivityFeed, ACTIVITY_TYPES } from '../services/activity';
 import { RoleBadge, RankBadge } from '../components/Badges';
-import PresenceIndicator from '../components/PresenceIndicator';
 import { subscribeLeaderboard } from '../services/admin';
 import { useFitness } from '../hooks/useFitness';
+import { subscribeNotifications } from '../services/notifications';
 
 /* ── Ultra-Premium Particle System ── */
 const ParticleSystem = () => (
@@ -77,6 +77,16 @@ const Home = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const accentColor = currentUser?.profileColor || '#00dfd8';
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = subscribeNotifications(currentUser.uid, (data) => {
+      setUnreadCount(data.filter(n => !n.read).length);
+    });
+    return () => unsub();
+  }, [currentUser?.uid]);
+
   useEffect(() => {
     const unsub = subscribeLeaderboard((data) => {
       setLeaderboard(data.slice(0, 3));
@@ -123,7 +133,11 @@ const Home = () => {
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '50%', width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', position: 'relative', backdropFilter: 'blur(10px)' }}
           >
             <Bell size={20} />
-            <div style={{ position: 'absolute', top: 0, right: 0, background: '#ff0080', color: 'white', fontSize: 10, fontWeight: 900, width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid black', boxShadow: '0 0 10px rgba(255, 0, 128, 0.5)' }}>3</div>
+            {unreadCount > 0 && (
+              <div style={{ position: 'absolute', top: 0, right: 0, background: '#ff0080', color: 'white', fontSize: 10, fontWeight: 900, width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid black', boxShadow: '0 0 10px rgba(255, 0, 128, 0.5)' }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </div>
+            )}
           </motion.button>
           <motion.div 
             whileTap={{ scale: 0.9 }}
@@ -147,7 +161,10 @@ const Home = () => {
           style={{ marginTop: 10, marginBottom: 32 }}
         >
           <div style={{ fontSize: 16, color: '#7928ca', fontWeight: 600, letterSpacing: 0.5 }}>
-            {new Date().getHours() < 12 ? 'Good Morning,' : new Date().getHours() < 17 ? 'Good Afternoon,' : 'Good Evening,'}
+            {new Date().getHours() < 5 ? 'Working late?' : 
+             new Date().getHours() < 12 ? 'Good Morning,' : 
+             new Date().getHours() < 17 ? 'Good Afternoon,' : 
+             new Date().getHours() < 21 ? 'Good Evening,' : 'Good Night,'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
             <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1 }}>{currentUser?.displayName?.split(' ')[0] || 'Citizen'} 👋</h1>

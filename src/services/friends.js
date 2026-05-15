@@ -13,7 +13,15 @@ export const sendFriendRequest = async (fromUid, toUid) => {
   const reqId = [fromUid, toUid].sort().join('_');
   const reqRef = doc(db, 'friendRequests', reqId);
   const existing = await getDoc(reqRef);
-  if (existing.exists()) throw new Error('Friend request already sent or you are already friends.');
+  
+  if (existing.exists()) {
+    const data = existing.data();
+    if (data.from === toUid) {
+      // They already sent a request to us! Let's just accept it.
+      return await acceptFriendRequest(toUid, fromUid);
+    }
+    throw new Error('Friend request already sent.');
+  }
 
   // Check if already friends
   const friendRef = doc(db, 'friends', reqId);
@@ -147,7 +155,7 @@ export const getFriendshipStatus = async (uid1, uid2) => {
 
 // ── Search users by display name ───────────────────────────────
 export const searchUsers = async (queryText, currentUid) => {
-  if (!queryText || queryText.length < 2) return [];
+  if (!queryText || queryText.length < 1) return [];
   const snap = await getDocs(collection(db, 'users'));
   const lower = queryText.toLowerCase();
   return snap.docs
@@ -158,9 +166,22 @@ export const searchUsers = async (queryText, currentUid) => {
 };
 // ── Get all users (demo-friendly version) ─────────────────────
 export const getAllUsers = async (currentUid) => {
-  const q = query(collection(db, 'users'), limit(100));
+  const q = query(collection(db, 'users'));
   const snap = await getDocs(q);
   return snap.docs
-    .map(d => d.data())
+    .map(d => ({ uid: d.id, ...d.data() }))
     .filter(u => u.uid !== currentUid);
+};
+
+export const subscribeAllUsers = (currentUid, callback) => {
+  const q = query(collection(db, 'users'));
+  return onSnapshot(q, (snap) => {
+    const users = snap.docs
+      .map(d => ({ uid: d.id, ...d.data() }))
+      .filter(u => u.uid !== currentUid);
+    callback(users);
+  }, (err) => {
+    console.error("subscribeAllUsers error:", err);
+    callback([]);
+  });
 };

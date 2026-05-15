@@ -31,6 +31,18 @@
   --neon-glow: 0 0 10px rgba(0, 223, 216, 0.5), 0 0 20px rgba(121, 40, 202, 0.3);
   --border-glass: rgba(255, 255, 255, 0.1);
   --primary: var(--primary-cyan);
+
+  /* Premium Gradients */
+  --grad-premium: linear-gradient(135deg, #0070f3, #7928ca, #00dfd8);
+  --grad-dark: linear-gradient(180deg, rgba(10, 10, 20, 0) 0%, rgba(0, 0, 0, 1) 100%);
+  --grad-glass: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  --grad-neon: linear-gradient(90deg, #0070f3, #7928ca, #00dfd8);
+  --primary-gradient: linear-gradient(135deg, #00dfd8, #0070f3);
+
+  /* Glow Effects */
+  --glow-cyan: 0 0 20px rgba(0, 223, 216, 0.4);
+  --glow-purple: 0 0 25px rgba(121, 40, 202, 0.35);
+  --glow-soft: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
 
 [data-theme="cyber-blue"] {

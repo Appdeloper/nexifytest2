@@ -79,9 +79,22 @@ const Rooms = () => {
           whileHover={{ scale: 1.1, rotate: 90 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => navigate('/create-room')}
-          style={{ background: 'var(--grad-premium)', border: 'none', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'black', boxShadow: '0 4px 15px rgba(0,223,216,0.4)' }}
+          style={{ 
+            background: 'var(--grad-premium)', 
+            border: 'none', 
+            borderRadius: '16px', 
+            width: 44, 
+            height: 44, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            cursor: 'pointer', 
+            color: 'white', 
+            boxShadow: '0 0 20px rgba(0,223,216,0.3)',
+            flexShrink: 0
+          }}
         >
-          <Plus size={24} strokeWidth={3} />
+          <Plus size={24} strokeWidth={2.5} />
         </motion.button>
       </motion.div>
 

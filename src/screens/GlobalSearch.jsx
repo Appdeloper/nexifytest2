@@ -4,9 +4,9 @@ import { Search, Sparkles, Clock, ArrowRight, MessageSquare, Users, Dumbbell, Za
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/GlassCard';
 import { useAuth } from '../hooks/useAuth';
-import { getAllUsers } from '../services/users';
+import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { subscribeAllUsers } from '../services/friends';
 
 const RECENT_SEARCHES = ['Deep work pod', 'React developers', 'State updates', 'Morning mobility'];
 const QUICK_FILTERS = ['All', 'Chats', 'Rooms', 'Edge', 'Fit', 'Pods'];
@@ -23,21 +23,20 @@ const GlobalSearch = () => {
   const [allRooms, setAllRooms] = useState([]);
 
   useEffect(() => {
-    // Pre-fetch data for fast filtering
-    const loadData = async () => {
-      try {
-        const users = await getAllUsers(currentUser?.uid);
-        setAllUsers(users);
+    if (!currentUser) return;
+    
+    const unsubUsers = subscribeAllUsers(currentUser.uid, setAllUsers);
+    
+    const qRooms = query(collection(db, 'rooms'), where('privacy', '==', 'public'));
+    const unsubRooms = onSnapshot(qRooms, (snap) => {
+      const rooms = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAllRooms(rooms);
+    });
 
-        const q = query(collection(db, 'rooms'), where('privacy', '==', 'public'));
-        const roomsSnap = await getDocs(q);
-        const rooms = roomsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAllRooms(rooms);
-      } catch (e) {
-        console.error("Search data load error:", e);
-      }
+    return () => {
+      unsubUsers();
+      unsubRooms();
     };
-    if (currentUser) loadData();
   }, [currentUser?.uid]);
 
   useEffect(() => {
@@ -54,7 +53,7 @@ const GlobalSearch = () => {
       
       // Match users
       allUsers.forEach(u => {
-        if (u.displayName?.toLowerCase().includes(lowerQuery) || u.username?.toLowerCase().includes(lowerQuery)) {
+        if (u.displayName?.toLowerCase()?.includes(lowerQuery) || u.username?.toLowerCase()?.includes(lowerQuery)) {
           matched.push({
             id: `user_${u.uid}`,
             navId: u.uid,
@@ -69,7 +68,7 @@ const GlobalSearch = () => {
 
       // Match rooms
       allRooms.forEach(r => {
-        if (r.name?.toLowerCase().includes(lowerQuery) || r.description?.toLowerCase().includes(lowerQuery)) {
+        if (r.name?.toLowerCase()?.includes(lowerQuery) || r.description?.toLowerCase()?.includes(lowerQuery)) {
           matched.push({
             id: `room_${r.id}`,
             navId: r.id,
@@ -170,7 +169,13 @@ const GlobalSearch = () => {
                 <GlassCard 
                   key={result.id} 
                   className="row align-center flex-between p-3 ripple" 
-                  onClick={() => navigate(result.path)}
+                  onClick={() => {
+                    if (result.type === 'Users') {
+                      navigate('/friends', { state: { tab: 'Find', query: result.title } });
+                    } else {
+                      navigate(result.path);
+                    }
+                  }}
                   style={{ cursor: 'pointer', animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}
                 >
                   <div className="row gap-3 align-center">

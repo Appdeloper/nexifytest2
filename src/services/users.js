@@ -15,6 +15,13 @@ export const getUserData = async (uid) => {
   return null;
 };
 
+export const subscribeUserData = (uid, callback) => {
+  return onSnapshot(doc(db, 'users', uid), (snap) => {
+    if (snap.exists()) callback(snap.data());
+    else callback(null);
+  });
+};
+
 export const ensureAIUser = async () => {
   const aiUid = 'nexify_ai';
   const aiRef = doc(db, 'users', aiUid);

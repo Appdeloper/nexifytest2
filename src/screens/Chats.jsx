@@ -154,9 +154,6 @@ const Chats = () => {
           <h1 style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>Conversations</h1>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/global-search')} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
-            <Search size={18} />
-          </motion.button>
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => navigate('/friends')}
