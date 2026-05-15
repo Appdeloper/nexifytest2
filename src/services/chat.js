@@ -98,6 +98,30 @@ export const sendTextMessage = async (chatId, senderId, text, replyTo = null) =>
       ...(replyTo ? { replyTo: { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId } } : {})
     });
     await updateLastMessage(chatId, trimmed);
+    
+    // Notification logic
+    try {
+      const chatSnap = await getDoc(doc(db, 'chats', chatId));
+      if (chatSnap.exists()) {
+        const chatData = chatSnap.data();
+        const otherId = chatData.members.find(id => id !== senderId);
+        if (otherId) {
+          const { getUserData } = await import('./users');
+          const senderData = await getUserData(senderId);
+          const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+          await sendNotification(otherId, {
+            title: senderData?.displayName || 'New Message',
+            body: trimmed,
+            type: NOTIFICATION_TYPES.NEW_MESSAGE,
+            chatId: chatId,
+            senderId: senderId
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Notification trigger failed:", err);
+    }
+
     // Award XP for sending a message
     import('./xp').then(({ addXP }) => addXP(senderId, 'sendMessage')).catch(() => {});
 
@@ -163,7 +187,27 @@ export const sendMediaMessage = async (chatId, senderId, file, type, mediaURL) =
     createdAt: serverTimestamp(),
     readBy: [senderId]
   });
-  await updateLastMessage(chatId, `[${type === 'image' ? 'Image' : 'File'}]`);
+  const body = `[${type === 'image' ? 'Image' : 'File'}]`;
+  await updateLastMessage(chatId, body);
+  
+  // Notification
+  try {
+    const chatSnap = await getDoc(doc(db, 'chats', chatId));
+    const chatData = chatSnap.data();
+    const otherId = chatData.members.find(id => id !== senderId);
+    if (otherId) {
+      const { getUserData } = await import('./users');
+      const senderData = await getUserData(senderId);
+      const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+      await sendNotification(otherId, {
+        title: senderData?.displayName || 'New Message',
+        body: body,
+        type: NOTIFICATION_TYPES.NEW_MESSAGE,
+        chatId: chatId,
+        senderId: senderId
+      });
+    }
+  } catch (e) {}
 };
 
 export const sendGifMessage = async (chatId, senderId, gifUrl) => {
@@ -177,6 +221,25 @@ export const sendGifMessage = async (chatId, senderId, gifUrl) => {
     readBy: [senderId]
   });
   await updateLastMessage(chatId, '[GIF]');
+  
+  // Notification
+  try {
+    const chatSnap = await getDoc(doc(db, 'chats', chatId));
+    const chatData = chatSnap.data();
+    const otherId = chatData.members.find(id => id !== senderId);
+    if (otherId) {
+      const { getUserData } = await import('./users');
+      const senderData = await getUserData(senderId);
+      const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+      await sendNotification(otherId, {
+        title: senderData?.displayName || 'New Message',
+        body: '[GIF]',
+        type: NOTIFICATION_TYPES.NEW_MESSAGE,
+        chatId: chatId,
+        senderId: senderId
+      });
+    }
+  } catch (e) {}
 };
 
 export const markMessagesRead = async (chatId) => {};

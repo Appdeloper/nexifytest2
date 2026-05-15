@@ -3,7 +3,7 @@ import { ROLES } from '../services/xp';
 
 const RoleBadge = ({ role, size = 'sm' }) => {
   const def = ROLES[role] || ROLES.member;
-  
+
   const isSpecial = ['owner', 'verified'].includes(role);
 
   const sizes = {
@@ -11,25 +11,25 @@ const RoleBadge = ({ role, size = 'sm' }) => {
     sm: { fontSize: '0.7rem', padding: '2px 8px', gap: '5px' },
     md: { fontSize: '0.85rem', padding: '4px 12px', gap: '6px' },
   };
-  
+
   const s = sizes[size] || sizes.sm;
 
   return (
-    <span 
+    <span
       className={`role-badge-pill ${isSpecial ? 'pulse-anim' : ''}`}
       style={{
-        display: 'inline-flex', 
+        display: 'inline-flex',
         alignItems: 'center',
         gap: s.gap,
-        background: '#000000', 
+        background: '#000000',
         border: `1px solid ${def.color}66`,
-        borderRadius: '50px', 
-        padding: s.padding, 
+        borderRadius: '50px',
+        padding: s.padding,
         fontWeight: 'bold',
-        fontSize: s.fontSize, 
-        color: def.color, 
+        fontSize: s.fontSize,
+        color: def.color,
         letterSpacing: '0.5px',
-        whiteSpace: 'nowrap', 
+        whiteSpace: 'nowrap',
         flexShrink: 0,
         boxShadow: `0 0 10px ${def.color}33`,
         textShadow: `0 0 5px ${def.color}88`,
@@ -38,7 +38,7 @@ const RoleBadge = ({ role, size = 'sm' }) => {
     >
       <span style={{ fontSize: '1.2em' }}>{def.icon}</span>
       <span>{def.label}</span>
-      
+
       <style>{`
         @keyframes badgePulse {
           0% { box-shadow: 0 0 5px ${def.color}44; border-color: ${def.color}44; }

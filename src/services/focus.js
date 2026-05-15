@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, collection, addDoc, query, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 const getFocusDocRef = (uid) => doc(db, 'focusStats', uid);
 
@@ -51,4 +51,34 @@ export const updateFocusStats = async (uid, minutes) => {
 
   // Award XP
   import('./xp').then(({ addXP }) => addXP(uid, 'focusSession')).catch(() => {});
+};
+
+export const createFocusPod = async (uid, data) => {
+  const docRef = await addDoc(collection(db, 'focusPods'), {
+    ...data,
+    createdBy: uid,
+    members: [uid],
+    createdAt: serverTimestamp(),
+    endTime: Date.now() + (data.time || 25) * 60000
+  });
+  return docRef.id;
+};
+
+export const joinFocusPod = async (podId, uid) => {
+  await updateDoc(doc(db, 'focusPods', podId), {
+    members: arrayUnion(uid)
+  });
+};
+
+export const leaveFocusPod = async (podId, uid) => {
+  await updateDoc(doc(db, 'focusPods', podId), {
+    members: arrayRemove(uid)
+  });
+};
+
+export const subscribeFocusPods = (callback) => {
+  const q = query(collection(db, 'focusPods'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
 };

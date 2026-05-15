@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { ensureUserProfile } from '../services/auth';
 
 const AuthContext = createContext();
 
@@ -14,7 +15,16 @@ export const AuthProvider = ({ children }) => {
     let profileUnsub = null;
 
     const authUnsub = onAuthStateChanged(auth, async (user) => {
+      if (profileUnsub) { profileUnsub(); profileUnsub = null; }
+      
       if (user) {
+        // Ensure profile exists before subscribing or updating status
+        try {
+          await ensureUserProfile(user);
+        } catch (e) {
+          console.error("Failed to ensure user profile:", e);
+        }
+
         // Subscribe to full Firestore profile for live role/rank/xp updates
         profileUnsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
           if (snap.exists()) {

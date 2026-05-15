@@ -23,7 +23,7 @@ export const useAIEngine = () => {
     }, 60 * 1000); // Check every minute
 
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleProactiveCheckIn = async () => {
     // Randomized proactive messages

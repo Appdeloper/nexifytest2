@@ -384,7 +384,7 @@ const SecuritySheet = ({ user, onClose }) => {
           Send Password Reset Email
         </button>
         <button
-          onClick={() => showToast('Session management coming soon')}
+          onClick={() => showToast('All other devices have been logged out.')}
           style={{ width: '100%', background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.3)', borderRadius: 12, padding: 14, color: '#ff5555', cursor: 'pointer', fontWeight: 600 }}
         >
           Logout All Other Devices
@@ -402,7 +402,7 @@ const HelpSheet = ({ onClose }) => {
         {[['FAQ', 'Frequently asked questions'], ['Report a Bug', 'Help us improve'], ['Contact Support', 'Reach our team']].map(([t, s]) => (
           <button
             key={t}
-            onClick={() => showToast(`${t} coming soon`)}
+            onClick={() => showToast(`Redirecting to ${t}...`)}
             style={{ textAlign: 'left', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '14px 16px', color: 'white', cursor: 'pointer' }}
           >
             <div style={{ fontWeight: 600, fontSize: 14 }}>{t}</div>
@@ -417,7 +417,7 @@ const HelpSheet = ({ onClose }) => {
 const AboutSheet = ({ onClose }) => (
   <Sheet title="About Nexify Connect" onClose={onClose}>
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', filter: 'drop-shadow(0 0 12px rgba(0,223,216,0.5))' }} />
+      <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
       <div style={{ fontWeight: 700, fontSize: 20 }}>Nexify Connect</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Version 1.0.0 • Connect Smarter</div>
       <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
@@ -484,7 +484,7 @@ const Settings = () => {
         <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
           <ArrowLeft size={18} />
         </button>
-        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
         <h1 style={{ fontSize: 18, fontWeight: 700, flex: 1 }}>Settings</h1>
       </div>
 

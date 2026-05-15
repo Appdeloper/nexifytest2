@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
-import { updateUserProfile, uploadBanner } from '../services/profile';
+import { updateUserProfile, uploadBanner, uploadAvatar } from '../services/profile';
 
 const THEMES = [
   { id: 'default', name: 'Nexify Dark', primary: '#00dfd8', gradient: 'linear-gradient(135deg, #050a1a, #000)' },
@@ -100,12 +100,30 @@ const ProfileCustomization = () => {
         <div style={{ marginBottom: 32 }}>
           <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1, display: 'block', marginBottom: 12 }}>BASIC INFO</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+               <span style={{ fontSize: 13, fontWeight: 700 }}>Profile Picture</span>
+               <motion.label whileTap={{ scale: 0.95 }} style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary)', cursor: 'pointer' }}>
+                 UPLOAD NEW
+                 <input type="file" accept="image/*" onChange={async (e) => {
+                   const file = e.target.files?.[0];
+                   if (!file) return;
+                   try { showToast('Uploading avatar...'); await uploadAvatar(currentUser.uid, file); showToast('Avatar updated!'); } catch(err) { showToast(err.message); }
+                 }} style={{ display: 'none' }} />
+               </motion.label>
+            </div>
             <input 
               type="text" 
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Display Name"
               onBlur={() => handleUpdate({ displayName })}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', outline: 'none' }}
+            />
+            <input 
+              type="text" 
+              value={currentUser?.username || ''}
+              onChange={(e) => handleUpdate({ username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+              placeholder="Username"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: '12px', color: 'white', outline: 'none' }}
             />
             <input 

@@ -50,7 +50,7 @@ const NexifyEdge = () => {
       const unsub = subscribeTasks(currentUser.uid, setTasks);
       return () => unsub();
     }
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleCompleteTask = async (taskId) => {
     if (!currentUser) return;
@@ -169,7 +169,7 @@ const NexifyEdge = () => {
               <Bookmark size={20} className={isSaved ? "text-primary" : "text-muted"} style={{ fill: isSaved ? "var(--primary)" : "none" }} />
               <span className="ml-2 font-bold text-sm" style={{ color: isSaved ? "var(--primary)" : "white" }}>{isSaved ? "Saved" : "Save"}</span>
             </button>
-            <GradientButton onClick={() => showToast('Discussions coming soon')} className="flex-2" style={{ height: '56px', borderRadius: '16px' }}>
+            <GradientButton onClick={() => showToast('Discussions not available in Demo Mode')} className="flex-2" style={{ height: '56px', borderRadius: '16px' }}>
               <MessageSquare size={20} className="mr-2" /> Discuss
             </GradientButton>
           </div>
@@ -181,6 +181,8 @@ const NexifyEdge = () => {
   return (
     <div className="fade-in col" style={{ height: '100%', position: 'relative' }}>
       <Header title="Nexify Edge" showBack={true} />
+      
+      <div style={{ position: 'absolute', top: 16, right: 16, background: '#ff4444', color: 'white', fontSize: 10, fontWeight: 900, padding: '4px 8px', borderRadius: 8, letterSpacing: 1, zIndex: 100 }}>DEMO DATA</div>
       
       <div className="p-4" style={{ paddingBottom: '0' }}>
         <div className="row flex-between align-center mb-4">

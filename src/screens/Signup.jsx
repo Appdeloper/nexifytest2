@@ -46,9 +46,12 @@ const Signup = () => {
 
   return (
     <div className="col p-4 flex-center fade-in" style={{ height: '100vh', background: 'radial-gradient(circle at bottom left, var(--glow-color), transparent 50%)' }}>
-      <GlassCard className="w-full" style={{ maxWidth: '400px' }}>
-        <h1 className="text-gradient mb-2" style={{ textAlign: 'center', fontSize: '28px' }}>Join Nexify</h1>
-        <p className="text-muted text-sm mb-4" style={{ textAlign: 'center' }}>Create your account.</p>
+      <div className="w-full flex-center col" style={{ maxWidth: '400px', zIndex: 1 }}>
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Nexify Connect Logo" style={{ width: 120, height: 120, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
+
+        <div className="col w-full glass-panel p-4" style={{ borderRadius: '24px' }}>
+          <h2 style={{ textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}>Join Nexify</h2>
+          <p className="text-muted text-sm mb-6 mt-1" style={{ textAlign: 'center' }}>Create your account.</p>
         
         <form onSubmit={handleSignup} className="col gap-3 mb-4">
           <input 
@@ -102,7 +105,12 @@ const Signup = () => {
         <p className="text-sm text-center text-muted">
           Already have an account? <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: '600' }} onClick={() => navigate('/login')}>Log in</span>
         </p>
-      </GlassCard>
+        </div>
+        
+        <p className="text-xs text-muted text-center mt-6" style={{ maxWidth: '80%' }}>
+          By continuing, you agree to our <span className="text-primary" style={{ cursor: 'pointer' }}>Terms & Privacy Policy</span>.
+        </p>
+      </div>
     </div>
   );
 };

@@ -44,24 +44,7 @@ const Splash = () => {
             filter: 'drop-shadow(0 0 20px rgba(0,223,216,0.5)) drop-shadow(0 0 40px rgba(121,40,202,0.3))'
           }}
         />
-        <div style={{ textAlign: 'center' }}>
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            style={{ fontSize: 24, fontWeight: 900, letterSpacing: 1, background: 'linear-gradient(135deg, #00dfd8, #7928ca)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
-          >
-            NEXIFY CONNECT
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
-            transition={{ delay: 0.8 }}
-            style={{ fontSize: 11, color: 'rgba(160,160,160,1)', letterSpacing: 3, marginTop: 4, fontWeight: 600 }}
-          >
-            CONNECT SMARTER
-          </motion.div>
-        </div>
+
       </motion.div>
 
       {/* Loading dots */}

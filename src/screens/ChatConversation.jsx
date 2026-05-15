@@ -528,7 +528,7 @@ const ChatConversation = () => {
             <Send size={17} color="white" />
           </button>
         ) : (
-          <button onClick={() => showToast('Voice notes coming soon')}
+          <button onClick={() => showToast('Voice notes disabled in beta')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--text-muted)' }}
           ><Mic size={20} /></button>
         )}

@@ -80,7 +80,7 @@ export const FitnessProvider = ({ children }) => {
       if (devicemotionListener) window.removeEventListener('devicemotion', devicemotionListener);
       syncSteps();
     };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   return (
     <FitnessContext.Provider value={{ stats, setStats }}>

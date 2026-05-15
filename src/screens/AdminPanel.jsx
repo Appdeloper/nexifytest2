@@ -274,7 +274,7 @@ const AdminPanel = () => {
         navigate('/home');
       }
     });
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleSeed = async () => {
     setLoading(true);

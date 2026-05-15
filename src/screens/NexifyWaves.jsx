@@ -68,7 +68,7 @@ const NexifyWaves = () => {
         title="Nexify Waves" 
         showBack 
         rightElement={
-          <button className="icon-btn" onClick={() => showToast('Search music coming soon')}>
+          <button className="icon-btn" onClick={() => showToast('Search music disabled in demo')}>
             <Search size={18} />
           </button>
         } 

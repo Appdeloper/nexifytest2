@@ -67,7 +67,7 @@ const Friends = () => {
     if (currentUser) {
       getAllUsers(currentUser.uid).then(setAllUsers).catch(console.error);
     }
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   /* subscriptions */
   useEffect(() => {
@@ -100,7 +100,7 @@ const Friends = () => {
       setSentProfiles(profiles);
     });
     return () => { unsubFr(); unsubIn(); unsubSent(); };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   /* search */
   useEffect(() => {
@@ -183,7 +183,7 @@ const Friends = () => {
             <ArrowLeft size={18} />
           </button>
           <div style={{ position: 'relative' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} alt="Logo" />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: '#10b981', borderRadius: '50%', border: '1.5px solid black' }} />
           </div>
         </div>

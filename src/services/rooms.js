@@ -167,6 +167,31 @@ export const sendRoomMessage = async (roomId, senderId, text) => {
       isPinned: false
     });
     await updateRoomLastMessage(roomId, trimmed);
+    
+    // Notification logic
+    try {
+      const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+      if (roomSnap.exists()) {
+        const roomData = roomSnap.data();
+        const { getUserData } = await import('./users');
+        const senderData = await getUserData(senderId);
+        const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+        
+        // Notify all other members
+        for (const uid of roomData.members) {
+          if (uid !== senderId) {
+            await sendNotification(uid, {
+              title: `${roomData.name}`,
+              body: `${senderData?.displayName || 'Someone'}: ${trimmed}`,
+              type: NOTIFICATION_TYPES.NEW_MESSAGE,
+              roomId: roomId,
+              senderId: senderId
+            });
+          }
+        }
+      }
+    } catch (err) {}
+
     // Award XP for sending a message
     import('./xp').then(({ addXP }) => addXP(senderId, 'sendMessage')).catch(() => {});
   } catch (error) {
@@ -205,7 +230,28 @@ export const sendRoomMediaMessage = async (roomId, senderId, file, type, mediaUR
     createdAt: serverTimestamp(),
     readBy: [senderId]
   });
-  await updateRoomLastMessage(roomId, `[${type === 'image' ? 'Image' : 'File'}]`);
+  const body = `[${type === 'image' ? 'Image' : 'File'}]`;
+  await updateRoomLastMessage(roomId, body);
+  
+  // Notification
+  try {
+    const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+    const roomData = roomSnap.data();
+    const { getUserData } = await import('./users');
+    const senderData = await getUserData(senderId);
+    const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+    for (const uid of roomData.members) {
+      if (uid !== senderId) {
+        await sendNotification(uid, {
+          title: `${roomData.name}`,
+          body: `${senderData?.displayName || 'Someone'}: ${body}`,
+          type: NOTIFICATION_TYPES.NEW_MESSAGE,
+          roomId: roomId,
+          senderId: senderId
+        });
+      }
+    }
+  } catch (e) {}
 };
 
 export const sendRoomGifMessage = async (roomId, senderId, gifUrl) => {
@@ -221,6 +267,26 @@ export const sendRoomGifMessage = async (roomId, senderId, gifUrl) => {
     isPinned: false
   });
   await updateRoomLastMessage(roomId, '[GIF]');
+  
+  // Notification
+  try {
+    const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+    const roomData = roomSnap.data();
+    const { getUserData } = await import('./users');
+    const senderData = await getUserData(senderId);
+    const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+    for (const uid of roomData.members) {
+      if (uid !== senderId) {
+        await sendNotification(uid, {
+          title: `${roomData.name}`,
+          body: `${senderData?.displayName || 'Someone'}: [GIF]`,
+          type: NOTIFICATION_TYPES.NEW_MESSAGE,
+          roomId: roomId,
+          senderId: senderId
+        });
+      }
+    }
+  } catch (e) {}
 };
 
 export const togglePinRoomMessage = async (roomId, messageId, currentPinStatus) => {

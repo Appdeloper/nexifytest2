@@ -26,30 +26,107 @@ const MOCK_GIFS = [
 
 const SMART_REPLIES = ['Hey!', 'How are you?', 'Great work!', 'Love this room', 'LFG! 🚀'];
 
-const PinnedMessagesSheet = ({ pins, onClose }) => (
-  <motion.div
-    initial={{ y: '100%' }}
-    animate={{ y: 0 }}
-    exit={{ y: '100%' }}
-    style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-  >
-    <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }} />
-    <div style={{ position: 'relative', background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 16px 40px', maxHeight: '70vh', overflowY: 'auto' }}>
-      <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, margin: '0 auto 20px' }} />
-      <h3 style={{ fontSize: 16, fontWeight: 900, marginBottom: 20, textAlign: 'center' }}>Pinned Messages</h3>
-      {pins.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>No pinned messages yet.</div>
-      ) : (
-        pins.map(msg => (
-          <div key={msg.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 12, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary)', marginBottom: 4 }}>PINNED</div>
-            <p style={{ fontSize: 13 }}>{msg.text || '[Media]'}</p>
+const MemberManagementSheet = ({ members, profiles, roomData, currentUser, onRemove, onInvite, onClose }) => {
+  const isOwner = roomData?.createdBy === currentUser.uid;
+  const [friends, setFriends] = useState([]);
+  
+  useEffect(() => {
+    const { subscribeFriends } = import('../services/friends').then(m => {
+      m.subscribeFriends(currentUser.uid, async (frList) => {
+        const friendIds = frList.map(f => f.users.find(id => id !== currentUser.uid));
+        const profiles = await Promise.all(friendIds.map(async id => {
+           const { getUserData } = await import('../services/users');
+           return await getUserData(id);
+        }));
+        setFriends(profiles.filter(p => p && !members.includes(p.uid)));
+      });
+    });
+  }, [members]);
+
+  return (
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column' }}
+    >
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }} />
+      <div style={{ 
+        position: 'relative', marginLeft: '20%', width: '80%', height: '100%', 
+        background: '#0a0a0a', borderLeft: '1px solid rgba(255,255,255,0.1)',
+        display: 'flex', flexDirection: 'column'
+      }}>
+        <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ fontSize: 18, fontWeight: 900 }}>Room Management</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+        </div>
+        
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+          {/* Invite Section */}
+          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--primary)', letterSpacing: 1.5, marginBottom: 16 }}>INVITE FRIENDS</div>
+          {friends.length === 0 ? (
+            <div style={{ fontSize: 12, opacity: 0.4, marginBottom: 24 }}>No friends available to invite.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
+              {friends.map(f => (
+                <div key={f.uid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img src={f.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.uid}`} style={{ width: 32, height: 32, borderRadius: 10 }} alt="" />
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{f.displayName}</span>
+                  </div>
+                  <button 
+                    onClick={() => onInvite(f.uid)}
+                    style={{ background: 'var(--primary-gradient)', border: 'none', borderRadius: 6, padding: '4px 10px', color: 'black', fontSize: 10, fontWeight: 900, cursor: 'pointer' }}
+                  >
+                    INVITE
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--primary)', letterSpacing: 1.5, marginBottom: 16 }}>MEMBERS — {members.length}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {members.map(uid => {
+              const p = profiles[uid] || { displayName: 'Loading...' };
+              const isUserOwner = roomData?.createdBy === uid;
+              const isMe = uid === currentUser.uid;
+              
+              return (
+                <div key={uid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ position: 'relative' }}>
+                      <img src={p.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`} style={{ width: 40, height: 40, borderRadius: 12, objectFit: 'cover' }} alt="" />
+                      {p.online && <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', border: '2px solid #0a0a0a', borderRadius: '50%' }} />}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>{p.displayName}</span>
+                        {isUserOwner && <div style={{ background: 'rgba(255,165,0,0.1)', color: 'orange', fontSize: 8, padding: '1px 4px', borderRadius: 4, fontWeight: 900 }}>OWNER</div>}
+                        {isMe && <span style={{ fontSize: 10, opacity: 0.4 }}>(You)</span>}
+                      </div>
+                      <span style={{ fontSize: 11, opacity: 0.5 }}>{p.status || (p.online ? 'Online' : 'Offline')}</span>
+                    </div>
+                  </div>
+                  
+                  {isOwner && !isUserOwner && !isMe && (
+                    <button 
+                      onClick={() => onRemove(uid)}
+                      style={{ background: 'rgba(255,50,50,0.1)', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#ff3232', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      REMOVE
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ))
-      )}
-    </div>
-  </motion.div>
-);
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 const RoomChat = () => {
   const { roomId } = useParams();
@@ -68,6 +145,7 @@ const RoomChat = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const [showPins, setShowPins] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null); // { id, x, y }
   const [inVoice, setInVoice] = useState(false);
 
@@ -76,8 +154,9 @@ const RoomChat = () => {
   useEffect(() => {
     if (!currentUser || !roomId) return;
 
-    const loadRoom = async () => {
-      const roomDoc = await getDoc(doc(db, 'rooms', roomId));
+    // Real-time room data listener
+    const roomRef = doc(db, 'rooms', roomId);
+    const unsubRoom = onSnapshot(roomRef, async (roomDoc) => {
       if (roomDoc.exists()) {
         const data = roomDoc.data();
         setRoomData(data);
@@ -90,11 +169,13 @@ const RoomChat = () => {
           }));
           setMemberProfiles(profiles);
         }
+      } else {
+        showToast('Room not found');
+        navigate('/rooms');
       }
-    };
-    loadRoom();
+    });
 
-    const unsub = subscribeRoomMessages(roomId, (msgs) => {
+    const unsubMessages = subscribeRoomMessages(roomId, (msgs) => {
       setMessages(msgs);
       setLoadingMsg(false);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 150);
@@ -105,7 +186,10 @@ const RoomChat = () => {
       });
     });
 
-    return () => unsub();
+    return () => {
+      unsubRoom();
+      unsubMessages();
+    };
   }, [roomId, currentUser]);
 
   const pinnedMessages = messages.filter(m => m.isPinned);
@@ -205,8 +289,55 @@ const RoomChat = () => {
     }
   };
 
+  const handleRemoveMember = async (uid) => {
+    if (window.confirm(`Are you sure you want to remove this member?`)) {
+      try {
+        import('../services/rooms').then(async ({ removeRoomMember }) => {
+          await removeRoomMember(roomId, uid);
+          showToast('Member removed');
+        });
+      } catch (e) {
+        showToast('Failed to remove member');
+      }
+    }
+  };
+
+  const handleInviteMember = async (uid) => {
+    try {
+      const { joinRoom } = await import('../services/rooms');
+      await joinRoom(roomId, uid);
+      
+      // Notify the friend
+      const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notifications');
+      await sendNotification(uid, {
+        title: 'Room Invitation',
+        body: `You've been invited to join ${roomData?.name || 'a room'}.`,
+        type: NOTIFICATION_TYPES.ROOM_INVITE,
+        roomId: roomId
+      });
+      
+      showToast('Invitation sent!');
+    } catch (e) {
+      showToast('Failed to invite friend');
+    }
+  };
+
   return (
     <div className="col" style={{ height: '100dvh', background: '#000', position: 'relative', zIndex: 10 }}>
+      <AnimatePresence>
+        {showMembers && (
+          <MemberManagementSheet 
+            members={roomData?.members || []}
+            profiles={memberProfiles}
+            roomData={roomData}
+            currentUser={currentUser}
+            onRemove={handleRemoveMember}
+            onInvite={handleInviteMember}
+            onClose={() => setShowMembers(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header style={{ 
         padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -217,20 +348,22 @@ const RoomChat = () => {
           <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
             <span style={{ fontSize: '20px' }}>←</span>
           </motion.button>
-          <div style={{ position: 'relative' }}>
-             <img src={roomData?.iconURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${roomId}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', objectFit: 'cover' }} />
-              {inVoice && <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, background: '#10b981', border: '2px solid #000', borderRadius: '50%' }} />}
-          </div>
-          <div className="col">
-            <span style={{ fontWeight: 800, fontSize: 14 }}>{roomData?.name || 'Loading...'}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{roomData?.members?.length || 0} MEMBERS</span>
-              {pinnedMessages.length > 0 && (
-                <div onClick={() => setShowPins(true)} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,223,216,0.1)', padding: '2px 6px', borderRadius: 10, cursor: 'pointer' }}>
-                  <Pin size={8} color="var(--primary)" />
-                  <span style={{ fontSize: 9, fontWeight: 900, color: 'var(--primary)' }}>{pinnedMessages.length}</span>
-                </div>
-              )}
+          <div onClick={() => setShowMembers(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+            <div style={{ position: 'relative' }}>
+               <img src={roomData?.iconURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${roomId}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', objectFit: 'cover' }} />
+                {inVoice && <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, background: '#10b981', border: '2px solid #000', borderRadius: '50%' }} />}
+            </div>
+            <div className="col">
+              <span style={{ fontWeight: 800, fontSize: 14 }}>{roomData?.name || 'Loading...'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{roomData?.members?.length || 0} MEMBERS</span>
+                {pinnedMessages.length > 0 && (
+                  <div onClick={(e) => { e.stopPropagation(); setShowPins(true); }} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,223,216,0.1)', padding: '2px 6px', borderRadius: 10, cursor: 'pointer' }}>
+                    <Pin size={8} color="var(--primary)" />
+                    <span style={{ fontSize: 9, fontWeight: 900, color: 'var(--primary)' }}>{pinnedMessages.length}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -249,7 +382,7 @@ const RoomChat = () => {
             {inVoice ? <Volume2 size={14} /> : <Phone size={14} />}
             {inVoice ? 'VOICE ON' : 'JOIN VOICE'}
           </motion.button>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={handleLeave} style={{ background: 'none', border: 'none', padding: 8, cursor: 'pointer' }}>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowMembers(true)} style={{ background: 'none', border: 'none', padding: 8, cursor: 'pointer' }}>
             <MoreVertical size={20} color="var(--text-muted)" />
           </motion.button>
         </div>
@@ -440,7 +573,7 @@ const RoomChat = () => {
 
       {/* Composer */}
       <div className="glass-panel row align-center p-2" style={{ borderBottom: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0, paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 20px))', zIndex: 10 }}>
-        <button className="icon-btn" onClick={() => showToast('More actions coming soon')}><Plus size={20} className="text-muted" /></button>
+        <button className="icon-btn" onClick={() => showToast('More actions disabled in beta')}><Plus size={20} className="text-muted" /></button>
         <button className="icon-btn" onClick={() => setShowGifs(!showGifs)}><Smile size={20} className="text-muted" /></button>
 
         <label className="icon-btn" style={{ cursor: 'pointer', margin: 0 }}>
@@ -462,7 +595,7 @@ const RoomChat = () => {
             <Send size={18} style={{ marginLeft: '-2px' }} />
           </button>
         ) : (
-          <button className="icon-btn" onClick={() => showToast('Voice notes coming soon')}>
+          <button className="icon-btn" onClick={() => showToast('Voice notes disabled in beta')}>
             <Mic size={20} className="text-muted" />
           </button>
         )}

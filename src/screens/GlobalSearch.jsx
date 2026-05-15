@@ -38,7 +38,7 @@ const GlobalSearch = () => {
       }
     };
     if (currentUser) loadData();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     if (!query.trim()) {

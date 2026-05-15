@@ -26,7 +26,7 @@ const Rooms = () => {
     unsubMy = subscribeMyRooms(currentUser.uid, rooms => { setMyRooms(rooms); setLoading(false); });
     unsubPublic = subscribePublicRooms(rooms => { setPublicRooms(rooms); setLoading(false); });
     return () => { if (unsubMy) unsubMy(); if (unsubPublic) unsubPublic(); };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleJoin = async (roomId) => {
     try { await joinRoom(roomId, currentUser.uid); navigate(`/room-chat/${roomId}`); }
@@ -62,7 +62,7 @@ const Rooms = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
           <div style={{ position: 'relative' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 36, height: 36, borderRadius: 8 }} />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 36, height: 36, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', borderRadius: '50%', border: '2px solid black' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>

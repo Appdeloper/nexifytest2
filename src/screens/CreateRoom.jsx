@@ -30,7 +30,7 @@ const CreateRoom = () => {
     if (currentUser) {
       getAllUsers(currentUser.uid).then(setAvailableFriends);
     }
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleIconChange = (e) => {
     const file = e.target.files[0];

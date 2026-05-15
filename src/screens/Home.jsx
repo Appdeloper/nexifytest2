@@ -102,7 +102,7 @@ const Home = () => {
             whileHover={{ scale: 1.1, rotate: 5 }}
             style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.05)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}
           >
-            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Nexify" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} alt="Nexify" />
           </motion.div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontWeight: 900, fontSize: 18, letterSpacing: 2, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>NEXIFY</span>
@@ -473,7 +473,7 @@ const Home = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ position: 'relative' }}>
-                <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, borderRadius: 8 }} alt="Logo" />
+                <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 32, height: 32, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} alt="Logo" />
                 <div style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: '#10b981', borderRadius: '50%', border: '1.5px solid black' }} />
               </div>
               <span className="header-title" style={{ fontSize: 18, letterSpacing: 1.5 }}>NEXIFY</span>

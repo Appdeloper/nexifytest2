@@ -56,7 +56,7 @@ export const CallProvider = ({ children }) => {
       });
     });
     return () => unsub();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // Handle stream attachment to refs
   useEffect(() => {
@@ -284,7 +284,7 @@ export const CallProvider = ({ children }) => {
   };
 
   const switchCamera = () => {
-    showToast('Switch camera coming soon');
+    showToast('Switch camera disabled in beta');
   };
 
   const formatTime = (seconds) => {
@@ -481,7 +481,7 @@ export const CallProvider = ({ children }) => {
                     {isCameraOff ? <VideoOff size={26} /> : <Video size={26} />}
                   </motion.button>
                 ) : (
-                  <motion.button whileTap={{ scale: 0.9 }} onClick={() => showToast('Enhance coming soon')} style={{ background: 'rgba(255,255,255,0.06)', width: 56, height: 56, borderRadius: '50%', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={() => showToast('Enhance disabled in beta')} style={{ background: 'rgba(255,255,255,0.06)', width: 56, height: 56, borderRadius: '50%', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Plus size={26} />
                   </motion.button>
                 )}
@@ -499,7 +499,7 @@ export const CallProvider = ({ children }) => {
                     <Camera size={26} />
                   </motion.button>
                 ) : (
-                  <motion.button whileTap={{ scale: 0.9 }} onClick={() => showToast('Quick chat coming soon')} style={{ background: 'rgba(255,255,255,0.06)', width: 56, height: 56, borderRadius: '50%', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={() => showToast('Quick chat disabled in beta')} style={{ background: 'rgba(255,255,255,0.06)', width: 56, height: 56, borderRadius: '50%', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <MessageSquare size={24} />
                   </motion.button>
                 )}

@@ -17,7 +17,7 @@ const TABS = ['Recent Calls', 'Missed Calls'];
 const Calls = () => {
   const { showToast } = useToast();
   const { currentUser } = useAuth();
-  const { startVoiceCall } = useCall();
+  const { startVoiceCall, startVideoCall } = useCall();
   const [calls, setCalls] = useState([]);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('Recent Calls');
@@ -40,11 +40,11 @@ const Calls = () => {
       setCalls(callList);
     });
     return () => { if (typeof unsub === 'function') unsub(); else unsub.then(fn => fn && fn()); };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleCallback = (uid, type) => {
     if (type === 'voice') startVoiceCall(uid);
-    else showToast('Video call UI ready. Connect WebRTC signaling to enable live calls.');
+    else startVideoCall(uid);
   };
 
   const displayedCalls = calls.filter(c => {
@@ -66,15 +66,19 @@ const Calls = () => {
         position: 'sticky', top: 0, zIndex: 10
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
           <h1 style={{ fontSize: 18, fontWeight: 700 }}>Calls</h1>
         </div>
         <button
-          onClick={() => showToast('Calling UI ready. Connect WebRTC signaling to enable live calls.')}
+          onClick={() => showToast('Select a user from your friends list to start a call.')}
           style={{ background: 'var(--primary-gradient)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', boxShadow: '0 2px 10px rgba(0,223,216,0.35)' }}
         >
           <PhoneForwarded size={17} />
         </button>
+      </div>
+
+      <div style={{ margin: '12px 16px 0', background: 'rgba(255, 152, 0, 0.15)', border: '1px solid rgba(255, 152, 0, 0.5)', padding: '10px 14px', borderRadius: '12px', color: '#ffcc80', fontSize: '13px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <span style={{ fontWeight: 800 }}>BETA:</span> WebRTC Calls are in beta. Expect connection instability.
       </div>
 
       {/* Search + Tabs */}
@@ -111,8 +115,8 @@ const Calls = () => {
             icon={Phone}
             title="No calls yet"
             description="Start a voice or video call with a friend. All your activity will appear here."
-            actionText="Start Voice Call"
-            onAction={() => showToast('Calling UI ready. Connect WebRTC signaling to enable live calls.')}
+            actionText="Find Friends"
+            onAction={() => showToast('Select a user from your friends list to start a call.')}
           />
         ) : (
           <div className="col gap-3">

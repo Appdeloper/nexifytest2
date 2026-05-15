@@ -26,6 +26,19 @@ export const sendFriendRequest = async (fromUid, toUid) => {
     status: 'pending',
     createdAt: serverTimestamp(),
   });
+
+  // Notify recipient
+  try {
+    const { getUserData } = await import('./users');
+    const sender = await getUserData(fromUid);
+    const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+    await sendNotification(toUid, {
+      title: 'New Friend Request',
+      body: `${sender?.displayName || 'Someone'} wants to be your friend.`,
+      type: NOTIFICATION_TYPES.FRIEND_REQUEST,
+      fromUid: fromUid
+    });
+  } catch (e) {}
 };
 
 // ── Cancel a sent request ──────────────────────────────────────
@@ -46,6 +59,19 @@ export const acceptFriendRequest = async (fromUid, toUid) => {
     userMap: { [fromUid]: true, [toUid]: true },
     createdAt: serverTimestamp(),
   });
+
+  // Notify the other person (fromUid is the one who sent the request, toUid is the one accepting)
+  try {
+    const { getUserData } = await import('./users');
+    const acceptor = await getUserData(toUid);
+    const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
+    await sendNotification(fromUid, {
+      title: 'Friend Request Accepted',
+      body: `${acceptor?.displayName || 'Someone'} accepted your friend request!`,
+      type: NOTIFICATION_TYPES.FRIEND_ACCEPTED,
+      fromUid: toUid
+    });
+  } catch (e) {}
 };
 
 // ── Decline a friend request ───────────────────────────────────

@@ -12,8 +12,12 @@ const ITEMS = [
   { to: '/profile', icon: User, label: 'Profile' },
 ];
 
+import { useNotifications } from './NotificationProvider';
+
 const BottomNav = () => {
   const location = useLocation();
+  const { notifications } = useNotifications();
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <nav style={{
@@ -34,6 +38,9 @@ const BottomNav = () => {
     }}>
       {ITEMS.map(({ to, icon: Icon, label }) => {
         const isActive = location.pathname === to || (to !== '/home' && location.pathname.startsWith(to));
+        // Show badge for Chats if there are unread notifications
+        const showBadge = (label === 'Chats' || label === 'Rooms') && unreadCount > 0;
+        
         return (
           <NavLink
             key={to}
@@ -65,7 +72,8 @@ const BottomNav = () => {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: isActive ? 'linear-gradient(135deg, rgba(121, 40, 202, 0.2), rgba(0, 223, 216, 0.2))' : 'transparent',
                 border: isActive ? '1px solid rgba(0, 223, 216, 0.3)' : '1px solid transparent',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                position: 'relative'
               }}>
                 <Icon
                   size={22}
@@ -73,6 +81,14 @@ const BottomNav = () => {
                   color={isActive ? '#00dfd8' : 'rgba(255,255,255,0.4)'}
                   style={{ filter: isActive ? 'drop-shadow(0 0 8px rgba(0, 223, 216, 0.4))' : 'none' }}
                 />
+                {showBadge && (
+                  <div style={{
+                    position: 'absolute', top: 5, right: 5,
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: '#ff4757', border: '2px solid rgba(10, 10, 15, 1)',
+                    boxShadow: '0 0 10px rgba(255, 71, 87, 0.5)'
+                  }} />
+                )}
               </div>
               {isActive && (
                 <span style={{

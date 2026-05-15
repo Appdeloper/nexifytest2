@@ -60,7 +60,7 @@ const Profile = () => {
     const unsubMusic = subscribeUserMusicStatus(currentUser.uid, setMusicStatus);
     const unsubFocus = subscribeFocusData(currentUser.uid, setFocusStats);
     return () => { unsub(); unsubMusic(); unsubFocus(); };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const [musicStatus, setMusicStatus] = useState(null);
   const { stats: fitStats } = useFitness();
@@ -165,7 +165,7 @@ const Profile = () => {
             <ArrowLeft size={18} />
           </button>
           <div style={{ position: 'relative' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 36, height: 36, borderRadius: 8 }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: 36, height: 36, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} alt="Logo" />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', borderRadius: '50%', border: '2px solid black' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -379,7 +379,6 @@ const Profile = () => {
         <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 24, padding: '4px 16px', border: '1px solid rgba(255,255,255,0.05)' }}>
           <ProfileRow icon={Target} color="#00dfd8" label="My Tasks" onClick={() => navigate('/tasks')} delay={0.1} />
           <ProfileRow icon={Trophy} color="#f59e0b" label="Leaderboards" onClick={() => navigate('/leaderboards')} delay={0.15} />
-          <ProfileRow icon={Bookmark} color="#8b5cf6" label="Saved Messages" onClick={() => showToast('Coming soon')} delay={0.2} />
           <ProfileRow icon={Zap} color="#0070f3" label="My Activity" onClick={() => navigate('/nexify-edge')} delay={0.25} />
         </div>
 

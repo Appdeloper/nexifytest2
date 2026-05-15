@@ -42,7 +42,7 @@ const Chats = () => {
       }
     });
     return () => unsub();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const filteredChats = chats.filter(chat => {
     if (activeTab === 'DMs' && chat.type !== 'dm') return false;
@@ -149,7 +149,7 @@ const Chats = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} alt="Logo" />
           </div>
           <h1 style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>Conversations</h1>
         </div>
@@ -183,18 +183,22 @@ const Chats = () => {
           {TABS.map(tab => (
             <motion.button
               key={tab}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab(tab)}
               style={{
-                background: activeTab === tab ? 'var(--primary-gradient)' : 'rgba(255,255,255,0.05)',
-                color: activeTab === tab ? 'black' : 'rgba(255,255,255,0.6)',
-                border: 'none', padding: '8px 20px', borderRadius: 12,
-                whiteSpace: 'nowrap', cursor: 'pointer',
-                fontWeight: 800, fontSize: 11,
-                letterSpacing: 0.5,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: activeTab === tab ? '0 4px 15px rgba(0,223,216,0.2)' : 'none'
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 20px', borderRadius: 24,
+                background: activeTab === tab ? 'linear-gradient(135deg, #00dfd8, #0070f3)' : 'rgba(255,255,255,0.05)',
+                border: activeTab === tab ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                color: activeTab === tab ? 'black' : 'white',
+                cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.3s',
+                fontWeight: 900, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
+                flexShrink: 0,
+                boxShadow: activeTab === tab ? '0 4px 15px rgba(0,223,216,0.3)' : 'none'
               }}
-            >{tab.toUpperCase()}</motion.button>
+            >
+              {tab}
+            </motion.button>
           ))}
         </div>
       </div>
