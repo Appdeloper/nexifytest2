@@ -149,20 +149,21 @@ const RoomChat = () => {
   const [showMembers, setShowMembers] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null); // { id, x, y }
   const [inVoice, setInVoice] = useState(false);
+  const [typingUsers, setTypingUsers] = useState([]);
 
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     if (!currentUser || !roomId) return;
 
-    // Real-time room data listener
-    const roomRef = doc(db, 'rooms', roomId);
-    const unsubRoom = onSnapshot(roomRef, async (roomDoc) => {
-      if (roomDoc.exists()) {
-        const data = roomDoc.data();
+    // 1. Room Data & Members Profiles
+    const unsubRoom = onSnapshot(doc(db, 'rooms', roomId), async (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
         setRoomData(data);
         
-        if (data.members && data.members.length > 0) {
+        // Fetch member profiles
+        if (data.members?.length > 0) {
           const profiles = {};
           await Promise.all(data.members.map(async (uid) => {
             const pDoc = await getDoc(doc(db, 'users', uid));
@@ -170,21 +171,8 @@ const RoomChat = () => {
           }));
           setMemberProfiles(profiles);
         }
-    const unsub = subscribeRoomMessages(roomId, msgs => {
-      setMessages(msgs);
-      setLoadingMsg(false);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      
-      // AI Tag Detection
-      import('../services/ai').then(({ processAITag }) => {
-        processAITag(roomId, true, msgs);
-      });
-    });
 
-    const unsubRoom = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setRoom(data);
+        // Typing indicator logic
         const typingData = data.typing || {};
         const typingList = Object.entries(typingData)
           .filter(([uid, typing]) => typing && uid !== currentUser.uid)
@@ -196,7 +184,22 @@ const RoomChat = () => {
       }
     });
 
-    return () => { unsub(); unsubRoom(); };
+    // 2. Room Messages
+    const unsubMsgs = subscribeRoomMessages(roomId, msgs => {
+      setMessages(msgs);
+      setLoadingMsg(false);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      
+      // AI Tag Detection
+      import('../services/ai').then(({ processAITag }) => {
+        processAITag(roomId, true, msgs);
+      });
+    });
+
+    return () => { 
+      unsubRoom(); 
+      unsubMsgs(); 
+    };
   }, [roomId, currentUser?.uid]);
 
   /* typing indicator */
@@ -330,7 +333,7 @@ const RoomChat = () => {
       const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notifications');
       await sendNotification(uid, {
         title: 'Room Invitation',
-        body: `You've been invited to join ${room?.name || 'a room'}.`,
+        body: `You've been invited to join ${roomData?.name || 'a room'}.`,
         type: NOTIFICATION_TYPES.ROOM_INVITE,
         roomId: roomId
       });
@@ -346,9 +349,9 @@ const RoomChat = () => {
       <AnimatePresence>
         {showMembers && (
           <MemberManagementSheet 
-            members={room?.members || []}
+            members={roomData?.members || []}
             profiles={memberProfiles}
-            roomData={room}
+            roomData={roomData}
             currentUser={currentUser}
             onRemove={handleRemoveMember}
             onInvite={handleInviteMember}
@@ -369,13 +372,13 @@ const RoomChat = () => {
           </motion.button>
           <div onClick={() => setShowMembers(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
             <div style={{ position: 'relative' }}>
-               <img src={room?.iconURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${roomId}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', objectFit: 'cover' }} />
+               <img src={roomData?.iconURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${roomId}`} alt="" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', objectFit: 'cover' }} />
                 {inVoice && <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, background: '#10b981', border: '2px solid #000', borderRadius: '50%' }} />}
             </div>
             <div className="col">
-              <span style={{ fontWeight: 800, fontSize: 14 }}>{room?.name || 'Loading...'}</span>
+              <span style={{ fontWeight: 800, fontSize: 14 }}>{roomData?.name || 'Loading...'}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{room?.members?.length || 0} MEMBERS</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{roomData?.members?.length || 0} MEMBERS</span>
                 {pinnedMessages.length > 0 && (
                   <div onClick={(e) => { e.stopPropagation(); setShowPins(true); }} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,223,216,0.1)', padding: '2px 6px', borderRadius: 10, cursor: 'pointer' }}>
                     <Pin size={8} color="var(--primary)" />
@@ -618,6 +621,7 @@ const RoomChat = () => {
         )}
       </div>
     </div>
+  </div>
   );
 };
 
