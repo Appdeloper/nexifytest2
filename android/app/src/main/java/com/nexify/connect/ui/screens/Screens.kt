@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -36,6 +37,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.nexify.connect.data.model.*
 import com.nexify.connect.data.repository.FirebaseRepository
+import com.nexify.connect.services.AiService
 import com.nexify.connect.services.CloudinaryService
 import com.nexify.connect.ui.components.*
 import com.nexify.connect.ui.theme.*
@@ -233,7 +235,7 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
     }
 }
 
-// ── EDIT PROFILE / CHANGE DP SCREEN (Fully Functional with Cloudinary) ─
+// ── EDIT PROFILE / CHANGE DP SCREEN (with AI Bio Generation) ────────
 @Composable
 fun ProfileCustomizationScreen(navController: NavController, repository: FirebaseRepository) {
     val uid = repository.currentUserId ?: ""
@@ -241,6 +243,9 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
     
     var bioText by remember { mutableStateOf("") }
     var isUploading by remember { mutableStateOf(false) }
+    var showAiBioDialog by remember { mutableStateOf(false) }
+    var aiInterestInput by remember { mutableStateOf("") }
+    var isGeneratingBio by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -344,7 +349,25 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold)
+                
+                Row(
+                    modifier = Modifier
+                        .clickable { showAiBioDialog = true }
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(12.dp))
+                    Text("AI Suggest", color = CyanNeon, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
             PremiumTextField(
                 value = bioText,
                 onValueChange = { bioText = it },
@@ -366,9 +389,57 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
             modifier = Modifier.fillMaxWidth()
         )
     }
+
+    if (showAiBioDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiBioDialog = false },
+            title = { Text("Generate Futuristic Bio", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Tell Nexify AI your interests (e.g. studying, fitness, coding) to generate a cyber bio:", color = TextMuted, fontSize = 13.sp)
+                    PremiumTextField(
+                        value = aiInterestInput,
+                        onValueChange = { aiInterestInput = it },
+                        placeholder = "e.g. gaming, lofi, tech"
+                    )
+                    if (isGeneratingBio) {
+                        CircularProgressIndicator(color = CyanNeon, modifier = Modifier.align(Alignment.CenterHorizontally))
+                    }
+                }
+            },
+            confirmButton = {
+                PremiumButton(
+                    text = "GENERATE",
+                    onClick = {
+                        if (aiInterestInput.isNotEmpty()) {
+                            coroutineScope.launch {
+                                isGeneratingBio = true
+                                try {
+                                    val suggested = AiService.generateBio(aiInterestInput)
+                                    bioText = suggested
+                                    showAiBioDialog = false
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "AI core error.", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isGeneratingBio = false
+                                }
+                            }
+                        }
+                    }
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiBioDialog = false }) {
+                    Text("CANCEL", color = Color.Red)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
 
-// ── FIND CITIZENS / ADD FRIEND SCREEN (Dynamically Linked) ────────
+// ── FIND CITIZENS / ADD FRIEND SCREEN ─────────────────────────────
 @Composable
 fun FindFriendsScreen(navController: NavController, repository: FirebaseRepository) {
     var searchQuery by remember { mutableStateOf("") }
@@ -505,7 +576,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
     }
 }
 
-// ── DIRECT MESSAGES & GROUP LISTS (Home Hub Screen) ───────────────
+// ── DIRECT MESSAGES & GROUP LISTS (with AI Shortcut) ───────────────────
 @Composable
 fun ChatListScreen(navController: NavController, repository: FirebaseRepository) {
     val chats by repository.subscribeToChats().collectAsState(initial = emptyList())
@@ -528,6 +599,9 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
         ) {
             Text("Nexify Hub", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CyanNeon)
             Row {
+                IconButton(onClick = { navController.navigate("ai_chat") }) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon)
+                }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Settings, contentDescription = null, color = Color.White)
                 }
@@ -671,21 +745,7 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
     }
 }
 
-// Helper Tab Button
-@Composable
-fun TabButton(text: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .background(if (active) PurpleNeon else CardBg, RoundedCornerShape(16.dp))
-            .border(1.dp, if (active) PurpleNeon else CardBorder, RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Text(text = text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-    }
-}
-
-// ── DIRECT DM CONVERSATION SCREEN (Images, Stickers, Auto Scroll, Seen) ──
+// ── DIRECT DM CONVERSATION SCREEN (with AI Smart Reply Chips) ─────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatConversationScreen(navController: NavController, repository: FirebaseRepository, chatId: String, otherUserId: String) {
@@ -697,6 +757,10 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
     var typedText by remember { mutableStateOf("") }
     var isUploadingMedia by remember { mutableStateOf(false) }
     var showStickerSheet by remember { mutableStateOf(false) }
+    
+    // Dynamic Smart Replies
+    var smartReplies by remember { mutableStateOf<List<String>>(emptyList()) }
+    val lastMessageText = messages.lastOrNull()?.let { if (it.senderId != repository.currentUserId) it.text ?: "" else "" } ?: ""
     
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -714,6 +778,15 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
 
     LaunchedEffect(typedText) {
         repository.setTypingStatus(chatId, typedText.isNotEmpty())
+    }
+
+    // Trigger AI Smart suggestions whenever a new message lands
+    LaunchedEffect(lastMessageText) {
+        if (lastMessageText.isNotEmpty()) {
+            smartReplies = AiService.getSmartReplies(lastMessageText)
+        } else {
+            smartReplies = emptyList()
+        }
     }
 
     // Media Picker launcher
@@ -867,6 +940,27 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
             }
         }
 
+        // AI Smart Suggestion Chips
+        if (smartReplies.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(smartReplies) { reply ->
+                    Box(
+                        modifier = Modifier
+                            .background(CardBg, RoundedCornerShape(16.dp))
+                            .border(1.dp, CyanNeon.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .clickable { typedText = reply }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(reply, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // Input Form
         Row(
             modifier = Modifier
@@ -893,8 +987,12 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                 onClick = {
                     if (typedText.isEmpty()) return@IconButton
                     coroutineScope.launch {
-                        repository.sendMessage(chatId, otherUserId, text = typedText)
-                        typedText = ""
+                        try {
+                            repository.sendMessage(chatId, otherUserId, text = typedText)
+                            typedText = ""
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
+                        }
                     }
                 },
                 modifier = Modifier
@@ -961,7 +1059,7 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
     }
 }
 
-// ── CREATE GROUP / CHAT POD SCREEN (Cloudinary Powered) ───────────
+// ── CREATE GROUP / CHAT POD SCREEN ─────────────────────────────────
 @Composable
 fun CreateGroupScreen(navController: NavController, repository: FirebaseRepository) {
     var groupName by remember { mutableStateOf("") }
@@ -1111,7 +1209,7 @@ fun CreateGroupScreen(navController: NavController, repository: FirebaseReposito
     }
 }
 
-// ── GROUP CONVERSATION SCREEN (Admin Tools + Media + Stickers) ─────
+// ── GROUP CONVERSATION SCREEN ──────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupChatScreen(navController: NavController, repository: FirebaseRepository, groupId: String) {
@@ -1313,8 +1411,12 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
                 onClick = {
                     if (typedText.isEmpty()) return@IconButton
                     coroutineScope.launch {
-                        repository.sendGroupMessage(groupId, text = typedText)
-                        typedText = ""
+                        try {
+                            repository.sendGroupMessage(groupId, text = typedText)
+                            typedText = ""
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
+                        }
                     }
                 },
                 modifier = Modifier
@@ -1475,7 +1577,7 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
     }
 }
 
-// ── DISCORD-STYLE ROOMS SCREEN (Categorized, Dynamic Members) ───────
+// ── DISCORD-STYLE ROOMS SCREEN ──────────────────────────────────────
 @Composable
 fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
     val rooms by repository.subscribeToRooms().collectAsState(initial = emptyList())
@@ -1593,7 +1695,6 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
                     
                     Text("Select Category", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     
-                    // Simple radio button rows for categories selection
                     categories.forEach { cat ->
                         Row(
                             modifier = Modifier
@@ -1635,5 +1736,194 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
             containerColor = Color(0xFF161128),
             shape = RoundedCornerShape(16.dp)
         )
+    }
+}
+
+// ── 🤖 INTELLIGENT AI COMPANION PORTAL (Nexify AI Chat Screen) ────────
+@Composable
+fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
+    val uid = repository.currentUserId ?: ""
+    val messages by repository.subscribeToAiMessages(uid).collectAsState(initial = emptyList())
+    var typedText by remember { mutableStateOf("") }
+    var isAiGenerating by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+    ) {
+        // Appbar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CardBg)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon))),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White)
+            }
+            Column {
+                Text("Nexify AI", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                Text(
+                    text = if (isAiGenerating) "Thinking..." else "Online & ready",
+                    color = if (isAiGenerating) CyanNeon else Color.Green,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        // Messages List
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            if (messages.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(48.dp))
+                            Text("Yo citizen! I'm your futuristic companion.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Ask me about workouts, study tips, or just vibe!", color = TextMuted, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            items(messages) { message ->
+                val isAi = message.senderId == "AI"
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = if (isAi) Alignment.CenterStart else Alignment.CenterEnd
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier.fillMaxWidth(0.85f)
+                    ) {
+                        if (isAi) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(CyanNeon),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = if (isAi) Alignment.Start else Alignment.End
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isAi) CardBg else PurpleNeon)
+                                    .border(1.dp, if (isAi) CyanNeon.copy(0.4f) else CardBorder, RoundedCornerShape(16.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
+                            }
+                            message.timestamp?.let {
+                                Text(
+                                    text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Typing Loader
+        if (isAiGenerating) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(14.dp))
+                Text("Nexify AI is generating response...", color = CyanNeon, fontSize = 11.sp)
+            }
+        }
+
+        // Input Form
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PremiumTextField(
+                value = typedText,
+                onValueChange = { typedText = it },
+                placeholder = "Vibe check with AI...",
+                modifier = Modifier.weight(1f),
+                leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon) }
+            )
+
+            IconButton(
+                onClick = {
+                    if (typedText.isEmpty()) return@IconButton
+                    val prompt = typedText
+                    typedText = ""
+                    coroutineScope.launch {
+                        try {
+                            repository.sendAiMessage(uid, prompt) { generating ->
+                                isAiGenerating = generating
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+            ) {
+                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+            }
+        }
     }
 }

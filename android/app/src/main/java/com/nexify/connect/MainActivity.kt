@@ -99,6 +99,9 @@ class MainActivity : ComponentActivity() {
                                 groupId = groupId
                             )
                         }
+                        composable("ai_chat") {
+                            AiChatScreen(navController = navController, repository = repository)
+                        }
                     }
                 }
             }

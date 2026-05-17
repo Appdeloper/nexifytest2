@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import com.nexify.connect.data.model.*
+import com.nexify.connect.services.AiService
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -57,7 +58,7 @@ class FirebaseRepository {
         auth.signOut()
     }
 
-    // ── PROFILE CUSTOMIZATION (Direct Firestore Writes) ───────────
+    // ── PROFILE CUSTOMIZATION ─────────────────────────────────────
     suspend fun updateProfileImage(imageUrl: String) {
         val uid = currentUserId ?: return
         db.collection("users").document(uid).update("profileImage", imageUrl).await()
@@ -163,7 +164,7 @@ class FirebaseRepository {
         }.await()
     }
 
-    // ── STICKER SYSTEM (Auto-Seeding Futuristic Pack) ──────────────
+    // ── STICKER SYSTEM ───────────────────────────────────────────
     fun subscribeToStickers(): Flow<List<Sticker>> = callbackFlow {
         db.collection("stickers").get().addOnSuccessListener { snap ->
             if (snap.isEmpty) {
@@ -194,7 +195,7 @@ class FirebaseRepository {
         awaitClose { listener.remove() }
     }
 
-    // ── 1-TO-1 CHAT SYSTEM (Text, Image, Stickers) ──────────────────
+    // ── 1-TO-1 CHAT SYSTEM (with Nexify Edge Moderation Shield) ───────
     fun getChatId(otherUserId: String): String {
         val uid = currentUserId ?: ""
         return listOf(uid, otherUserId).sorted().joinToString("_")
@@ -208,6 +209,11 @@ class FirebaseRepository {
         stickerId: String? = null,
         stickerUrl: String? = null
     ) {
+        // CONTENT MODERATION / SHIELD
+        if (text != null && AiService.isOffensiveOrSpam(text)) {
+            throw Exception("Transmission blocked by Nexify Edge: Spam or unsafe content detected.")
+        }
+
         val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
         val message = Message(
@@ -288,7 +294,61 @@ class FirebaseRepository {
             }
     }
 
-    // ── GROUP CHAT SYSTEM (Image, Stickers, Admin Control) ─────────
+    // ── NEXIFY INTELLIGENT ASSISTANT (Nexify AI Chat System) ───────────
+    fun subscribeToAiMessages(userId: String): Flow<List<Message>> = callbackFlow {
+        val q = db.collection("ai_chats").document(userId).collection("chat_messages").orderBy("timestamp")
+        val listener = q.addSnapshotListener { snap, err ->
+            if (err != null) {
+                close(err)
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { it.toObject(Message::class.java) } ?: emptyList()
+            trySend(list)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun sendAiMessage(userId: String, text: String, onAiTyping: (Boolean) -> Unit) {
+        // CONTENT MODERATION CHECK ON USER PROMPT
+        if (AiService.isOffensiveOrSpam(text)) {
+            throw Exception("Transmission blocked by Nexify Edge: Prompt violates moderation rules.")
+        }
+
+        val messageId = UUID.randomUUID().toString()
+        val userMessage = Message(
+            messageId = messageId,
+            senderId = userId,
+            text = text,
+            timestamp = Date()
+        )
+        val ref = db.collection("ai_chats").document(userId).collection("chat_messages")
+        ref.document(messageId).set(userMessage).await()
+
+        // Get context chat history
+        val historySnap = ref.orderBy("timestamp").limitToLast(10).get().await()
+        val history = historySnap.documents.mapNotNull { it.toObject(Message::class.java) }
+
+        // Start typing animation delay
+        onAiTyping(true)
+        
+        // Secure AI Call
+        val response = AiService.askNexifyAI(text, history)
+        
+        // Delay to simulate computation
+        kotlinx.coroutines.delay(1200)
+        onAiTyping(false)
+
+        val aiMessageId = UUID.randomUUID().toString()
+        val aiMessage = Message(
+            messageId = aiMessageId,
+            senderId = "AI",
+            text = response,
+            timestamp = Date()
+        )
+        ref.document(aiMessageId).set(aiMessage).await()
+    }
+
+    // ── GROUP CHAT SYSTEM (with Moderation) ──────────────────────
     suspend fun createGroup(name: String, members: List<String>, groupImage: String): String {
         val uid = currentUserId ?: throw Exception("Unauthenticated")
         val groupId = UUID.randomUUID().toString()
@@ -324,6 +384,10 @@ class FirebaseRepository {
         stickerId: String? = null,
         stickerUrl: String? = null
     ) {
+        if (text != null && AiService.isOffensiveOrSpam(text)) {
+            throw Exception("Transmission blocked by Nexify Edge: Moderation filter triggered.")
+        }
+
         val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
         val message = Message(
@@ -365,7 +429,7 @@ class FirebaseRepository {
         awaitClose { listener.remove() }
     }
 
-    // ── DISCORD-STYLE ROOMS SYSTEM (Public/Private with categories) ──
+    // ── DISCORD-STYLE ROOMS SYSTEM ──────────────────────────────────
     suspend fun createRoom(name: String, description: String, category: String, isPrivate: Boolean) {
         val uid = currentUserId ?: return
         val roomId = UUID.randomUUID().toString()
@@ -392,6 +456,9 @@ class FirebaseRepository {
     }
 
     suspend fun sendRoomMessage(roomId: String, text: String) {
+        if (AiService.isOffensiveOrSpam(text)) {
+            throw Exception("Transmission blocked by Nexify Edge: Moderation filter triggered.")
+        }
         val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
         val message = Message(
