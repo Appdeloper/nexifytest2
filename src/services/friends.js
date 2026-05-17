@@ -183,58 +183,21 @@ export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
   }
 
   const lower = searchQuery.toLowerCase();
-  
-  const qName = query(
-    collection(db, 'users'),
-    where('displayNameLower', '>=', lower),
-    where('displayNameLower', '<=', lower + '\uf8ff'),
-    limit(20)
-  );
+  const q = query(collection(db, 'users'));
 
-  const qEmail = query(
-    collection(db, 'users'),
-    where('emailLower', '>=', lower),
-    where('emailLower', '<=', lower + '\uf8ff'),
-    limit(20)
-  );
-
-  let resultsName = [];
-  let resultsEmail = [];
-
-  const update = () => {
-    const combined = [];
-    const seenUids = new Set();
-
-    const addUsers = (list) => {
-      list.forEach(u => {
-        const id = u.uid || u.id;
-        if (id && !seenUids.has(id)) {
-          seenUids.add(id);
-          combined.push({ ...u, uid: id });
-        }
-      });
-    };
-
-    addUsers(resultsName);
-    addUsers(resultsEmail);
-
-    callback(combined.filter(u => u.uid !== currentUid));
-  };
-
-  const unsubName = onSnapshot(qName, (snap) => {
-    resultsName = snap.docs.map(d => ({ uid: d.id, id: d.id, ...d.data() }));
-    update();
-  }, (err) => console.error("Search name failed:", err));
-
-  const unsubEmail = onSnapshot(qEmail, (snap) => {
-    resultsEmail = snap.docs.map(d => ({ uid: d.id, id: d.id, ...d.data() }));
-    update();
-  }, (err) => console.error("Search email failed:", err));
-
-  return () => {
-    unsubName();
-    unsubEmail();
-  };
+  return onSnapshot(q, (snap) => {
+    const matched = snap.docs
+      .map(d => ({ uid: d.id, id: d.id, ...d.data() }))
+      .filter(u => u.uid !== currentUid && (
+        u.displayName?.toLowerCase().includes(lower) ||
+        u.email?.toLowerCase().includes(lower) ||
+        u.username?.toLowerCase().includes(lower)
+      ));
+    callback(matched);
+  }, (err) => {
+    console.error("Search subscribe failed:", err);
+    callback([]);
+  });
 };
 
 // ── Real-time: subscribe to all users (for global search/filtering) ──
