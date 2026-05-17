@@ -100,13 +100,13 @@ service cloud.firestore {
 
     // ── Friends & Requests ────────────────────────────────────────
     match /friends/{friendId} {
-      allow read: if isSignedIn() && (resource.data.userMap[request.auth.uid] == true || isStaff());
-      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource == null || resource.data.userMap[request.auth.uid] == true || isStaff());
+      allow create: if isSignedIn() && request.resource.data.userMap[request.auth.uid] == true;
       allow update, delete: if isSignedIn() && (resource.data.userMap[request.auth.uid] == true || isStaff());
     }
 
     match /friendRequests/{requestId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
+      allow read: if isSignedIn() && (resource == null || request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
       allow create: if isSignedIn() && request.resource.data.from == request.auth.uid;
       allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
     }

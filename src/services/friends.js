@@ -184,7 +184,6 @@ export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
 
   const lower = searchQuery.toLowerCase();
   
-  // We'll create two queries: one for name, one for email
   const qName = query(
     collection(db, 'users'),
     where('displayNameLower', '>=', lower),
@@ -199,26 +198,36 @@ export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
     limit(20)
   );
 
-  // Since we can't easily merge two onSnapshot streams into one clean callback with deduplication
-  // without state management, we'll use a combined listener approach.
   let resultsName = [];
   let resultsEmail = [];
 
   const update = () => {
-    const combined = [...resultsName];
-    resultsEmail.forEach(u => {
-      if (!combined.find(c => c.uid === u.uid)) combined.push(u);
-    });
+    const combined = [];
+    const seenUids = new Set();
+
+    const addUsers = (list) => {
+      list.forEach(u => {
+        const id = u.uid || u.id;
+        if (id && !seenUids.has(id)) {
+          seenUids.add(id);
+          combined.push({ ...u, uid: id });
+        }
+      });
+    };
+
+    addUsers(resultsName);
+    addUsers(resultsEmail);
+
     callback(combined.filter(u => u.uid !== currentUid));
   };
 
   const unsubName = onSnapshot(qName, (snap) => {
-    resultsName = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    resultsName = snap.docs.map(d => ({ uid: d.id, id: d.id, ...d.data() }));
     update();
   }, (err) => console.error("Search name failed:", err));
 
   const unsubEmail = onSnapshot(qEmail, (snap) => {
-    resultsEmail = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    resultsEmail = snap.docs.map(d => ({ uid: d.id, id: d.id, ...d.data() }));
     update();
   }, (err) => console.error("Search email failed:", err));
 
