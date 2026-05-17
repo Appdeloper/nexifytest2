@@ -134,11 +134,23 @@ class FirebaseRepository {
         val currentRef = db.collection("users").document(uid)
         val targetRef = db.collection("users").document(targetUserId)
 
+        val chatId = listOf(uid, targetUserId).sorted().joinToString("_")
+        val chatRef = db.collection("chats").document(chatId)
+
         db.runTransaction { transaction ->
             transaction.update(currentRef, "friends", FieldValue.arrayUnion(targetUserId))
             transaction.update(targetRef, "friends", FieldValue.arrayUnion(uid))
             transaction.update(currentRef, "requestsReceived", FieldValue.arrayRemove(targetUserId))
             transaction.update(targetRef, "requestsSent", FieldValue.arrayRemove(uid))
+
+            val chatMeta = mapOf(
+                "chatId" to chatId,
+                "participants" to listOf(uid, targetUserId),
+                "lastMessage" to "✨ Connected! Say hello.",
+                "timestamp" to Date(),
+                "createdAt" to Date()
+            )
+            transaction.set(chatRef, chatMeta, SetOptions.merge())
         }.await()
     }
 

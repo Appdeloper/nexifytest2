@@ -427,19 +427,10 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
                         }
                     }
                 )
-            },
-            dismissButton = {
-                TextButton(onClick = { showAiBioDialog = false }) {
-                    Text("CANCEL", color = Color.Red)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
     }
 }
 
-// ── FIND CITIZENS / ADD FRIEND SCREEN ─────────────────────────────
+// ── FIND CITIZENS / ADD FRIEND SCREEN (Sliding Invites Tab) ────────────────
 @Composable
 fun FindFriendsScreen(navController: NavController, repository: FirebaseRepository) {
     var searchQuery by remember { mutableStateOf("") }
@@ -447,6 +438,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
     val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    var activeSubTab by remember { mutableStateOf("Search") }
 
     val filteredUsers = allUsers.filter {
         it.username.contains(searchQuery, ignoreCase = true) ||
@@ -467,105 +460,216 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
             IconButton(onClick = { navController.popBackStack() }) {
                 Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
             }
-            Text("Find Citizens", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Citizen Directory", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
 
-        PremiumTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = "Search by username or email...",
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, color = CyanNeon) }
-        )
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        // Sliding Sub-Tabs for Search vs Received Requests
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(filteredUsers) { targetUser ->
-                GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            PresenceIndicator(
-                                imageUrl = targetUser.profileImage,
-                                onlineStatus = targetUser.onlineStatus
-                            )
-                            Column {
-                                Text(targetUser.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                Text(targetUser.email, color = TextMuted, fontSize = 12.sp)
+            TabButton(
+                text = "Search Citizens",
+                active = activeSubTab == "Search",
+                onClick = { activeSubTab = "Search" }
+            )
+            TabButton(
+                text = "Received Invites (${currentUserProfile?.requestsReceived?.size ?: 0})",
+                active = activeSubTab == "Requests",
+                onClick = { activeSubTab = "Requests" }
+            )
+        }
+
+        if (activeSubTab == "Search") {
+            PremiumTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = "Search by username or email...",
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, color = CyanNeon) }
+            )
+
+            if (filteredUsers.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No citizens found matching query.", color = TextMuted, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredUsers) { targetUser ->
+                        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PresenceIndicator(
+                                        imageUrl = targetUser.profileImage,
+                                        onlineStatus = targetUser.onlineStatus
+                                    )
+                                    Column {
+                                        Text(targetUser.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text(targetUser.email, color = TextMuted, fontSize = 12.sp)
+                                    }
+                                }
+
+                                val status = when {
+                                    currentUserProfile?.friends?.contains(targetUser.userId) == true -> "friends"
+                                    currentUserProfile?.requestsSent?.contains(targetUser.userId) == true -> "sent"
+                                    currentUserProfile?.requestsReceived?.contains(targetUser.userId) == true -> "received"
+                                    else -> "none"
+                                }
+
+                                when (status) {
+                                    "friends" -> {
+                                        Button(
+                                            onClick = {
+                                                val chatId = repository.getChatId(targetUser.userId)
+                                                navController.navigate("chat/$chatId/${targetUser.userId}")
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
+                                            shape = RoundedCornerShape(20.dp)
+                                        ) {
+                                            Icon(Icons.Default.Message, contentDescription = null, color = Color.Black)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Message", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    "sent" -> {
+                                        Button(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    repository.cancelFriendRequest(targetUser.userId)
+                                                    Toast.makeText(context, "Request cancelled.", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                            shape = RoundedCornerShape(20.dp)
+                                        ) {
+                                            Text("Pending", color = Color.White, fontSize = 12.sp)
+                                        }
+                                    }
+                                    "received" -> {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Button(
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        repository.acceptFriendRequest(targetUser.userId)
+                                                        Toast.makeText(context, "Accepted request!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon),
+                                                shape = RoundedCornerShape(20.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Accept", color = Color.White, fontSize = 11.sp)
+                                            }
+                                            OutlinedButton(
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        repository.rejectFriendRequest(targetUser.userId)
+                                                        Toast.makeText(context, "Rejected request.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                border = BorderStroke(1.dp, Color.Red),
+                                                shape = RoundedCornerShape(20.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Reject", color = Color.Red, fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                    "none" -> {
+                                        Button(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    repository.sendFriendRequest(targetUser.userId)
+                                                    Toast.makeText(context, "Friend request sent!", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                            shape = RoundedCornerShape(20.dp),
+                                            modifier = Modifier
+                                                .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), RoundedCornerShape(20.dp))
+                                        ) {
+                                            Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Add", color = Color.White, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
                             }
                         }
+                    }
+                }
+            }
+        } else {
+            // Received Requests view
+            val requestsList = allUsers.filter { currentUserProfile?.requestsReceived?.contains(it.userId) == true }
+            
+            if (requestsList.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No pending invitations received.", color = TextMuted, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(requestsList) { sender ->
+                        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PresenceIndicator(
+                                        imageUrl = sender.profileImage,
+                                        onlineStatus = sender.onlineStatus
+                                    )
+                                    Column {
+                                        Text(sender.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text(sender.email, color = TextMuted, fontSize = 12.sp)
+                                    }
+                                }
 
-                        val status = when {
-                            currentUserProfile?.friends?.contains(targetUser.userId) == true -> "friends"
-                            currentUserProfile?.requestsSent?.contains(targetUser.userId) == true -> "sent"
-                            currentUserProfile?.requestsReceived?.contains(targetUser.userId) == true -> "received"
-                            else -> "none"
-                        }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                repository.acceptFriendRequest(sender.userId)
+                                                Toast.makeText(context, "Accepted invite!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon),
+                                        shape = RoundedCornerShape(20.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("Accept", color = Color.White, fontSize = 12.sp)
+                                    }
 
-                        when (status) {
-                            "friends" -> {
-                                Button(
-                                    onClick = {
-                                        val chatId = repository.getChatId(targetUser.userId)
-                                        navController.navigate("chat/$chatId/${targetUser.userId}")
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
-                                    shape = RoundedCornerShape(20.dp)
-                                ) {
-                                    Icon(Icons.Default.Message, contentDescription = null, color = Color.Black)
-                                }
-                            }
-                            "sent" -> {
-                                Button(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            repository.cancelFriendRequest(targetUser.userId)
-                                            Toast.makeText(context, "Cancelled", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                                    shape = RoundedCornerShape(20.dp)
-                                ) {
-                                    Text("Pending", color = Color.White, fontSize = 12.sp)
-                                }
-                            }
-                            "received" -> {
-                                Button(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            repository.acceptFriendRequest(targetUser.userId)
-                                            Toast.makeText(context, "Accepted!", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon),
-                                    shape = RoundedCornerShape(20.dp)
-                                ) {
-                                    Text("Accept", color = Color.White, fontSize = 12.sp)
-                                }
-                            }
-                            "none" -> {
-                                Button(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            repository.sendFriendRequest(targetUser.userId)
-                                            Toast.makeText(context, "Request Sent", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                                    shape = RoundedCornerShape(20.dp),
-                                    modifier = Modifier
-                                        .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), RoundedCornerShape(20.dp))
-                                ) {
-                                    Icon(Icons.Default.UserPlus, contentDescription = null, color = Color.White)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Add", color = Color.White, fontSize = 12.sp)
+                                    OutlinedButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                repository.rejectFriendRequest(sender.userId)
+                                                Toast.makeText(context, "Rejected invite.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        border = BorderStroke(1.dp, Color.Red),
+                                        shape = RoundedCornerShape(20.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("Reject", color = Color.Red, fontSize = 12.sp)
+                                    }
                                 }
                             }
                         }
@@ -751,6 +855,7 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
 fun ChatConversationScreen(navController: NavController, repository: FirebaseRepository, chatId: String, otherUserId: String) {
     val messages by repository.subscribeToMessages(chatId).collectAsState(initial = emptyList())
     val otherUserProfile by repository.subscribeToUser(otherUserId).collectAsState(initial = null)
+    val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").collectAsState(initial = null)
     val chatMeta by repository.subscribeToChats().collectAsState(initial = emptyList())
     val stickers by repository.subscribeToStickers().collectAsState(initial = emptyList())
 
@@ -940,67 +1045,105 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
             }
         }
 
-        // AI Smart Suggestion Chips
-        if (smartReplies.isNotEmpty()) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                modifier = Modifier.fillMaxWidth()
+        val isFriend = currentUserProfile?.friends?.contains(otherUserId) == true
+
+        if (!isFriend) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .background(Color.Red.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                    .border(1.dp, Color.Red.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(vertical = 20.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                items(smartReplies) { reply ->
-                    Box(
-                        modifier = Modifier
-                            .background(CardBg, RoundedCornerShape(16.dp))
-                            .border(1.dp, CyanNeon.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                            .clickable { typedText = reply }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(reply, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color.Red,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = "Secure Connection Required",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "You must be mutually connected as friends to unlock the secure chat line.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            // AI Smart Suggestion Chips
+            if (smartReplies.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(smartReplies) { reply ->
+                        Box(
+                            modifier = Modifier
+                                .background(CardBg, RoundedCornerShape(16.dp))
+                                .border(1.dp, CyanNeon.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                .clickable { typedText = reply }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(reply, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
-        }
 
-        // Input Form
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            IconButton(onClick = { mediaLauncher.launch("image/*") }) {
-                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = CyanNeon)
-            }
-            IconButton(onClick = { showStickerSheet = true }) {
-                Icon(Icons.Default.SentimentSatisfied, contentDescription = null, tint = CyanNeon)
-            }
-
-            PremiumTextField(
-                value = typedText,
-                onValueChange = { typedText = it },
-                placeholder = "Transmit DM...",
-                modifier = Modifier.weight(1f)
-            )
-
-            IconButton(
-                onClick = {
-                    if (typedText.isEmpty()) return@IconButton
-                    coroutineScope.launch {
-                        try {
-                            repository.sendMessage(chatId, otherUserId, text = typedText)
-                            typedText = ""
-                        } catch (e: Exception) {
-                            Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                },
+            // Input Form
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                IconButton(onClick = { mediaLauncher.launch("image/*") }) {
+                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = CyanNeon)
+                }
+                IconButton(onClick = { showStickerSheet = true }) {
+                    Icon(Icons.Default.SentimentSatisfied, contentDescription = null, tint = CyanNeon)
+                }
+
+                PremiumTextField(
+                    value = typedText,
+                    onValueChange = { typedText = it },
+                    placeholder = "Transmit DM...",
+                    modifier = Modifier.weight(1f)
+                )
+
+                IconButton(
+                    onClick = {
+                        if (typedText.isEmpty()) return@IconButton
+                        coroutineScope.launch {
+                            try {
+                                repository.sendMessage(chatId, otherUserId, text = typedText)
+                                typedText = ""
+                            } catch (e: Exception) {
+                                Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                }
             }
         }
     }
