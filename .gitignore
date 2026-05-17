@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android-specific ignores
+**/android/.gradle/
+**/android/build/
+**/android/app/build/
+**/android/local.properties
+**/android/.idea/
+**/android/*.iml
+**/android/app/*.iml
+**/android/.cxx/
+**/android/captures/
+
