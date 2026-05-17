@@ -1,11 +1,18 @@
 package com.nexify.connect.ui.screens
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -17,21 +24,42 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.nexify.connect.data.model.*
 import com.nexify.connect.data.repository.FirebaseRepository
+import com.nexify.connect.services.CloudinaryService
 import com.nexify.connect.ui.components.*
 import com.nexify.connect.ui.theme.*
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+
+// ── RELATIVE PRESENCE PARSER ──────────────────────────────────
+fun getRelativeTimeString(date: Date?, onlineStatus: Boolean): String {
+    if (onlineStatus) return "online"
+    if (date == null) return "offline"
+    val diff = Date().time - date.time
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+    
+    return when {
+        seconds < 30 -> "online"
+        minutes < 60 -> "Last seen ${minutes}m ago"
+        hours < 24 -> "Last seen ${hours}h ago"
+        else -> "Last seen ${days}d ago"
+    }
+}
 
 // ── LOGIN SCREEN ─────────────────────────────────────────────
 @Composable
@@ -205,7 +233,142 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
     }
 }
 
-// ── FIND CITIZENS / ADD FRIEND SCREEN (Satisfying Core Goal) ─────
+// ── EDIT PROFILE / CHANGE DP SCREEN (Fully Functional with Cloudinary) ─
+@Composable
+fun ProfileCustomizationScreen(navController: NavController, repository: FirebaseRepository) {
+    val uid = repository.currentUserId ?: ""
+    val userProfile by repository.subscribeToUser(uid).collectAsState(initial = null)
+    
+    var bioText by remember { mutableStateOf("") }
+    var isUploading by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(userProfile) {
+        userProfile?.let { bioText = it.bio }
+    }
+
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                isUploading = true
+                try {
+                    Toast.makeText(context, "Compressing & uploading...", Toast.LENGTH_SHORT).show()
+                    val secureUrl = CloudinaryService.uploadImage(context, it)
+                    repository.updateProfileImage(secureUrl)
+                    Toast.makeText(context, "Profile Image Updated!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, e.message ?: "Upload failed.", Toast.LENGTH_LONG).show()
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
+            }
+            Text("Edit Profile", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(130.dp)
+        ) {
+            AsyncImage(
+                model = userProfile?.profileImage,
+                contentDescription = "Profile Picture",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .border(3.dp, Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), CircleShape)
+                    .clickable { imageLauncher.launch("image/*") }
+            )
+
+            if (isUploading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = CyanNeon)
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .background(PurpleNeon, CircleShape)
+                        .padding(8.dp)
+                        .border(1.dp, Color.Black, CircleShape)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, color = Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        Text(
+            text = userProfile?.username ?: "Citizen",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+        Text(
+            text = userProfile?.email ?: "",
+            fontSize = 13.sp,
+            color = TextMuted
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold)
+            PremiumTextField(
+                value = bioText,
+                onValueChange = { bioText = it },
+                placeholder = "Write something futuristic about yourself..."
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        PremiumButton(
+            text = "SAVE CHANGES",
+            onClick = {
+                coroutineScope.launch {
+                    repository.updateProfileBio(bioText)
+                    Toast.makeText(context, "Profile bio updated!", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+// ── FIND CITIZENS / ADD FRIEND SCREEN (Dynamically Linked) ────────
 @Composable
 fun FindFriendsScreen(navController: NavController, repository: FirebaseRepository) {
     var searchQuery by remember { mutableStateOf("") }
@@ -268,7 +431,6 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                             }
                         }
 
-                        // Determine relation status dynamically
                         val status = when {
                             currentUserProfile?.friends?.contains(targetUser.userId) == true -> "friends"
                             currentUserProfile?.requestsSent?.contains(targetUser.userId) == true -> "sent"
@@ -343,11 +505,14 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
     }
 }
 
-// ── DIRECT MESSAGES / CHAT LIST SCREEN ──────────────────────────
+// ── DIRECT MESSAGES & GROUP LISTS (Home Hub Screen) ───────────────
 @Composable
 fun ChatListScreen(navController: NavController, repository: FirebaseRepository) {
     val chats by repository.subscribeToChats().collectAsState(initial = emptyList())
+    val groups by repository.subscribeToGroups().collectAsState(initial = emptyList())
     val allUsers by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
+    
+    var currentTab by remember { mutableStateOf("DMs") }
 
     Column(
         modifier = Modifier
@@ -361,8 +526,11 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Nexify DMs", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CyanNeon)
+            Text("Nexify Hub", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CyanNeon)
             Row {
+                IconButton(onClick = { navController.navigate("profile") }) {
+                    Icon(Icons.Default.Settings, contentDescription = null, color = Color.White)
+                }
                 IconButton(onClick = { navController.navigate("find") }) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White)
                 }
@@ -380,56 +548,119 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
             }
         }
 
-        if (chats.isEmpty()) {
-            Box(modifier = Modifier.fillGrid(), contentAlignment = Alignment.Center) {
-                Text("No active conversations. Find friends to start a chat!", color = TextMuted, fontSize = 14.sp)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(chats) { chat ->
-                    val otherUserId = chat.participants.find { it != repository.currentUserId } ?: ""
-                    val otherUserProfile = allUsers.find { it.userId == otherUserId }
+        // Tab Selector
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TabButton(text = "Direct Messages", active = currentTab == "DMs", onClick = { currentTab = "DMs" })
+            TabButton(text = "Group Chats", active = currentTab == "Groups", onClick = { currentTab = "Groups" })
+        }
 
-                    if (otherUserProfile != null) {
-                        GlassmorphicCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                navController.navigate("chat/${chat.chatId}/$otherUserId")
-                            }
-                        ) {
-                            Row(
+        if (currentTab == "DMs") {
+            if (chats.isEmpty()) {
+                Box(modifier = Modifier.fillGrid(), contentAlignment = Alignment.Center) {
+                    Text("No active DMs. Find friends to connect!", color = TextMuted, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(chats) { chat ->
+                        val otherUserId = chat.participants.find { it != repository.currentUserId } ?: ""
+                        val otherUserProfile = allUsers.find { it.userId == otherUserId }
+
+                        if (otherUserProfile != null) {
+                            GlassmorphicCard(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                onClick = {
+                                    navController.navigate("chat/${chat.chatId}/$otherUserId")
+                                }
                             ) {
                                 Row(
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    PresenceIndicator(
-                                        imageUrl = otherUserProfile.profileImage,
-                                        onlineStatus = otherUserProfile.onlineStatus
-                                    )
-                                    Column {
-                                        Text(otherUserProfile.username, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        PresenceIndicator(
+                                            imageUrl = otherUserProfile.profileImage,
+                                            onlineStatus = otherUserProfile.onlineStatus
+                                        )
+                                        Column {
+                                            Text(otherUserProfile.username, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = if (chat.typingStatus[otherUserId] == true) "typing..." else chat.lastMessage,
+                                                color = if (chat.typingStatus[otherUserId] == true) CyanNeon else TextMuted,
+                                                fontSize = 13.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+
+                                    chat.timestamp?.let {
                                         Text(
-                                            text = if (chat.typingStatus[otherUserId] == true) "typing..." else chat.lastMessage,
-                                            color = if (chat.typingStatus[otherUserId] == true) CyanNeon else TextMuted,
-                                            fontSize = 13.sp,
-                                            maxLines = 1
+                                            text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
+                                            color = TextMuted,
+                                            fontSize = 11.sp
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Groups Tab
+            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Your Active Pods", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    IconButton(onClick = { navController.navigate("create_group") }) {
+                        Icon(Icons.Default.GroupAdd, contentDescription = null, color = CyanNeon)
+                    }
+                }
 
-                                chat.timestamp?.let {
-                                    Text(
-                                        text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
-                                        color = TextMuted,
-                                        fontSize = 11.sp
+                if (groups.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No active groups. Initialize a group!", color = TextMuted, fontSize = 14.sp)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(groups) { group ->
+                            GlassmorphicCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { navController.navigate("group/${group.groupId}") }
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    AsyncImage(
+                                        model = group.groupImage,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(50.dp)
+                                            .clip(CircleShape)
+                                            .border(1.5.dp, PurpleNeon, CircleShape)
                                     )
+                                    Column {
+                                        Text(group.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("${group.members.size} members connected", color = TextMuted, fontSize = 13.sp)
+                                    }
                                 }
                             }
                         }
@@ -440,32 +671,68 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
     }
 }
 
-// ── DIRECT MESSAGES CHAT SCREEN (Auto-Scroll, Typing, Timestamps, Seen) ─
+// Helper Tab Button
+@Composable
+fun TabButton(text: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .background(if (active) PurpleNeon else CardBg, RoundedCornerShape(16.dp))
+            .border(1.dp, if (active) PurpleNeon else CardBorder, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(text = text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    }
+}
+
+// ── DIRECT DM CONVERSATION SCREEN (Images, Stickers, Auto Scroll, Seen) ──
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatConversationScreen(navController: NavController, repository: FirebaseRepository, chatId: String, otherUserId: String) {
     val messages by repository.subscribeToMessages(chatId).collectAsState(initial = emptyList())
     val otherUserProfile by repository.subscribeToUser(otherUserId).collectAsState(initial = null)
     val chatMeta by repository.subscribeToChats().collectAsState(initial = emptyList())
+    val stickers by repository.subscribeToStickers().collectAsState(initial = emptyList())
 
     var typedText by remember { mutableStateOf("") }
+    var isUploadingMedia by remember { mutableStateOf(false) }
+    var showStickerSheet by remember { mutableStateOf(false) }
+    
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    // Mark messages as seen
     LaunchedEffect(messages.size) {
         repository.markMessagesAsSeen(chatId)
     }
 
-    // Auto scroll to bottom
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
-    // Monitor typing status
     LaunchedEffect(typedText) {
         repository.setTypingStatus(chatId, typedText.isNotEmpty())
+    }
+
+    // Media Picker launcher
+    val mediaLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                isUploadingMedia = true
+                try {
+                    val imageUrl = CloudinaryService.uploadImage(context, it)
+                    repository.sendMessage(chatId, otherUserId, imageUrl = imageUrl)
+                } catch (e: Exception) {
+                    Toast.makeText(context, e.message ?: "Failed to transmit media.", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isUploadingMedia = false
+                }
+            }
+        }
     }
 
     val activeChat = chatMeta.find { it.chatId == chatId }
@@ -497,7 +764,7 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                     Column {
                         Text(it.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text(
-                            text = if (isOtherTyping) "typing..." else if (it.onlineStatus) "online" else "offline",
+                            text = if (isOtherTyping) "typing..." else getRelativeTimeString(it.lastSeen, it.onlineStatus),
                             color = if (isOtherTyping) CyanNeon else if (it.onlineStatus) Color.Green else TextMuted,
                             fontSize = 11.sp
                         )
@@ -506,13 +773,13 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
             }
         }
 
-        // Message List
+        // Messages List
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             items(messages) { message ->
@@ -521,24 +788,44 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
                 ) {
-                    Column(
-                        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(
-                                    RoundedCornerShape(
-                                        topStart = 16.dp,
-                                        topEnd = 16.dp,
-                                        bottomStart = if (isMe) 16.dp else 0.dp,
-                                        bottomEnd = if (isMe) 0.dp else 16.dp
-                                    )
+                    Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
+                        when {
+                            message.imageUrl != null -> {
+                                AsyncImage(
+                                    model = message.imageUrl,
+                                    contentDescription = "Image message",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(width = 200.dp, height = 240.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .border(1.dp, if (isMe) PurpleNeon else CardBorder, RoundedCornerShape(16.dp))
                                 )
-                                .background(if (isMe) PurpleNeon else CardBg)
-                                .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-                                .padding(12.dp)
-                        ) {
-                            Text(message.text, color = Color.White, fontSize = 14.sp)
+                            }
+                            message.stickerUrl != null -> {
+                                AsyncImage(
+                                    model = message.stickerUrl,
+                                    contentDescription = "Sticker message",
+                                    modifier = Modifier.size(120.dp)
+                                )
+                            }
+                            else -> {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(
+                                            RoundedCornerShape(
+                                                topStart = 16.dp,
+                                                topEnd = 16.dp,
+                                                bottomStart = if (isMe) 16.dp else 0.dp,
+                                                bottomEnd = if (isMe) 0.dp else 16.dp
+                                            )
+                                        )
+                                        .background(if (isMe) PurpleNeon else CardBg)
+                                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
+                                }
+                            }
                         }
 
                         Row(
@@ -567,14 +854,17 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
             }
         }
 
-        // Typing indicator
-        if (isOtherTyping) {
-            Text(
-                text = "${otherUserProfile?.username ?: "Someone"} is typing...",
-                color = CyanNeon,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
+        if (isUploadingMedia) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(16.dp))
+                Text("Uploading media to cloud...", color = CyanNeon, fontSize = 12.sp)
+            }
         }
 
         // Input Form
@@ -585,17 +875,25 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            IconButton(onClick = { mediaLauncher.launch("image/*") }) {
+                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = CyanNeon)
+            }
+            IconButton(onClick = { showStickerSheet = true }) {
+                Icon(Icons.Default.SentimentSatisfied, contentDescription = null, tint = CyanNeon)
+            }
+
             PremiumTextField(
                 value = typedText,
                 onValueChange = { typedText = it },
-                placeholder = "Transmit message...",
+                placeholder = "Transmit DM...",
                 modifier = Modifier.weight(1f)
             )
+
             IconButton(
                 onClick = {
                     if (typedText.isEmpty()) return@IconButton
                     coroutineScope.launch {
-                        repository.sendMessage(chatId, otherUserId, typedText)
+                        repository.sendMessage(chatId, otherUserId, text = typedText)
                         typedText = ""
                     }
                 },
@@ -608,19 +906,593 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
             }
         }
     }
+
+    // STICKER PICKER BOTTOM SHEET
+    if (showStickerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showStickerSheet = false },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Choose sticker", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(stickers) { sticker ->
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .background(CardBg, RoundedCornerShape(12.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                                .clickable {
+                                    coroutineScope.launch {
+                                        repository.sendMessage(
+                                            chatId,
+                                            otherUserId,
+                                            stickerId = sticker.stickerId,
+                                            stickerUrl = sticker.imageUrl
+                                        )
+                                        showStickerSheet = false
+                                    }
+                                }
+                                .padding(12.dp)
+                        ) {
+                            AsyncImage(
+                                model = sticker.imageUrl,
+                                contentDescription = null,
+                                modifier = Modifier.size(65.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
-// Helper Extension
-fun Modifier.fillGrid() = this.fillMaxSize()
+// ── CREATE GROUP / CHAT POD SCREEN (Cloudinary Powered) ───────────
+@Composable
+fun CreateGroupScreen(navController: NavController, repository: FirebaseRepository) {
+    var groupName by remember { mutableStateOf("") }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var uploadedImageUrl by remember { mutableStateOf("") }
+    var isUploading by remember { mutableStateOf(false) }
 
-// ── DISCORD-STYLE ROOMS SCREEN ───────────────────────────────
+    val friendsList by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
+    val selectedMembers = remember { mutableStateListOf<String>() }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            selectedImageUri = it
+            coroutineScope.launch {
+                isUploading = true
+                try {
+                    Toast.makeText(context, "Uploading pod avatar...", Toast.LENGTH_SHORT).show()
+                    uploadedImageUrl = CloudinaryService.uploadImage(context, it)
+                    Toast.makeText(context, "Avatar loaded!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, e.message ?: "Media upload failed.", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
+            }
+            Text("Create Chat Pod", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(CardBg)
+                    .border(2.dp, PurpleNeon, CircleShape)
+                    .clickable { galleryLauncher.launch("image/*") },
+                contentAlignment = Alignment.Center
+            ) {
+                if (selectedImageUri != null) {
+                    AsyncImage(
+                        model = selectedImageUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = TextMuted)
+                }
+
+                if (isUploading) {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(0.6f)), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                PremiumTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it },
+                    placeholder = "Pod Name"
+                )
+            }
+        }
+
+        Text("Select Citizens to Join", color = CyanNeon, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(friendsList) { friend ->
+                val isChecked = selectedMembers.contains(friend.userId)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CardBg, RoundedCornerShape(12.dp))
+                        .clickable {
+                            if (isChecked) selectedMembers.remove(friend.userId) else selectedMembers.add(friend.userId)
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        PresenceIndicator(imageUrl = friend.profileImage, onlineStatus = friend.onlineStatus)
+                        Text(friend.username, color = Color.White)
+                    }
+                    Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = {
+                            if (it) selectedMembers.add(friend.userId) else selectedMembers.remove(friend.userId)
+                        },
+                        colors = CheckboxDefaults.colors(checkedColor = CyanNeon)
+                    )
+                }
+            }
+        }
+
+        PremiumButton(
+            text = "INITIALIZE POD",
+            onClick = {
+                if (groupName.isEmpty()) return@PremiumButton
+                coroutineScope.launch {
+                    try {
+                        repository.createGroup(groupName, selectedMembers.toList(), uploadedImageUrl)
+                        Toast.makeText(context, "Group created successfully!", Toast.LENGTH_SHORT).show()
+                        navController.navigate("home") {
+                            popUpTo("create_group") { inclusive = true }
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, e.message ?: "Failed.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+// ── GROUP CONVERSATION SCREEN (Admin Tools + Media + Stickers) ─────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GroupChatScreen(navController: NavController, repository: FirebaseRepository, groupId: String) {
+    val uid = repository.currentUserId ?: ""
+    val groups by repository.subscribeToGroups().collectAsState(initial = emptyList())
+    val messages by repository.subscribeToGroupMessages(groupId).collectAsState(initial = emptyList())
+    val stickers by repository.subscribeToStickers().collectAsState(initial = emptyList())
+    val friendsList by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
+
+    val currentGroup = groups.find { it.groupId == groupId }
+    val isAdmin = currentGroup?.adminId == uid
+
+    var typedText by remember { mutableStateOf("") }
+    var isUploadingMedia by remember { mutableStateOf(false) }
+    var showStickerSheet by remember { mutableStateOf(false) }
+    var showAdminPanel by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                isUploadingMedia = true
+                try {
+                    val imageUrl = CloudinaryService.uploadImage(context, it)
+                    repository.sendGroupMessage(groupId, imageUrl = imageUrl)
+                } catch (e: Exception) {
+                    Toast.makeText(context, e.message ?: "Media failure.", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isUploadingMedia = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+    ) {
+        // Appbar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CardBg)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
+                }
+                currentGroup?.let {
+                    AsyncImage(
+                        model = it.groupImage,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .border(1.dp, PurpleNeon, CircleShape)
+                    )
+                    Column {
+                        Text(it.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("${it.members.size} active members", color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+
+            IconButton(onClick = { showAdminPanel = true }) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = Color.White)
+            }
+        }
+
+        // Messages List
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            items(messages) { message ->
+                val isMe = message.senderId == uid
+                val senderName = friendsList.find { it.userId == message.senderId }?.username ?: "Citizen"
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
+                ) {
+                    Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
+                        if (!isMe) {
+                            Text(senderName, color = CyanNeon, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                        }
+                        
+                        when {
+                            message.imageUrl != null -> {
+                                AsyncImage(
+                                    model = message.imageUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(width = 200.dp, height = 240.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .border(1.dp, if (isMe) PurpleNeon else CardBorder, RoundedCornerShape(16.dp))
+                                )
+                            }
+                            message.stickerUrl != null -> {
+                                AsyncImage(
+                                    model = message.stickerUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(120.dp)
+                                )
+                            }
+                            else -> {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(
+                                            RoundedCornerShape(
+                                                topStart = 16.dp,
+                                                topEnd = 16.dp,
+                                                bottomStart = if (isMe) 16.dp else 0.dp,
+                                                bottomEnd = if (isMe) 0.dp else 16.dp
+                                            )
+                                        )
+                                        .background(if (isMe) PurpleNeon else CardBg)
+                                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
+                                }
+                            }
+                        }
+
+                        message.timestamp?.let {
+                            Text(
+                                text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
+                                color = TextMuted,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isUploadingMedia) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(color = PurpleNeon, modifier = Modifier.size(16.dp))
+                Text("Uploading media to cloud...", color = PurpleNeon, fontSize = 12.sp)
+            }
+        }
+
+        // Input forms
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = { imageLauncher.launch("image/*") }) {
+                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = CyanNeon)
+            }
+            IconButton(onClick = { showStickerSheet = true }) {
+                Icon(Icons.Default.SentimentSatisfied, contentDescription = null, tint = CyanNeon)
+            }
+
+            PremiumTextField(
+                value = typedText,
+                onValueChange = { typedText = it },
+                placeholder = "Pod broadcast...",
+                modifier = Modifier.weight(1f)
+            )
+
+            IconButton(
+                onClick = {
+                    if (typedText.isEmpty()) return@IconButton
+                    coroutineScope.launch {
+                        repository.sendGroupMessage(groupId, text = typedText)
+                        typedText = ""
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+            ) {
+                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+            }
+        }
+    }
+
+    // Sticker Picker Bottom Sheet
+    if (showStickerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showStickerSheet = false },
+            containerColor = Color(0xFF161128)
+        ) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Send Pod Sticker", color = Color.White, fontWeight = FontWeight.Bold)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(stickers) { sticker ->
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .background(CardBg, RoundedCornerShape(12.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                                .clickable {
+                                    coroutineScope.launch {
+                                        repository.sendGroupMessage(groupId, stickerId = sticker.stickerId, stickerUrl = sticker.imageUrl)
+                                        showStickerSheet = false
+                                    }
+                                }
+                                .padding(12.dp)
+                        ) {
+                            AsyncImage(model = sticker.imageUrl, contentDescription = null, modifier = Modifier.size(65.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Admin Options Panel
+    if (showAdminPanel && currentGroup != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showAdminPanel = false },
+            containerColor = Color(0xFF161128)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text("Pod Management Panel", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                
+                Text("Admin: ${if (isAdmin) "You (Sole Admin)" else "Citizen #${currentGroup.adminId.take(5)}"}", color = CyanNeon, fontSize = 12.sp)
+
+                Divider(color = CardBorder)
+
+                Text("Citizens in this Pod", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(currentGroup.members) { memberId ->
+                        val memberProfile = friendsList.find { it.userId == memberId } ?: allUsers.find { it.userId == memberId }
+                        val isMemberMe = memberId == uid
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(CardBg, RoundedCornerShape(12.dp))
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AsyncImage(
+                                    model = memberProfile?.profileImage ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$memberId",
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                )
+                                Text(memberProfile?.username ?: "Citizen #${memberId.take(4)}", color = Color.White)
+                            }
+
+                            if (isAdmin && !isMemberMe) {
+                                IconButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            repository.removeMemberFromGroup(groupId, memberId)
+                                            Toast.makeText(context, "Removed Citizen.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (isAdmin) {
+                    Divider(color = CardBorder)
+                    Text("Add Friends to this Pod", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    val unaddedFriends = friendsList.filter { !currentGroup.members.contains(it.userId) }
+
+                    if (unaddedFriends.isEmpty()) {
+                        Text("All active citizens are already connected.", color = TextMuted, fontSize = 12.sp)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(unaddedFriends) { friend ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(CardBg, RoundedCornerShape(12.dp))
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(friend.username, color = Color.White)
+                                    IconButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                repository.addMemberToGroup(groupId, friend.userId)
+                                                Toast.makeText(context, "Citizen Added!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = CyanNeon)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── DISCORD-STYLE ROOMS SCREEN (Categorized, Dynamic Members) ───────
 @Composable
 fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
     val rooms by repository.subscribeToRooms().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
+    
     var newRoomName by remember { mutableStateOf("") }
     var newRoomDesc by remember { mutableStateOf("") }
+    var newRoomCategory by remember { mutableStateOf("Gaming 🎮") }
+
+    val categories = listOf("General 💬", "Gaming 🎮", "Music 🎵", "Focus Pods ⚡")
+    var selectedCategoryFilter by remember { mutableStateOf("All") }
+
     val coroutineScope = rememberCoroutineScope()
+
+    val filteredRooms = rooms.filter {
+        selectedCategoryFilter == "All" || it.category == selectedCategoryFilter
+    }
 
     Column(
         modifier = Modifier
@@ -645,11 +1517,22 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
             }
         }
 
+        // Category Filter Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TabButton(text = "All", active = selectedCategoryFilter == "All", onClick = { selectedCategoryFilter = "All" })
+            categories.forEach { cat ->
+                TabButton(text = cat, active = selectedCategoryFilter == cat, onClick = { selectedCategoryFilter = cat })
+            }
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(rooms) { room ->
+            items(filteredRooms) { room ->
                 val isMember = room.members.contains(repository.currentUserId)
                 GlassmorphicCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -665,7 +1548,10 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("# ${room.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Column {
+                                Text("# ${room.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(room.category, color = PurpleNeon, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                             if (isMember) {
                                 Pill(text = "Joined", color = CyanNeon)
                             } else {
@@ -683,7 +1569,13 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
                             }
                         }
                         Text(room.description, color = TextMuted, fontSize = 13.sp)
-                        Text("${room.members.size} members online", color = CyanNeon, fontSize = 11.sp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.People, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(14.dp))
+                            Text("${room.members.size} citizens inside", color = CyanNeon, fontSize = 11.sp)
+                        }
                     }
                 }
             }
@@ -693,11 +1585,31 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
-            title = { Text("Initialize Custom Room", color = Color.White) },
+            title = { Text("Initialize Custom Room", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PremiumTextField(value = newRoomName, onValueChange = { newRoomName = it }, placeholder = "Room Name")
                     PremiumTextField(value = newRoomDesc, onValueChange = { newRoomDesc = it }, placeholder = "Room Description")
+                    
+                    Text("Select Category", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    
+                    // Simple radio button rows for categories selection
+                    categories.forEach { cat ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { newRoomCategory = cat }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = newRoomCategory == cat,
+                                onClick = { newRoomCategory = cat },
+                                colors = RadioButtonDefaults.colors(selectedColor = CyanNeon)
+                            )
+                            Text(cat, color = Color.White, fontSize = 14.sp)
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -706,7 +1618,7 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
                     onClick = {
                         if (newRoomName.isNotEmpty()) {
                             coroutineScope.launch {
-                                repository.createRoom(newRoomName, newRoomDesc, false)
+                                repository.createRoom(newRoomName, newRoomDesc, newRoomCategory, false)
                                 newRoomName = ""
                                 newRoomDesc = ""
                                 showCreateDialog = false
@@ -723,113 +1635,5 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
             containerColor = Color(0xFF161128),
             shape = RoundedCornerShape(16.dp)
         )
-    }
-}
-
-// ── ROOM / CHANNEL CHAT SCREEN ───────────────────────────────
-@Composable
-fun RoomChatScreen(navController: NavController, repository: FirebaseRepository, roomId: String) {
-    val messages by repository.subscribeToRoomMessages(roomId).collectAsState(initial = emptyList())
-    var typedText by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AmoledBg)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(CardBg)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
-            }
-            Text("Room Broadcast", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            items(messages) { message ->
-                val isMe = message.senderId == repository.currentUserId
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
-                ) {
-                    GlassmorphicCard(
-                        modifier = Modifier.fillMaxWidth(0.8f),
-                        borderStroke = BorderStroke(1.dp, if (isMe) PurpleNeon else CardBorder)
-                    ) {
-                        Column {
-                            Text(
-                                text = if (isMe) "You" else "Citizen #${message.senderId.take(5)}",
-                                color = if (isMe) PurpleNeon else CyanNeon,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
-                            Text(message.text, color = Color.White, fontSize = 14.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            PremiumTextField(
-                value = typedText,
-                onValueChange = { typedText = it },
-                placeholder = "Broadcast signal...",
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(
-                onClick = {
-                    if (typedText.isEmpty()) return@IconButton
-                    coroutineScope.launch {
-                        repository.sendRoomMessage(roomId, typedText)
-                        typedText = ""
-                    }
-                },
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
-            ) {
-                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
-            }
-        }
-    }
-}
-
-@Composable
-fun Pill(text: String, color: Color) {
-    Box(
-        modifier = Modifier
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-            .border(1.dp, color, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(text = text, color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }

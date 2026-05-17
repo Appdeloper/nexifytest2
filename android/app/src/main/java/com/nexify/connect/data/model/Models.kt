@@ -1,7 +1,6 @@
 package com.nexify.connect.data.model
 
 import com.google.firebase.firestore.DocumentId
-import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
 data class User(
@@ -28,7 +27,10 @@ data class Chat(
 data class Message(
     @DocumentId val messageId: String = "",
     val senderId: String = "",
-    val text: String = "",
+    val text: String? = null,
+    val imageUrl: String? = null,
+    val stickerId: String? = null,
+    val stickerUrl: String? = null,
     val timestamp: Date? = null,
     val seen: Boolean = false
 )
@@ -48,5 +50,12 @@ data class Room(
     val description: String = "",
     val members: List<String> = emptyList(),
     val createdBy: String = "",
-    val isPrivate: Boolean = false
+    val isPrivate: Boolean = false,
+    val category: String = "General"
+)
+
+data class Sticker(
+    @DocumentId val stickerId: String = "",
+    val imageUrl: String = "",
+    val category: String = "Futuristic"
 )

@@ -80,6 +80,25 @@ class MainActivity : ComponentActivity() {
                                 roomId = roomId
                             )
                         }
+                        composable("profile") {
+                            ProfileCustomizationScreen(navController = navController, repository = repository)
+                        }
+                        composable("create_group") {
+                            CreateGroupScreen(navController = navController, repository = repository)
+                        }
+                        composable(
+                            route = "group/{groupId}",
+                            arguments = listOf(
+                                navArgument("groupId") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
+                            GroupChatScreen(
+                                navController = navController,
+                                repository = repository,
+                                groupId = groupId
+                            )
+                        }
                     }
                 }
             }

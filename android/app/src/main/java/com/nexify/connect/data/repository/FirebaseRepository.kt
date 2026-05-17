@@ -57,6 +57,17 @@ class FirebaseRepository {
         auth.signOut()
     }
 
+    // ── PROFILE CUSTOMIZATION (Direct Firestore Writes) ───────────
+    suspend fun updateProfileImage(imageUrl: String) {
+        val uid = currentUserId ?: return
+        db.collection("users").document(uid).update("profileImage", imageUrl).await()
+    }
+
+    suspend fun updateProfileBio(bio: String) {
+        val uid = currentUserId ?: return
+        db.collection("users").document(uid).update("bio", bio).await()
+    }
+
     // ── PRESENCE SYSTEM ──────────────────────────────────────────
     fun updatePresence(isOnline: Boolean) {
         val uid = currentUserId ?: return
@@ -101,9 +112,7 @@ class FirebaseRepository {
         val targetRef = db.collection("users").document(targetUserId)
 
         db.runTransaction { transaction ->
-            // Update current user
             transaction.update(currentRef, "requestsSent", FieldValue.arrayUnion(targetUserId))
-            // Update target user
             transaction.update(targetRef, "requestsReceived", FieldValue.arrayUnion(uid))
         }.await()
     }
@@ -125,10 +134,8 @@ class FirebaseRepository {
         val targetRef = db.collection("users").document(targetUserId)
 
         db.runTransaction { transaction ->
-            // Move both into each other's friends list
             transaction.update(currentRef, "friends", FieldValue.arrayUnion(targetUserId))
             transaction.update(targetRef, "friends", FieldValue.arrayUnion(uid))
-            // Remove from request lists
             transaction.update(currentRef, "requestsReceived", FieldValue.arrayRemove(targetUserId))
             transaction.update(targetRef, "requestsSent", FieldValue.arrayRemove(uid))
         }.await()
@@ -156,34 +163,77 @@ class FirebaseRepository {
         }.await()
     }
 
-    // ── 1-TO-1 CHAT SYSTEM ────────────────────────────────────────
+    // ── STICKER SYSTEM (Auto-Seeding Futuristic Pack) ──────────────
+    fun subscribeToStickers(): Flow<List<Sticker>> = callbackFlow {
+        db.collection("stickers").get().addOnSuccessListener { snap ->
+            if (snap.isEmpty) {
+                val defaultStickers = listOf(
+                    Sticker("stk_1", "https://api.dicebear.com/7.x/bottts/svg?seed=NeonMax", "Futuristic"),
+                    Sticker("stk_2", "https://api.dicebear.com/7.x/bottts/svg?seed=RetroBit", "Futuristic"),
+                    Sticker("stk_3", "https://api.dicebear.com/7.x/bottts/svg?seed=GlowCore", "Neon Glow"),
+                    Sticker("stk_4", "https://api.dicebear.com/7.x/bottts/svg?seed=HyperDriv", "Neon Glow"),
+                    Sticker("stk_5", "https://api.dicebear.com/7.x/bottts/svg?seed=CitizZero", "Cyberpunk"),
+                    Sticker("stk_6", "https://api.dicebear.com/7.x/bottts/svg?seed=NexPulse", "Cyberpunk")
+                )
+                db.runBatch { batch ->
+                    defaultStickers.forEach { sticker ->
+                        batch.set(db.collection("stickers").document(sticker.stickerId), sticker)
+                    }
+                }
+            }
+        }
+
+        val listener = db.collection("stickers").addSnapshotListener { snap, err ->
+            if (err != null) {
+                close(err)
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { it.toObject(Sticker::class.java) } ?: emptyList()
+            trySend(list)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    // ── 1-TO-1 CHAT SYSTEM (Text, Image, Stickers) ──────────────────
     fun getChatId(otherUserId: String): String {
         val uid = currentUserId ?: ""
         return listOf(uid, otherUserId).sorted().joinToString("_")
     }
 
-    suspend fun sendMessage(chatId: String, otherUserId: String, text: String) {
+    suspend fun sendMessage(
+        chatId: String, 
+        otherUserId: String, 
+        text: String? = null,
+        imageUrl: String? = null,
+        stickerId: String? = null,
+        stickerUrl: String? = null
+    ) {
         val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
         val message = Message(
             messageId = messageId,
             senderId = uid,
             text = text,
+            imageUrl = imageUrl,
+            stickerId = stickerId,
+            stickerUrl = stickerUrl,
             timestamp = Date(),
             seen = false
         )
 
         val batch = db.batch()
-        
-        // Write message
         val msgRef = db.collection("messages").document(chatId).collection("chat_messages").document(messageId)
         batch.set(msgRef, message)
 
-        // Write or update Chat meta document
         val chatRef = db.collection("chats").document(chatId)
+        val summary = when {
+            imageUrl != null -> "📷 Sent an image"
+            stickerId != null -> "👾 Sent a sticker"
+            else -> text ?: ""
+        }
         val chatMeta = mapOf(
             "participants" to listOf(uid, otherUserId),
-            "lastMessage" to text,
+            "lastMessage" to summary,
             "timestamp" to Date()
         )
         batch.set(chatRef, chatMeta, SetOptions.merge())
@@ -238,7 +288,7 @@ class FirebaseRepository {
             }
     }
 
-    // ── GROUP CHAT SYSTEM ──────────────────────────────────────────
+    // ── GROUP CHAT SYSTEM (Image, Stickers, Admin Control) ─────────
     suspend fun createGroup(name: String, members: List<String>, groupImage: String): String {
         val uid = currentUserId ?: throw Exception("Unauthenticated")
         val groupId = UUID.randomUUID().toString()
@@ -255,13 +305,34 @@ class FirebaseRepository {
         return groupId
     }
 
-    suspend fun sendGroupMessage(groupId: String, text: String) {
+    suspend fun addMemberToGroup(groupId: String, targetUserId: String) {
+        db.collection("groups").document(groupId).update("members", FieldValue.arrayUnion(targetUserId)).await()
+    }
+
+    suspend fun removeMemberFromGroup(groupId: String, targetUserId: String) {
+        db.collection("groups").document(groupId).update("members", FieldValue.arrayRemove(targetUserId)).await()
+    }
+
+    suspend fun updateGroupImage(groupId: String, imageUrl: String) {
+        db.collection("groups").document(groupId).update("groupImage", imageUrl).await()
+    }
+
+    suspend fun sendGroupMessage(
+        groupId: String, 
+        text: String? = null,
+        imageUrl: String? = null,
+        stickerId: String? = null,
+        stickerUrl: String? = null
+    ) {
         val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
         val message = Message(
             messageId = messageId,
             senderId = uid,
             text = text,
+            imageUrl = imageUrl,
+            stickerId = stickerId,
+            stickerUrl = stickerUrl,
             timestamp = Date()
         )
         db.collection("group_messages").document(groupId).collection("messages").document(messageId).set(message).await()
@@ -294,8 +365,8 @@ class FirebaseRepository {
         awaitClose { listener.remove() }
     }
 
-    // ── DISCORD-STYLE ROOMS SYSTEM ──────────────────────────────────
-    suspend fun createRoom(name: String, description: String, isPrivate: Boolean) {
+    // ── DISCORD-STYLE ROOMS SYSTEM (Public/Private with categories) ──
+    suspend fun createRoom(name: String, description: String, category: String, isPrivate: Boolean) {
         val uid = currentUserId ?: return
         val roomId = UUID.randomUUID().toString()
         val room = Room(
@@ -304,7 +375,8 @@ class FirebaseRepository {
             description = description,
             members = listOf(uid),
             createdBy = uid,
-            isPrivate = isPrivate
+            isPrivate = isPrivate,
+            category = category
         )
         db.collection("rooms").document(roomId).set(room).await()
     }
