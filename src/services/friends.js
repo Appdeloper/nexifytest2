@@ -236,3 +236,17 @@ export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
     unsubEmail();
   };
 };
+
+// ── Real-time: subscribe to all users (for global search/filtering) ──
+export const subscribeAllUsers = (currentUid, callback) => {
+  const q = query(collection(db, 'users'));
+  return onSnapshot(q, snap => {
+    const list = snap.docs
+      .map(d => ({ uid: d.id, ...d.data() }))
+      .filter(u => u.uid !== currentUid);
+    callback(list);
+  }, err => {
+    console.warn("Subscribe all users failed:", err);
+    callback([]);
+  });
+};
