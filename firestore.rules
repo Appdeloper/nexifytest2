@@ -114,21 +114,23 @@ service cloud.firestore {
     
     // === Roles & Ranks ===
     match /roles/{roleId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isStaff();
     }
     
     match /ranks/{rankId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isStaff();
     }
     
     // === Leaderboards ===
     match /leaderboards/{lbId} {
       allow read: if isSignedIn();
-      allow write: if true;
+      allow write: if isStaff();
       
       match /users/{userId} {
         allow read: if isSignedIn();
-        allow write: if true;
+        allow write: if isSignedIn() && (request.auth.uid == userId || isStaff());
       }
     }
     
