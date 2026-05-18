@@ -83,5 +83,8 @@ export const subscribeFocusPods = (callback) => {
   const q = query(collection(db, 'focusPods'), orderBy('createdAt', 'desc'));
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.error("Focus pods subscription failed:", err);
+    callback([]);
   });
 };

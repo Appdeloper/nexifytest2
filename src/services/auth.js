@@ -5,7 +5,7 @@ import {
   signInWithPopup, 
   signOut 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { logActivity, ACTIVITY_TYPES } from './activity';
 
 const OWNER_EMAIL = "iamwe@nexify.com";
@@ -23,11 +23,14 @@ export const ensureUserProfile = async (user) => {
   if (!snap.exists()) {
     const isOwner = user.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
     
+    const fallbackUsername = user.email.split('@')[0].toLowerCase();
+    const normalizedUsername = (user.username || fallbackUsername).trim().toLowerCase();
+
     const profileData = {
       uid: user.uid,
       displayName: user.displayName || 'Nexify Citizen',
       displayNameLower: (user.displayName || 'Nexify Citizen').toLowerCase(),
-      username: user.email.split('@')[0],
+      username: normalizedUsername,
       email: user.email,
       emailLower: user.email.toLowerCase(),
       photoURL: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
@@ -42,6 +45,9 @@ export const ensureUserProfile = async (user) => {
       updatedAt: serverTimestamp(),
       online: true,
       lastSeen: serverTimestamp(),
+      friends: [],
+      requestsSent: [],
+      requestsReceived: [],
     };
     
     await setDoc(userRef, profileData);
@@ -90,7 +96,7 @@ export const registerUser = async (email, password, username) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    await ensureUserProfile({ ...user, displayName: username });
+    await ensureUserProfile({ ...user, displayName: username, username });
     return user;
   } catch (error) {
     throw parseAuthError(error);

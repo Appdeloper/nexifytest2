@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, UserPlus, UserCheck, UserX, ArrowLeft, Users,
-  Clock, CheckCircle, X, MessageSquare, ChevronRight, Loader
+  Clock, CheckCircle, X, MessageSquare, Loader
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
 import {
-  searchUsers, sendFriendRequest, cancelFriendRequest,
+  sendFriendRequest, cancelFriendRequest,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   subscribeIncomingRequests, subscribeSentRequests, subscribeFriends,
-  getFriendshipStatus, getAllUsers, subscribeSearchUsers
+  subscribeSearchUsers
 } from '../services/friends';
 import { getUserData } from '../services/users';
 import { createOrGetDMChat } from '../services/chat';
@@ -47,6 +47,7 @@ const Friends = () => {
   const location = useLocation();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
+  const currentUid = currentUser?.uid;
 
   const [tab, setTab] = useState(location.state?.tab || 'Friends');
   const [searchQ, setSearchQ] = useState(location.state?.query || '');
@@ -58,7 +59,6 @@ const Friends = () => {
   const [sent, setSent] = useState([]);
   const [sentProfiles, setSentProfiles] = useState({});
 
-  const [allUsers, setAllUsers] = useState([]);
   const [loadingActions, setLoadingActions] = useState({});
 
   const getStatus = useCallback((uid) => {
@@ -70,59 +70,82 @@ const Friends = () => {
     return 'none';
   }, [friends, incoming, sent]);
 
-  // No longer using global allUsers subscription for performance
-  useEffect(() => {
-    // We fetch current results via subscribeSearchUsers effect below
-  }, []);
-
   /* subscriptions */
   useEffect(() => {
-    if (!currentUser) return;
-    const unsubFr = subscribeFriends(currentUser.uid, async list => {
+    if (!currentUid) return;
+    const unsubFr = subscribeFriends(currentUid, async list => {
       setFriends(list);
       const profiles = {};
       for (const fr of list) {
-        const otherId = fr.users.find(u => u !== currentUser.uid);
+        const otherId = fr.users.find(u => u !== currentUid);
         if (otherId && !profiles[otherId]) {
           profiles[otherId] = await getUserData(otherId);
         }
       }
       setFriendProfiles(profiles);
     });
-    const unsubIn = subscribeIncomingRequests(currentUser.uid, async list => {
+    const unsubIn = subscribeIncomingRequests(currentUid, async list => {
       setIncoming(list);
       const profiles = {};
       for (const r of list) {
         if (!profiles[r.from]) {
-          try { profiles[r.from] = await getUserData(r.from); } catch(e) {}
+          try { profiles[r.from] = await getUserData(r.from); } catch { /* Profile is optional. */ }
         }
       }
       setIncomingProfiles(profiles);
     });
-    const unsubSent = subscribeSentRequests(currentUser.uid, async list => {
+    const unsubSent = subscribeSentRequests(currentUid, async list => {
       setSent(list);
       const profiles = {};
       for (const r of list) {
         if (!profiles[r.to]) {
-          try { profiles[r.to] = await getUserData(r.to); } catch(e) {}
+          try { profiles[r.to] = await getUserData(r.to); } catch { /* Profile is optional. */ }
         }
       }
       setSentProfiles(profiles);
     });
     return () => { unsubFr(); unsubIn(); unsubSent(); };
-  }, [currentUser?.uid]);
+  }, [currentUid]);
 
   /* search results */
   const [results, setResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(Boolean(location.state?.query?.trim()));
+  const trimmedSearch = searchQ.trim().toLowerCase();
+  const visibleResults = tab === 'Find' && trimmedSearch ? results : [];
   
   useEffect(() => {
-    if (!currentUser || tab !== 'Find' || !searchQ) {
-      setResults([]);
-      return;
-    }
-    const unsub = subscribeSearchUsers(searchQ, currentUser.uid, setResults);
-    return () => unsub();
-  }, [searchQ, tab, currentUser?.uid]);
+    if (!currentUid || tab !== 'Find' || !trimmedSearch) return;
+
+    let cancelled = false;
+    let unsubscribe = () => {};
+    const debounceTimer = setTimeout(() => {
+      unsubscribe = subscribeSearchUsers(trimmedSearch, currentUid, list => {
+        if (!cancelled) {
+          setResults(list);
+          setIsSearching(false);
+        }
+      });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(debounceTimer);
+      unsubscribe();
+    };
+  }, [currentUid, tab, trimmedSearch]);
+
+  const handleSearchChange = (value) => {
+    const nextQuery = value.toLowerCase();
+    setSearchQ(nextQuery);
+    setResults([]);
+    setIsSearching(Boolean(nextQuery.trim()));
+  };
+
+  const clearSearch = () => {
+    setSearchQ('');
+    setResults([]);
+    setIsSearching(false);
+  };
 
   const withLoading = async (key, fn) => {
     setLoadingActions(p => ({ ...p, [key]: true }));
@@ -131,33 +154,37 @@ const Friends = () => {
   };
 
   const handleAddFriend = (uid) => withLoading(uid, async () => {
-    await sendFriendRequest(currentUser.uid, uid);
+    await sendFriendRequest(currentUid, uid);
     showToast('Success!');
   });
 
   const handleCancelRequest = (uid) => withLoading(uid, async () => {
-    await cancelFriendRequest(currentUser.uid, uid);
+    await cancelFriendRequest(currentUid, uid);
     showToast('Request cancelled.');
   });
 
   const handleAccept = (fromUid) => withLoading(fromUid + '_accept', async () => {
-    await acceptFriendRequest(fromUid, currentUser.uid);
+    await acceptFriendRequest(fromUid, currentUid);
     showToast('Friend added! 🎉');
   });
 
   const handleDecline = (fromUid) => withLoading(fromUid + '_decline', async () => {
-    await declineFriendRequest(fromUid, currentUser.uid);
+    await declineFriendRequest(fromUid, currentUid);
     showToast('Request declined.');
   });
 
   const handleRemoveFriend = (uid) => withLoading(uid + '_remove', async () => {
-    await removeFriend(currentUser.uid, uid);
+    await removeFriend(currentUid, uid);
     showToast('Friend removed.');
   });
 
   const handleMessage = async (uid) => {
-    const chatId = await createOrGetDMChat(currentUser.uid, uid);
-    navigate(`/chat-conversation/${chatId}`);
+    try {
+      const chatId = await createOrGetDMChat(currentUid, uid);
+      navigate(`/chat-conversation/${chatId}`);
+    } catch (e) {
+      showToast(e.message);
+    }
   };
 
   /* ── render ── */
@@ -233,7 +260,7 @@ const Friends = () => {
             </div>
           ) : (
             friends.map(fr => {
-              const otherId = fr.users.find(u => u !== currentUser.uid);
+              const otherId = fr.users.find(u => u !== currentUid);
               const profile = friendProfiles[otherId] || {};
               return (
                 <div key={fr.id} style={{
@@ -343,13 +370,14 @@ const Friends = () => {
               <Search size={16} color="var(--text-muted)" />
               <input
                 type="text"
-                placeholder="Search by name or email..."
+                placeholder="Search by username..."
                 value={searchQ}
-                onChange={e => setSearchQ(e.target.value)}
+                onChange={e => handleSearchChange(e.target.value)}
                 autoFocus
                 style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', flex: 1, fontSize: 14 }}
               />
-              {searchQ && <button onClick={() => setSearchQ('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}><X size={14} /></button>}
+              {isSearching && <Loader size={14} style={{ color: 'var(--primary)', animation: 'spin 0.8s linear infinite' }} />}
+              {searchQ && <button onClick={clearSearch} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}><X size={14} /></button>}
             </div>
           </div>
 
@@ -359,18 +387,25 @@ const Friends = () => {
                 <Search size={40} color="var(--text-muted)" strokeWidth={1.5} />
                 <div>
                   <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Find people on Nexify</h3>
-                  <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>Search by name or email address.</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>Search by username.</p>
                 </div>
               </div>
             )}
 
-            {searchQ && results.length === 0 && (
+            {isSearching && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 0', color: 'var(--text-muted)', fontSize: 14 }}>
+                <Loader size={16} style={{ animation: 'spin 0.8s linear infinite' }} />
+                Searching...
+              </div>
+            )}
+
+            {searchQ && !isSearching && visibleResults.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 14 }}>
                 No users found for "{searchQ}"
               </div>
             )}
 
-            {results.map(user => {
+            {visibleResults.map(user => {
               const status = getStatus(user.uid);
               return (
                 <div key={user.uid} style={{
@@ -394,18 +429,18 @@ const Friends = () => {
                   )}
                   {status === 'sent' && (
                     <Btn onClick={() => handleCancelRequest(user.uid)} color="var(--text-muted)" border="1px solid rgba(255,255,255,0.12)" disabled={loadingActions[user.uid]}>
-                      <Clock size={13} /> Sent
+                      <Clock size={13} /> Pending
                     </Btn>
                   )}
                   {status === 'received' && (
-                    <Btn onClick={() => handleAccept(user.uid)} color="black" bg="var(--primary-gradient)" disabled={loadingActions[user.uid]}>
-                      <CheckCircle size={13} /> Accept
+                    <Btn onClick={() => handleAccept(user.uid)} color="black" bg="var(--primary-gradient)" disabled={loadingActions[user.uid + '_accept']}>
+                      {loadingActions[user.uid + '_accept'] ? <Loader size={13} /> : <CheckCircle size={13} />} Accept
                     </Btn>
                   )}
                   {status === 'friends' && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <Btn onClick={() => handleMessage(user.uid)} bg="rgba(0,223,216,0.1)" color="#00dfd8" border="1.5px solid rgba(0,223,216,0.3)">
-                        <MessageSquare size={13} />
+                        <MessageSquare size={13} /> Message
                       </Btn>
                       <Btn color="#00dfd8" border="1px solid rgba(0,223,216,0.15)">
                         <UserCheck size={13} />

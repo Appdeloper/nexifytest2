@@ -82,5 +82,7 @@ export const subscribeToAIMentions = (chatId, isRoom = false, callback) => {
       const lastMsg = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
       callback(lastMsg);
     }
+  }, (err) => {
+    console.error("AI Mentions subscription failed:", err);
   });
 };

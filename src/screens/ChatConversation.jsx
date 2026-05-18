@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Phone, Video, MoreVertical, Plus, Smile, Mic, Send,
-  Paperclip, FileText, ArrowLeft, Check, CheckCheck,
+  Phone, Video, Smile, Mic, Send,
+  Paperclip, FileText, ArrowLeft, CheckCheck,
   Reply, Trash2, Copy, X, Download, ChevronDown, Sparkles, Play
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -10,13 +10,14 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
 import {
   subscribeToMessages, sendTextMessage, sendMediaMessage,
-  uploadChatAttachment, sendGifMessage, deleteMessage, addReaction
+  uploadChatAttachment, sendGifMessage, deleteMessage, addReaction,
+  canUserAccessChat
 } from '../services/chat';
 import { getUserData, subscribeUserData } from '../services/users';
-import { doc, getDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useCall } from '../components/CallProvider';
-import { RoleBadge, RankBadge } from '../components/Badges';
+import { RoleBadge } from '../components/Badges';
 import PresenceIndicator from '../components/PresenceIndicator';
 
 const TRENDING_GIFS = [
@@ -34,8 +35,10 @@ const formatTime = ts => {
   catch { return ''; }
 };
 
+const getChatMembers = (chat) => chat.members || chat.participants || [];
+
 /* ── Long-press menu ── */
-const MsgMenu = ({ msg, isMe, onReply, onDelete, onCopy, onReact, onClose }) => (
+const MsgMenu = ({ isMe, onReply, onDelete, onCopy, onReact, onClose }) => (
   <div
     style={{
       position: 'fixed', inset: 0, zIndex: 200,
@@ -119,8 +122,8 @@ const ChatConversation = () => {
   const [replyTo, setReplyTo] = useState(null);
   const [viewerSrc, setViewerSrc] = useState(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [chatBlocked, setChatBlocked] = useState(false);
 
   const messagesEndRef = useRef(null);
   const scrollRef = useRef(null);
@@ -129,52 +132,77 @@ const ChatConversation = () => {
   /* load chat/user */
   useEffect(() => {
     if (!currentUser || !chatId) return;
-    const load = async () => {
-      const chatDoc = await getDoc(doc(db, 'chats', chatId));
-      if (chatDoc.exists()) {
-        const data = chatDoc.data();
-        const otherId = data.members?.find(id => id !== currentUser.uid);
-        if (otherId) setOtherUser(await getUserData(otherId));
-      }
-    };
-    load();
-    const unsub = subscribeToMessages(chatId, msgs => {
-      setMessages(msgs);
-      setLoadingMsg(false);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      
-      // AI Tag Detection
-      import('../services/ai').then(({ processAITag }) => {
-        processAITag(chatId, false, msgs);
-      });
-    });
-
-    const unsubChat = onSnapshot(doc(db, 'chats', chatId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        const otherId = data.members?.find(id => id !== currentUser.uid);
-        if (otherId) {
-          setOtherTyping(data.typing?.[otherId] || false);
-        }
-      }
-    });
-
+    let didCancel = false;
+    let unsub = () => {};
+    let unsubChat = () => {};
     let unsubUser;
-    const initOtherUser = async () => {
+    const initChat = async () => {
       const chatDoc = await getDoc(doc(db, 'chats', chatId));
-      if (chatDoc.exists()) {
-        const otherId = chatDoc.data().members?.find(id => id !== currentUser.uid);
-        if (otherId) unsubUser = subscribeUserData(otherId, setOtherUser);
+      if (!chatDoc.exists()) {
+        if (!didCancel) {
+          setChatBlocked(true);
+          setLoadingMsg(false);
+        }
+        return;
       }
-    };
-    initOtherUser();
 
-    return () => { unsub(); unsubChat(); if (unsubUser) unsubUser(); };
+      const data = chatDoc.data();
+      const otherId = getChatMembers(data).find(id => id !== currentUser.uid);
+      if (otherId) {
+        const profile = await getUserData(otherId);
+        if (!didCancel) setOtherUser(profile);
+      }
+
+      const allowed = await canUserAccessChat(chatId, currentUser.uid);
+      if (!allowed) {
+        if (!didCancel) {
+          setChatBlocked(true);
+          setLoadingMsg(false);
+          setMessages([]);
+        }
+        return;
+      }
+
+      if (didCancel) return;
+      setChatBlocked(false);
+
+      unsub = subscribeToMessages(chatId, msgs => {
+        setMessages(msgs);
+        setLoadingMsg(false);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        
+        // AI Tag Detection
+        import('../services/ai').then(({ processAITag }) => {
+          processAITag(chatId, false, msgs);
+        });
+      });
+
+      unsubChat = onSnapshot(doc(db, 'chats', chatId), (snap) => {
+        if (snap.exists()) {
+          const liveData = snap.data();
+          const liveOtherId = getChatMembers(liveData).find(id => id !== currentUser.uid);
+          if (liveOtherId) {
+            setOtherTyping(liveData.typing?.[liveOtherId] || false);
+          }
+        }
+      });
+
+      if (otherId) unsubUser = subscribeUserData(otherId, setOtherUser);
+    };
+    initChat().catch(() => {
+      if (!didCancel) {
+        setChatBlocked(true);
+        setLoadingMsg(false);
+      }
+    });
+
+    return () => { didCancel = true; unsub(); unsubChat(); if (unsubUser) unsubUser(); };
   }, [chatId, currentUser]);
 
   /* typing indicator */
   const handleTyping = useCallback((val) => {
     setText(val);
+    if (chatBlocked) return;
     if (!val.trim()) return;
     clearTimeout(typingTimer.current);
     // update typing state in firestore
@@ -182,7 +210,7 @@ const ChatConversation = () => {
     typingTimer.current = setTimeout(() => {
       updateDoc(doc(db, 'chats', chatId), { [`typing.${currentUser.uid}`]: false }).catch(() => {});
     }, 2000);
-  }, [chatId, currentUser]);
+  }, [chatBlocked, chatId, currentUser]);
 
   /* scroll detection */
   const handleScroll = () => {
@@ -193,6 +221,10 @@ const ChatConversation = () => {
 
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
+    if (chatBlocked) {
+      showToast('Add this user as a friend before messaging.');
+      return;
+    }
     const msgText = text;
     const reply = replyTo;
     setText('');
@@ -210,6 +242,7 @@ const ChatConversation = () => {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (chatBlocked) { showToast('Add this user as a friend before messaging.'); return; }
     if (file.size > 10 * 1024 * 1024) { showToast('Max 10MB'); return; }
     setIsUploading(true);
     if (file.type.startsWith('image/')) setUploadPreview(URL.createObjectURL(file));
@@ -225,6 +258,7 @@ const ChatConversation = () => {
   };
 
   const handleGifSelect = async (gifUrl) => {
+    if (chatBlocked) { showToast('Add this user as a friend before messaging.'); return; }
     setShowGifs(false);
     try { await sendGifMessage(chatId, currentUser.uid, gifUrl); }
     catch { showToast('Failed to send GIF'); }
@@ -284,10 +318,24 @@ const ChatConversation = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 18, color: 'var(--primary)' }}>
-          <motion.button whileTap={{ scale: 0.9 }} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--primary)' }} onClick={() => otherUser?.uid && startVoiceCall(otherUser.uid)}><Phone size={20} /></motion.button>
-          <motion.button whileTap={{ scale: 0.9 }} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--primary)' }} onClick={() => otherUser?.uid && startVideoCall(otherUser.uid)}><Video size={20} /></motion.button>
+          <motion.button disabled={chatBlocked} whileTap={{ scale: 0.9 }} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: chatBlocked ? 'not-allowed' : 'pointer', color: 'var(--primary)', opacity: chatBlocked ? 0.45 : 1 }} onClick={() => otherUser?.uid && !chatBlocked && startVoiceCall(otherUser.uid)}><Phone size={20} /></motion.button>
+          <motion.button disabled={chatBlocked} whileTap={{ scale: 0.9 }} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: chatBlocked ? 'not-allowed' : 'pointer', color: 'var(--primary)', opacity: chatBlocked ? 0.45 : 1 }} onClick={() => otherUser?.uid && !chatBlocked && startVideoCall(otherUser.uid)}><Video size={20} /></motion.button>
         </div>
       </motion.div>
+
+      {chatBlocked && (
+        <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Messaging unlocks after both users are friends.
+          </span>
+          <button
+            onClick={() => navigate('/friends', { state: { tab: 'Find', query: otherUser?.username || otherUser?.displayName || '' } })}
+            style={{ background: 'var(--primary-gradient)', border: 'none', borderRadius: 14, padding: '8px 12px', color: 'black', fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Add Friend
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -305,9 +353,7 @@ const ChatConversation = () => {
           </div>
         )}
 
-        {(() => {
-          let lastDate = null;
-          return messages.map((msg, i) => {
+        {messages.map((msg, i) => {
             const isMe = msg.senderId === currentUser.uid;
             const prev = i > 0 ? messages[i-1] : null;
             const isGrouped = prev && prev.senderId === msg.senderId;
@@ -315,8 +361,8 @@ const ChatConversation = () => {
             const isDeleted = msg.deleted;
             
             const msgDate = msg.createdAt ? new Date(msg.createdAt.toDate()).toDateString() : null;
-            const showDateDivider = msgDate && msgDate !== lastDate;
-            lastDate = msgDate;
+            const prevDate = prev?.createdAt ? new Date(prev.createdAt.toDate()).toDateString() : null;
+            const showDateDivider = msgDate && msgDate !== prevDate;
 
             return (
               <React.Fragment key={msg.id}>
@@ -442,8 +488,7 @@ const ChatConversation = () => {
                 </motion.div>
               </React.Fragment>
             );
-          });
-        })()}
+          })}
 
         {otherTyping && (
           <div className="msg-pop" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 8 }}>
@@ -495,7 +540,7 @@ const ChatConversation = () => {
       )}
 
       {/* Smart replies */}
-      {messages.length > 0 && !text.trim() && !isUploading && !showGifs && (
+      {messages.length > 0 && !chatBlocked && !text.trim() && !isUploading && !showGifs && (
         <div style={{ overflowX: 'auto', display: 'flex', gap: 8, padding: '4px 12px', flexShrink: 0 }}>
           <Sparkles size={13} color="var(--primary)" style={{ flexShrink: 0, marginTop: 5 }} />
           {SMART_REPLIES.map((r, i) => (
@@ -519,18 +564,19 @@ const ChatConversation = () => {
 
       {/* Composer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 8px))', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
-        <button onClick={() => setShowGifs(!showGifs)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--text-muted)' }}><Smile size={20} /></button>
-        <label style={{ cursor: 'pointer', padding: 6, color: 'var(--text-muted)', display: 'flex' }}>
+        <button disabled={chatBlocked} onClick={() => setShowGifs(!showGifs)} style={{ background: 'none', border: 'none', cursor: chatBlocked ? 'not-allowed' : 'pointer', padding: 6, color: 'var(--text-muted)', opacity: chatBlocked ? 0.45 : 1 }}><Smile size={20} /></button>
+        <label style={{ cursor: chatBlocked ? 'not-allowed' : 'pointer', padding: 6, color: 'var(--text-muted)', display: 'flex', opacity: chatBlocked ? 0.45 : 1 }}>
           <Paperclip size={20} />
-          <input type="file" hidden onChange={handleFileUpload} accept="image/*,video/*,.pdf,.doc,.docx,.txt" />
+          <input type="file" hidden disabled={chatBlocked} onChange={handleFileUpload} accept="image/*,video/*,.pdf,.doc,.docx,.txt" />
         </label>
         <input
           type="text"
-          placeholder="Message..."
+          placeholder={chatBlocked ? 'Add friend to message...' : 'Message...'}
           value={text}
+          disabled={chatBlocked}
           onChange={e => handleTyping(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 14px', borderRadius: 22, color: 'white', outline: 'none', fontSize: 14 }}
+          style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 14px', borderRadius: 22, color: 'white', outline: 'none', fontSize: 14, opacity: chatBlocked ? 0.6 : 1 }}
         />
         {text.trim() ? (
           <button onClick={handleSend} disabled={isSending}

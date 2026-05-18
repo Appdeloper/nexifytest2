@@ -35,6 +35,9 @@ export const subscribeActivityFeed = (callback, limitCount = 20) => {
       ...doc.data()
     }));
     callback(activities);
+  }, (err) => {
+    console.error("Activity feed subscription failed:", err);
+    callback([]);
   });
 };
 

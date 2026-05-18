@@ -1,25 +1,97 @@
 import { db } from './firebase';
 import { 
-  collection, doc, setDoc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, query, where, orderBy, serverTimestamp, getDoc, getDocs 
+  collection, doc, setDoc, updateDoc,
+  onSnapshot, query, where, orderBy, serverTimestamp, getDoc
 } from 'firebase/firestore';
 import { uploadToCloudinary } from './cloudinary';
 
+const getDMChatId = (uid1, uid2) => [uid1, uid2].sort().join('_');
+const getMembers = (chat) => chat?.members || chat?.participants || [];
+const getFriends = async (uid) => {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const friends = snap.exists() && Array.isArray(snap.data().friends) ? snap.data().friends : [];
+  return friends;
+};
+
+const areFriends = async (uid1, uid2) => {
+  const [friends1, friends2] = await Promise.all([getFriends(uid1), getFriends(uid2)]);
+  return friends1.includes(uid2) && friends2.includes(uid1);
+};
+
+const assertCanUseChat = async (chatId, uid) => {
+  const chatSnap = await getDoc(doc(db, 'chats', chatId));
+  if (!chatSnap.exists()) throw new Error('Chat not found.');
+
+  const chat = chatSnap.data();
+  const members = getMembers(chat);
+  if (!members.includes(uid)) throw new Error('You are not a participant in this chat.');
+
+  if (chat.type === 'dm') {
+    const otherUid = members.find(id => id !== uid);
+    if (!otherUid || chatId !== getDMChatId(uid, otherUid) || !(await areFriends(uid, otherUid))) {
+      throw new Error('You can only message accepted friends.');
+    }
+  }
+
+  return chat;
+};
+
+export const canUserAccessChat = async (chatId, uid) => {
+  try {
+    await assertCanUseChat(chatId, uid);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const subscribeUserChats = (uid, callback) => {
+  let rawChats = [];
+  let friendIds = new Set();
+  let hasUserSnapshot = false;
+
+  const publish = () => {
+    if (!hasUserSnapshot) return;
+    const visibleChats = rawChats.filter(chat => {
+      if (chat.type !== 'dm') return true;
+      const members = getMembers(chat);
+      const otherUid = members.find(id => id !== uid);
+      return otherUid && friendIds.has(otherUid) && chat.id === getDMChatId(uid, otherUid);
+    });
+    callback(visibleChats);
+  };
+
+  const unsubUser = onSnapshot(doc(db, 'users', uid), (snap) => {
+    const friends = snap.exists() && Array.isArray(snap.data().friends) ? snap.data().friends : [];
+    friendIds = new Set(friends);
+    hasUserSnapshot = true;
+    publish();
+  }, (err) => {
+    console.warn("User friends subscription failed:", err);
+    friendIds = new Set();
+    hasUserSnapshot = true;
+    publish();
+  });
+
   const q = query(
     collection(db, 'chats'),
     where(`memberMap.${uid}`, '==', true),
     orderBy('updatedAt', 'desc')
   );
   
-  return onSnapshot(q, (snapshot) => {
-    const chats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    callback(chats);
+  const unsubChats = onSnapshot(q, (snapshot) => {
+    rawChats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    publish();
   }, (err) => {
     console.warn("User chats subscription failed:", err);
+    rawChats = [];
     callback([]);
   });
 
+  return () => {
+    unsubUser();
+    unsubChats();
+  };
 };
 
 export const subscribeToMessages = (chatId, callback) => {
@@ -39,19 +111,17 @@ export const subscribeToMessages = (chatId, callback) => {
 };
 
 export const createOrGetDMChat = async (uid1, uid2) => {
-  // Check if chat exists
-  const chatsRef = collection(db, 'chats');
-  const q = query(chatsRef, where(`memberMap.${uid1}`, '==', true), where(`memberMap.${uid2}`, '==', true), where('type', '==', 'dm'));
-  const snapshot = await getDocs(q);
+  if (!uid1 || !uid2) throw new Error('Missing user.');
+  if (!(await areFriends(uid1, uid2))) throw new Error('Add this user as a friend before messaging.');
+
+  const chatId = getDMChatId(uid1, uid2);
+  const chatRef = doc(db, 'chats', chatId);
+  const chatSnap = await getDoc(chatRef);
+  if (chatSnap.exists()) return chatId;
   
-  if (!snapshot.empty) {
-    return snapshot.docs[0].id;
-  }
-  
-  // Create new chat
-  const newChatRef = doc(collection(db, 'chats'));
-  await setDoc(newChatRef, {
+  await setDoc(chatRef, {
     type: 'dm',
+    participants: [uid1, uid2].sort(),
     members: [uid1, uid2],
     memberMap: {
       [uid1]: true,
@@ -63,7 +133,7 @@ export const createOrGetDMChat = async (uid1, uid2) => {
     updatedAt: serverTimestamp()
   });
   
-  return newChatRef.id;
+  return chatId;
 };
 
 export const updateLastMessage = async (chatId, text) => {
@@ -79,6 +149,7 @@ let lastMessageTime = 0;
 const MESSAGE_COOLDOWN = 500; // 500ms
 
 export const sendTextMessage = async (chatId, senderId, text, replyTo = null) => {
+  await assertCanUseChat(chatId, senderId);
   const now = Date.now();
   if (now - lastMessageTime < MESSAGE_COOLDOWN) {
     throw new Error('Please wait before sending another message.');
@@ -104,7 +175,7 @@ export const sendTextMessage = async (chatId, senderId, text, replyTo = null) =>
       const chatSnap = await getDoc(doc(db, 'chats', chatId));
       if (chatSnap.exists()) {
         const chatData = chatSnap.data();
-        const otherId = chatData.members.find(id => id !== senderId);
+        const otherId = getMembers(chatData).find(id => id !== senderId);
         if (otherId) {
           const { getUserData } = await import('./users');
           const senderData = await getUserData(senderId);
@@ -126,7 +197,7 @@ export const sendTextMessage = async (chatId, senderId, text, replyTo = null) =>
     import('./xp').then(({ addXP }) => addXP(senderId, 'sendMessage')).catch(() => {});
 
   } catch (error) {
-    throw new Error('Failed to send message. Please try again.');
+    throw new Error('Failed to send message. Please try again.', { cause: error });
   }
 };
 
@@ -176,6 +247,7 @@ export const uploadChatAttachment = async (chatId, file, onProgress, onComplete,
 };
 
 export const sendMediaMessage = async (chatId, senderId, file, type, mediaURL) => {
+  await assertCanUseChat(chatId, senderId);
   const msgRef = doc(collection(db, `chats/${chatId}/messages`));
   await setDoc(msgRef, {
     senderId,
@@ -194,7 +266,7 @@ export const sendMediaMessage = async (chatId, senderId, file, type, mediaURL) =
   try {
     const chatSnap = await getDoc(doc(db, 'chats', chatId));
     const chatData = chatSnap.data();
-    const otherId = chatData.members.find(id => id !== senderId);
+    const otherId = getMembers(chatData).find(id => id !== senderId);
     if (otherId) {
       const { getUserData } = await import('./users');
       const senderData = await getUserData(senderId);
@@ -207,10 +279,13 @@ export const sendMediaMessage = async (chatId, senderId, file, type, mediaURL) =
         senderId: senderId
       });
     }
-  } catch (e) {}
+  } catch {
+    /* Notification is best-effort. */
+  }
 };
 
 export const sendGifMessage = async (chatId, senderId, gifUrl) => {
+  await assertCanUseChat(chatId, senderId);
   const msgRef = doc(collection(db, `chats/${chatId}/messages`));
   await setDoc(msgRef, {
     senderId,
@@ -226,7 +301,7 @@ export const sendGifMessage = async (chatId, senderId, gifUrl) => {
   try {
     const chatSnap = await getDoc(doc(db, 'chats', chatId));
     const chatData = chatSnap.data();
-    const otherId = chatData.members.find(id => id !== senderId);
+    const otherId = getMembers(chatData).find(id => id !== senderId);
     if (otherId) {
       const { getUserData } = await import('./users');
       const senderData = await getUserData(senderId);
@@ -239,10 +314,12 @@ export const sendGifMessage = async (chatId, senderId, gifUrl) => {
         senderId: senderId
       });
     }
-  } catch (e) {}
+  } catch {
+    /* Notification is best-effort. */
+  }
 };
 
-export const markMessagesRead = async (chatId) => {};
+export const markMessagesRead = async () => null;
 
 export const deleteMessage = async (chatId, messageId) => {
   const msgRef = doc(db, `chats/${chatId}/messages`, messageId);

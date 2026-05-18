@@ -93,13 +93,16 @@ export const calculateRankFromXP = (xp = 0) => {
 
 export const getRankForXP = calculateRankFromXP;
 
-export const syncLeaderboard = async (uid) => {
+export const syncLeaderboard = async (uid, cachedData = null) => {
   if (!uid) return;
   try {
-    const userRef = doc(db, 'users', uid);
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) return;
-    const userData = snap.data();
+    let userData = cachedData;
+    if (!userData) {
+      const userRef = doc(db, 'users', uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) return;
+      userData = snap.data();
+    }
 
     await setDoc(doc(db, 'leaderboards', 'global', 'users', uid), {
       uid,
@@ -180,7 +183,11 @@ export const addXP = async (uid, reason, amountOverride = null) => {
 
     await updateDoc(userRef, updates);
     await logXPEvent(uid, finalAmount, reason);
-    await syncLeaderboard(uid);
+    await syncLeaderboard(uid, {
+      ...data,
+      ...updates,
+      xp: newXP,
+    });
 
     // Notable milestones
     if (data.rank !== newRank.id) {

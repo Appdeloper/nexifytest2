@@ -1,22 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import EmptyState from '../components/EmptyState';
 import { MessageSquare, Plus, Search } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { subscribeUserChats } from '../services/chat';
 import { getUserData } from '../services/users';
-import GlassCard from '../components/GlassCard';
-import { RoleBadge, RankBadge } from '../components/Badges';
+import { RoleBadge } from '../components/Badges';
+import Avatar from '../components/Avatar';
 
 
 const TABS = ['All', 'DMs', 'Groups', 'Unread'];
 
-import Avatar from '../components/Avatar';
+const getChatMembers = (chat) => chat.members || chat.participants || [];
 
 const Chats = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const currentUid = currentUser?.uid;
   const [chats, setChats] = useState([]);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -25,12 +26,12 @@ const Chats = () => {
   const fetchedIds = React.useRef(new Set());
 
   useEffect(() => {
-    if (!currentUser) return;
-    const unsub = subscribeUserChats(currentUser.uid, async (fetchedChats) => {
+    if (!currentUid) return;
+    const unsub = subscribeUserChats(currentUid, async (fetchedChats) => {
       setChats(fetchedChats);
       const map = {};
       for (const chat of fetchedChats) {
-        const otherUserId = chat.members.find(id => id !== currentUser.uid);
+        const otherUserId = getChatMembers(chat).find(id => id !== currentUid);
         if (otherUserId && !fetchedIds.current.has(otherUserId)) {
           fetchedIds.current.add(otherUserId);
           const userData = await getUserData(otherUserId);
@@ -42,27 +43,27 @@ const Chats = () => {
       }
     });
     return () => unsub();
-  }, [currentUser?.uid]);
+  }, [currentUid]);
 
   const filteredChats = chats.filter(chat => {
     if (activeTab === 'DMs' && chat.type !== 'dm') return false;
     if (activeTab === 'Groups' && chat.type !== 'group') return false;
-    if (activeTab === 'Unread' && (!chat.unreadCount?.[currentUser.uid])) return false;
+    if (activeTab === 'Unread' && (!chat.unreadCount?.[currentUid])) return false;
     if (search) {
-      const otherUserId = chat.members.find(id => id !== currentUser.uid);
+      const otherUserId = getChatMembers(chat).find(id => id !== currentUid);
       const otherUser = chatUsersMap[otherUserId];
       if (otherUser && !otherUser.displayName?.toLowerCase().includes(search.toLowerCase())) return false;
     }
     return true;
   });
 
-  const pinnedChats = filteredChats.filter(c => c.isPinned?.[currentUser.uid]);
-  const normalChats = filteredChats.filter(c => !c.isPinned?.[currentUser.uid]);
+  const pinnedChats = filteredChats.filter(c => c.isPinned?.[currentUid]);
+  const normalChats = filteredChats.filter(c => !c.isPinned?.[currentUid]);
 
   const renderChatCard = (chat) => {
-    const otherUserId = chat.members.find(id => id !== currentUser.uid);
+    const otherUserId = getChatMembers(chat).find(id => id !== currentUid);
     const otherUser = chatUsersMap[otherUserId] || { uid: otherUserId };
-    const unreadCount = chat.unreadCount?.[currentUser.uid] || 0;
+    const unreadCount = chat.unreadCount?.[currentUid] || 0;
     const isOnline = otherUser.online;
     
     let timeStr = '';
@@ -113,7 +114,7 @@ const Chats = () => {
                 {otherUser.displayName || 'Loading...'}
               </span>
               {otherUser.role && otherUser.role !== 'member' && <RoleBadge role={otherUser.role} size="xs" hideLabel />}
-              {chat.isPinned?.[currentUser.uid] && <div style={{ fontSize: 10, opacity: 0.5 }}>📌</div>}
+              {chat.isPinned?.[currentUid] && <div style={{ fontSize: 10, opacity: 0.5 }}>📌</div>}
             </div>
             <span style={{ fontSize: 10, color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700 }}>{timeStr}</span>
           </div>

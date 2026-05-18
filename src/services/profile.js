@@ -8,32 +8,37 @@ export const updateUserProfile = async (uid, updates) => {
   const snap = await getDoc(userRef);
   if (!snap.exists()) throw new Error('User not found');
   
+  const nextUpdates = { ...updates };
+  if (nextUpdates.username) {
+    nextUpdates.username = nextUpdates.username.trim().toLowerCase();
+  }
+
   const userData = snap.data();
   const now = Date.now();
   const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
   // Check username cooldown
-  if (updates.username && updates.username !== userData.username) {
+  if (nextUpdates.username && nextUpdates.username !== userData.username) {
     const lastUpdate = userData.lastUsernameUpdate?.toMillis() || 0;
     if (now - lastUpdate < DAY_IN_MS) {
       const remaining = Math.ceil((DAY_IN_MS - (now - lastUpdate)) / (60 * 60 * 1000));
       throw new Error(`Username can only be changed once every 24 hours. Try again in ${remaining} hours.`);
     }
-    updates.lastUsernameUpdate = serverTimestamp();
+    nextUpdates.lastUsernameUpdate = serverTimestamp();
   }
 
   // Check name cooldown
-  if (updates.displayName && updates.displayName !== userData.displayName) {
+  if (nextUpdates.displayName && nextUpdates.displayName !== userData.displayName) {
     const lastUpdate = userData.lastNameUpdate?.toMillis() || 0;
     if (now - lastUpdate < DAY_IN_MS) {
       const remaining = Math.ceil((DAY_IN_MS - (now - lastUpdate)) / (60 * 60 * 1000));
       throw new Error(`Name can only be changed once every 24 hours. Try again in ${remaining} hours.`);
     }
-    updates.lastNameUpdate = serverTimestamp();
+    nextUpdates.lastNameUpdate = serverTimestamp();
   }
 
   await updateDoc(userRef, {
-    ...updates,
+    ...nextUpdates,
     updatedAt: serverTimestamp(),
   });
 };
@@ -71,4 +76,3 @@ export const setProfileAnthem = async (uid, anthemData) => {
     updatedAt: serverTimestamp()
   });
 };
-

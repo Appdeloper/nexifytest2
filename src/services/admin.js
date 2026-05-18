@@ -137,6 +137,9 @@ export const subscribeLeaderboard = (callback, sortKey = 'xp') => {
   );
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+  }, (err) => {
+    console.error("Leaderboard subscription failed:", err);
+    callback([]);
   });
 };
 

@@ -1,215 +1,294 @@
 import { db } from './firebase';
 import {
-  collection, doc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, where, getDocs, getDoc,
-  serverTimestamp, orderBy, limit
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  where,
+  writeBatch
 } from 'firebase/firestore';
 
-// ── Send a friend request ──────────────────────────────────────
+export const getDMChatId = (uid1, uid2) => [uid1, uid2].sort().join('_');
+
+const getArray = (data, key) => (Array.isArray(data?.[key]) ? data[key] : []);
+
+const getRequiredUser = async (uid) => {
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists()) throw new Error('User not found.');
+  return { id: snap.id, ...snap.data() };
+};
+
 export const sendFriendRequest = async (fromUid, toUid) => {
+  if (!fromUid || !toUid) throw new Error('Missing user.');
   if (fromUid === toUid) throw new Error('Cannot add yourself.');
 
-  // Check for existing request
-  const reqId = [fromUid, toUid].sort().join('_');
-  const reqRef = doc(db, 'friendRequests', reqId);
-  const existing = await getDoc(reqRef);
-  
-  if (existing.exists()) {
-    const data = existing.data();
-    if (data.from === toUid) {
-      // They already sent a request to us! Let's just accept it.
-      return await acceptFriendRequest(toUid, fromUid);
-    }
+  const [fromUser, toUser] = await Promise.all([
+    getRequiredUser(fromUid),
+    getRequiredUser(toUid)
+  ]);
+
+  if (getArray(fromUser, 'friends').includes(toUid) || getArray(toUser, 'friends').includes(fromUid)) {
+    throw new Error('You are already friends.');
+  }
+  if (getArray(fromUser, 'requestsSent').includes(toUid) || getArray(toUser, 'requestsReceived').includes(fromUid)) {
     throw new Error('Friend request already sent.');
   }
+  if (getArray(fromUser, 'requestsReceived').includes(toUid) || getArray(toUser, 'requestsSent').includes(fromUid)) {
+    throw new Error('This user already sent you a request.');
+  }
 
-  // Check if already friends
-  const friendRef = doc(db, 'friends', reqId);
-  const fr = await getDoc(friendRef);
-  if (fr.exists()) throw new Error('You are already friends.');
-
-  await setDoc(reqRef, {
-    from: fromUid,
-    to: toUid,
-    status: 'pending',
-    createdAt: serverTimestamp(),
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', fromUid), {
+    requestsSent: arrayUnion(toUid),
+    updatedAt: serverTimestamp()
   });
+  batch.update(doc(db, 'users', toUid), {
+    requestsReceived: arrayUnion(fromUid),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
 
-  // Notify recipient
   try {
     const { getUserData } = await import('./users');
     const sender = await getUserData(fromUid);
     const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
     await sendNotification(toUid, {
       title: 'New Friend Request',
-      body: `${sender?.displayName || 'Someone'} wants to be your friend.`,
+      body: `${sender?.displayName || sender?.username || 'Someone'} wants to be your friend.`,
       type: NOTIFICATION_TYPES.FRIEND_REQUEST,
-      fromUid: fromUid
+      fromUid
     });
-  } catch (e) {}
+  } catch {
+    /* Notification is best-effort. */
+  }
 };
 
-// ── Cancel a sent request ──────────────────────────────────────
 export const cancelFriendRequest = async (fromUid, toUid) => {
-  const reqId = [fromUid, toUid].sort().join('_');
-  await deleteDoc(doc(db, 'friendRequests', reqId));
+  if (!fromUid || !toUid) throw new Error('Missing user.');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', fromUid), {
+    requestsSent: arrayRemove(toUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(doc(db, 'users', toUid), {
+    requestsReceived: arrayRemove(fromUid),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
 };
 
-// ── Accept a friend request ────────────────────────────────────
 export const acceptFriendRequest = async (fromUid, toUid) => {
-  const reqId = [fromUid, toUid].sort().join('_');
-  await deleteDoc(doc(db, 'friendRequests', reqId));
+  if (!fromUid || !toUid) throw new Error('Missing user.');
+  if (fromUid === toUid) throw new Error('Cannot add yourself.');
 
-  // Write friendship document (bidirectional via single doc + map)
-  const friendRef = doc(db, 'friends', reqId);
-  await setDoc(friendRef, {
-    users: [fromUid, toUid],
-    userMap: { [fromUid]: true, [toUid]: true },
-    createdAt: serverTimestamp(),
+  const [fromUser, toUser] = await Promise.all([
+    getRequiredUser(fromUid),
+    getRequiredUser(toUid)
+  ]);
+
+  const alreadyFriends = getArray(toUser, 'friends').includes(fromUid) && getArray(fromUser, 'friends').includes(toUid);
+  const hasIncomingRequest = getArray(toUser, 'requestsReceived').includes(fromUid)
+    && getArray(fromUser, 'requestsSent').includes(toUid);
+
+  if (!alreadyFriends && !hasIncomingRequest) {
+    throw new Error('Friend request is no longer available.');
+  }
+
+  const chatId = getDMChatId(fromUid, toUid);
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', toUid), {
+    friends: arrayUnion(fromUid),
+    requestsReceived: arrayRemove(fromUid),
+    requestsSent: arrayRemove(fromUid),
+    updatedAt: serverTimestamp()
   });
+  batch.update(doc(db, 'users', fromUid), {
+    friends: arrayUnion(toUid),
+    requestsSent: arrayRemove(toUid),
+    requestsReceived: arrayRemove(toUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.set(doc(db, 'chats', chatId), {
+    type: 'dm',
+    participants: [fromUid, toUid].sort(),
+    members: [fromUid, toUid],
+    memberMap: {
+      [fromUid]: true,
+      [toUid]: true
+    },
+    lastMessage: '',
+    lastMessageAt: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await batch.commit();
 
-  // Notify the other person (fromUid is the one who sent the request, toUid is the one accepting)
   try {
     const { getUserData } = await import('./users');
     const acceptor = await getUserData(toUid);
     const { sendNotification, NOTIFICATION_TYPES } = await import('./notifications');
     await sendNotification(fromUid, {
       title: 'Friend Request Accepted',
-      body: `${acceptor?.displayName || 'Someone'} accepted your friend request!`,
+      body: `${acceptor?.displayName || acceptor?.username || 'Someone'} accepted your friend request!`,
       type: NOTIFICATION_TYPES.FRIEND_ACCEPTED,
-      fromUid: toUid
+      fromUid: toUid,
+      chatId
     });
-  } catch (e) {}
-};
-
-// ── Decline a friend request ───────────────────────────────────
-export const declineFriendRequest = async (fromUid, toUid) => {
-  const reqId = [fromUid, toUid].sort().join('_');
-  await deleteDoc(doc(db, 'friendRequests', reqId));
-};
-
-// ── Remove a friend ────────────────────────────────────────────
-export const removeFriend = async (uid1, uid2) => {
-  const reqId = [uid1, uid2].sort().join('_');
-  await deleteDoc(doc(db, 'friends', reqId));
-};
-
-// ── Real-time: incoming requests ───────────────────────────────
-export const subscribeIncomingRequests = (uid, callback) => {
-  const q = query(
-    collection(db, 'friendRequests'),
-    where('to', '==', uid)
-  );
-  return onSnapshot(q, snap => {
-    const list = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(r => r.status === 'pending');
-    callback(list);
-  }, (err) => {
-    console.warn("Incoming requests subscription failed:", err);
-    callback([]);
-  });
-};
-
-// ── Real-time: sent requests ───────────────────────────────────
-export const subscribeSentRequests = (uid, callback) => {
-  const q = query(
-    collection(db, 'friendRequests'),
-    where('from', '==', uid)
-  );
-  return onSnapshot(q, snap => {
-    const list = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(r => r.status === 'pending');
-    callback(list);
-  }, (err) => {
-    console.warn("Sent requests subscription failed:", err);
-    callback([]);
-  });
-};
-
-// ── Real-time: friends list ────────────────────────────────────
-export const subscribeFriends = (uid, callback) => {
-  const q = query(
-    collection(db, 'friends'),
-    where('users', 'array-contains', uid)
-  );
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  }, err => {
-    console.warn("Friends subscription failed:", err);
-    callback([]);
-  });
-};
-
-// ── Check friendship status ────────────────────────────────────
-export const getFriendshipStatus = async (uid1, uid2) => {
-  const reqId = [uid1, uid2].sort().join('_');
-  const [frSnap, reqSnap] = await Promise.all([
-    getDoc(doc(db, 'friends', reqId)),
-    getDoc(doc(db, 'friendRequests', reqId)),
-  ]);
-  if (frSnap.exists()) return 'friends';
-  if (reqSnap.exists()) {
-    return reqSnap.data().from === uid1 ? 'sent' : 'received';
+  } catch {
+    /* Notification is best-effort. */
   }
+
+  return chatId;
+};
+
+export const declineFriendRequest = async (fromUid, toUid) => {
+  if (!fromUid || !toUid) throw new Error('Missing user.');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', toUid), {
+    requestsReceived: arrayRemove(fromUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(doc(db, 'users', fromUid), {
+    requestsSent: arrayRemove(toUid),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+};
+
+export const removeFriend = async (uid1, uid2) => {
+  if (!uid1 || !uid2) throw new Error('Missing user.');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', uid1), {
+    friends: arrayRemove(uid2),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(doc(db, 'users', uid2), {
+    friends: arrayRemove(uid1),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+};
+
+export const subscribeIncomingRequests = (uid, callback) => {
+  return onSnapshot(doc(db, 'users', uid), snap => {
+    const requests = getArray(snap.data(), 'requestsReceived')
+      .filter(Boolean)
+      .map(from => ({ id: getDMChatId(from, uid), from, to: uid, status: 'pending' }));
+    callback(requests);
+  }, err => {
+    console.warn('Incoming requests subscription failed:', err);
+    callback([]);
+  });
+};
+
+export const subscribeSentRequests = (uid, callback) => {
+  return onSnapshot(doc(db, 'users', uid), snap => {
+    const requests = getArray(snap.data(), 'requestsSent')
+      .filter(Boolean)
+      .map(to => ({ id: getDMChatId(uid, to), from: uid, to, status: 'pending' }));
+    callback(requests);
+  }, err => {
+    console.warn('Sent requests subscription failed:', err);
+    callback([]);
+  });
+};
+
+export const subscribeFriends = (uid, callback) => {
+  return onSnapshot(doc(db, 'users', uid), snap => {
+    const friends = getArray(snap.data(), 'friends')
+      .filter(Boolean)
+      .map(otherUid => ({
+        id: getDMChatId(uid, otherUid),
+        users: [uid, otherUid],
+        userMap: { [uid]: true, [otherUid]: true },
+        createdAt: null
+      }));
+    callback(friends);
+  }, err => {
+    console.warn('Friends subscription failed:', err);
+    callback([]);
+  });
+};
+
+export const getFriendshipStatus = async (uid1, uid2) => {
+  if (!uid1 || !uid2) return 'none';
+  const user = await getRequiredUser(uid1);
+  if (getArray(user, 'friends').includes(uid2)) return 'friends';
+  if (getArray(user, 'requestsSent').includes(uid2)) return 'sent';
+  if (getArray(user, 'requestsReceived').includes(uid2)) return 'received';
   return 'none';
 };
 
-// ── Search users by display name ───────────────────────────────
-export const searchUsers = async (queryText, currentUid) => {
-  if (!queryText || queryText.length < 1) return [];
-  const snap = await getDocs(collection(db, 'users'));
-  const lower = queryText.toLowerCase();
-  return snap.docs
-    .map(d => d.data())
-    .filter(u => u.uid !== currentUid &&
-      (u.displayName?.toLowerCase().includes(lower) ||
-       u.email?.toLowerCase().includes(lower)));
+const uniqueUsersFromSnapshot = (snap, currentUid) => {
+  const usersById = new Map();
+  snap.docs.forEach(userDoc => {
+    if (userDoc.id !== currentUid) {
+      usersById.set(userDoc.id, { uid: userDoc.id, id: userDoc.id, ...userDoc.data() });
+    }
+  });
+  return Array.from(usersById.values());
 };
-// ── Get all users (demo-friendly version) ─────────────────────
+
+export const searchUsers = async (queryText, currentUid) => {
+  const lower = queryText?.trim().toLowerCase();
+  if (!lower) return [];
+
+  const searchQuery = query(
+    collection(db, 'users'),
+    orderBy('username'),
+    where('username', '>=', lower),
+    where('username', '<=', `${lower}\uf8ff`),
+    limit(20)
+  );
+  const snap = await getDocs(searchQuery);
+  return uniqueUsersFromSnapshot(snap, currentUid);
+};
+
 export const getAllUsers = async (currentUid) => {
-  const q = query(collection(db, 'users'));
-  const snap = await getDocs(q);
+  const snap = await getDocs(query(collection(db, 'users')));
   return snap.docs
     .map(d => ({ uid: d.id, ...d.data() }))
     .filter(u => u.uid !== currentUid);
 };
 
 export const subscribeSearchUsers = (searchQuery, currentUid, callback) => {
-  if (!searchQuery || searchQuery.length < 1) {
+  const lower = searchQuery?.trim().toLowerCase();
+  if (!lower) {
     callback([]);
     return () => {};
   }
 
-  const lower = searchQuery.toLowerCase();
-  const q = query(collection(db, 'users'));
+  const searchRef = query(
+    collection(db, 'users'),
+    orderBy('username'),
+    where('username', '>=', lower),
+    where('username', '<=', `${lower}\uf8ff`),
+    limit(20)
+  );
 
-  return onSnapshot(q, (snap) => {
-    const matched = snap.docs
-      .map(d => ({ uid: d.id, id: d.id, ...d.data() }))
-      .filter(u => u.uid !== currentUid && (
-        u.displayName?.toLowerCase().includes(lower) ||
-        u.email?.toLowerCase().includes(lower) ||
-        u.username?.toLowerCase().includes(lower)
-      ));
-    callback(matched);
-  }, (err) => {
-    console.error("Search subscribe failed:", err);
+  return onSnapshot(searchRef, snap => {
+    callback(uniqueUsersFromSnapshot(snap, currentUid));
+  }, err => {
+    console.error('Search subscribe failed:', err);
     callback([]);
   });
 };
 
-// ── Real-time: subscribe to all users (for global search/filtering) ──
 export const subscribeAllUsers = (currentUid, callback) => {
-  const q = query(collection(db, 'users'));
-  return onSnapshot(q, snap => {
+  return onSnapshot(query(collection(db, 'users')), snap => {
     const list = snap.docs
       .map(d => ({ uid: d.id, ...d.data() }))
       .filter(u => u.uid !== currentUid);
     callback(list);
   }, err => {
-    console.warn("Subscribe all users failed:", err);
+    console.warn('Subscribe all users failed:', err);
     callback([]);
   });
 };

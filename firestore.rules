@@ -2,13 +2,81 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ── Helper functions ─────────────────────────────────────────
+    // === Helper functions ===
     function isSignedIn() {
       return request.auth != null;
     }
     
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUser(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function getUserAfter(uid) {
+      return getAfter(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function hasUid(values, uid) {
+      return values is list && uid in values;
+    }
+
+    function onlySocialUserFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['friends', 'requestsSent', 'requestsReceived', 'updatedAt']);
+    }
+
+    function signedUserIsInvolvedInSocialWrite(userId) {
+      return request.auth.uid == userId
+        || hasUid(resource.data.friends, request.auth.uid)
+        || hasUid(resource.data.requestsSent, request.auth.uid)
+        || hasUid(resource.data.requestsReceived, request.auth.uid)
+        || hasUid(request.resource.data.friends, request.auth.uid)
+        || hasUid(request.resource.data.requestsSent, request.auth.uid)
+        || hasUid(request.resource.data.requestsReceived, request.auth.uid);
+    }
+
+    function areFriends(uid1, uid2) {
+      return hasUid(getUser(uid1).friends, uid2) && hasUid(getUser(uid2).friends, uid1);
+    }
+
+    function areFriendsAfter(uid1, uid2) {
+      return hasUid(getUserAfter(uid1).friends, uid2) && hasUid(getUserAfter(uid2).friends, uid1);
+    }
+
+    function isDmChatData(data) {
+      return data.type == 'dm'
+        && data.participants is list
+        && data.participants.size() == 2
+        && data.members is list
+        && data.members.size() == 2;
+    }
+
+    function isChatParticipant(data) {
+      return (data.members is list && request.auth.uid in data.members)
+        || (data.participants is list && request.auth.uid in data.participants)
+        || data.memberMap[request.auth.uid] == true;
+    }
+
+    function isDeterministicDm(chatId, data) {
+      return isDmChatData(data)
+        && chatId == data.participants[0] + '_' + data.participants[1];
+    }
+
+    function canUseDmChat(chatId, data) {
+      return isSignedIn()
+        && isChatParticipant(data)
+        && isDeterministicDm(chatId, data)
+        && areFriends(data.participants[0], data.participants[1]);
+    }
+
+    function canCreateDmChat(chatId) {
+      return isSignedIn()
+        && isChatParticipant(request.resource.data)
+        && isDeterministicDm(chatId, request.resource.data)
+        && areFriendsAfter(request.resource.data.participants[0], request.resource.data.participants[1]);
     }
 
     function isOwner() {
@@ -23,15 +91,19 @@ service cloud.firestore {
       return isOwner() || isAdmin();
     }
 
-    // ── Users collection ──────────────────────────────────────────
+    // === Users collection ===
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && (request.auth.uid == userId || userId == 'nexify_ai');
       
       // Strict update rules: users can only edit non-sensitive fields
       allow update: if (isSignedIn() && request.auth.uid == userId 
                         && !request.resource.data.diff(resource.data).affectedKeys()
                            .hasAny(['role', 'rank', 'xp', 'level', 'verified', 'badges', 'banned'])
+                       )
+                    || (isSignedIn()
+                        && onlySocialUserFieldsChanged()
+                        && signedUserIsInvolvedInSocialWrite(userId)
                        )
                     || (isStaff() 
                         // Staff can update mostly anything, but only owner can assign owner/admin
@@ -40,7 +112,7 @@ service cloud.firestore {
                        );
     }
     
-    // ── Roles & Ranks ─────────────────────────────────────────────
+    // === Roles & Ranks ===
     match /roles/{roleId} {
       allow read, write: if true;
     }
@@ -49,7 +121,7 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
-    // ── Leaderboards ──────────────────────────────────────────────
+    // === Leaderboards ===
     match /leaderboards/{lbId} {
       allow read: if isSignedIn();
       allow write: if true;
@@ -60,7 +132,7 @@ service cloud.firestore {
       }
     }
     
-    // ── Admin Logs & XP Events ────────────────────────────────────
+    // === Admin Logs & XP Events ===
     match /adminLogs/{logId} {
       allow read: if isStaff();
       allow create: if isStaff();
@@ -71,7 +143,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
     }
 
-    // ── Rooms & Chats ─────────────────────────────────────────────
+    // === Rooms & Chats ===
     match /rooms/{roomId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -87,18 +159,22 @@ service cloud.firestore {
     }
     
     match /chats/{chatId} {
-      allow read, update: if isSignedIn() && request.auth.uid in resource.data.members;
-      allow create: if isSignedIn();
+      allow read: if isSignedIn() && isChatParticipant(resource.data);
+      allow update: if canUseDmChat(chatId, resource.data);
+      allow create: if canCreateDmChat(chatId);
       
       match /messages/{messageId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn();
-        allow delete: if isStaff() || (isSignedIn() && resource.data.senderId == request.auth.uid);
+        allow read: if canUseDmChat(chatId, get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow create: if request.resource.data.senderId == request.auth.uid
+          && canUseDmChat(chatId, get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow update: if canUseDmChat(chatId, get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow delete: if isStaff() || (isSignedIn()
+          && resource.data.senderId == request.auth.uid
+          && canUseDmChat(chatId, get(/databases/$(database)/documents/chats/$(chatId)).data));
       }
     }
 
-    // ── Friends & Requests ────────────────────────────────────────
+    // === Friends & Requests ===
     match /friends/{friendId} {
       allow read: if isSignedIn() && (resource == null || resource.data.userMap[request.auth.uid] == true || isStaff());
       allow create: if isSignedIn() && request.resource.data.userMap[request.auth.uid] == true;
@@ -111,7 +187,7 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from || isStaff());
     }
 
-    // ── Calls ─────────────────────────────────────────────────────
+    // === Calls ===
     match /calls/{callId} {
       allow read, create, update: if isSignedIn();
       allow delete: if isStaff();
@@ -120,7 +196,7 @@ service cloud.firestore {
       }
     }
 
-    // ── Music ─────────────────────────────────────────────────────
+    // === Music ===
     match /musicRooms/{roomId} {
       allow read, create, update: if isSignedIn();
     }
@@ -131,7 +207,7 @@ service cloud.firestore {
       allow read, create: if isSignedIn();
     }
 
-    // ── Activity, Focus, Tasks ────────────────────────────────────
+    // === Activity, Focus, Tasks ===
     match /activityFeed/{activityId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -144,14 +220,35 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
+    match /users/{userId}/tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
     match /tasks/{taskId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
+    match /focusPods/{podId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isStaff());
+    }
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.toUid == request.auth.uid || isStaff());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.toUid == request.auth.uid || isStaff());
+      allow delete: if isSignedIn() && (resource.data.toUid == request.auth.uid || isStaff());
+    }
+    match /milestones/{milestoneId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isStaff();
+    }
 
-    // ── Catch-all ────────────────────────────────────────────────
+    // === Catch-all ===
     match /{path=**} {
       allow read: if isSignedIn();
       allow write: if isStaff();

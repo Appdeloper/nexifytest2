@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export const getAllUsers = async (currentUid) => {
   const snapshot = await getDocs(collection(db, 'users'));
@@ -19,6 +19,9 @@ export const subscribeUserData = (uid, callback) => {
   return onSnapshot(doc(db, 'users', uid), (snap) => {
     if (snap.exists()) callback(snap.data());
     else callback(null);
+  }, (err) => {
+    console.error("User data subscription failed:", err);
+    callback(null);
   });
 };
 
@@ -37,6 +40,9 @@ export const ensureAIUser = async () => {
       bio: 'Your futuristic AI companion. Tag me with @nexifyai to chat!',
       photoURL: 'https://api.dicebear.com/7.x/bottts/svg?seed=nexify_ai&backgroundColor=000000',
       presence: 'online',
+      friends: [],
+      requestsSent: [],
+      requestsReceived: [],
       createdAt: new Date(),
       prefs: {
         avatarRing: true,

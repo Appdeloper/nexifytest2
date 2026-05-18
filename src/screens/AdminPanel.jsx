@@ -285,19 +285,21 @@ const AdminPanel = () => {
     setLoading(false);
   };
 
-
-  const loadUsers = useCallback(async () => {
+  useEffect(() => {
+    if (!authorized) return;
     setLoading(true);
-    try {
-      const snap = await getDocs(query(collection(db, 'users'), orderBy('xp', 'desc'), limit(50)));
+    const q = query(collection(db, 'users'), orderBy('xp', 'desc'), limit(50));
+    const unsub = onSnapshot(q, (snap) => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setUsers(list);
       setFiltered(list);
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { if (authorized) loadUsers(); }, [authorized, loadUsers]);
+      setLoading(false);
+    }, (err) => {
+      console.error("AdminPanel users subscription failed:", err);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [authorized]);
 
   useEffect(() => {
     if (!search.trim()) { setFiltered(users); return; }
@@ -457,11 +459,11 @@ const AdminPanel = () => {
 
       {selectedUser && (
         <UserSheet
-          user={selectedUser}
+          user={users.find(u => u.uid === selectedUser.uid) || selectedUser}
           actorRole={actorRole}
           actorUid={currentUser.uid}
           onClose={() => setSelectedUser(null)}
-          onRefresh={() => { loadUsers(); setSelectedUser(null); }}
+          onRefresh={() => setSelectedUser(null)}
         />
       )}
     </motion.div>
