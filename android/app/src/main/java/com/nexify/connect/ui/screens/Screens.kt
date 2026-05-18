@@ -41,6 +41,8 @@ import com.nexify.connect.services.AiService
 import com.nexify.connect.services.CloudinaryService
 import com.nexify.connect.ui.components.*
 import com.nexify.connect.ui.theme.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -434,16 +436,45 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
 @Composable
 fun FindFriendsScreen(navController: NavController, repository: FirebaseRepository) {
     var searchQuery by remember { mutableStateOf("") }
-    val allUsers by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
     val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var activeSubTab by remember { mutableStateOf("Search") }
+    var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
 
-    val filteredUsers = allUsers.filter {
-        it.username.contains(searchQuery, ignoreCase = true) ||
-        it.email.contains(searchQuery, ignoreCase = true)
+    val receivedRequestIds = currentUserProfile?.requestsReceived ?: emptyList()
+    val requestUsersFlow = remember(receivedRequestIds) {
+        repository.subscribeToUsersByIds(receivedRequestIds)
+    }
+    val requestsList by requestUsersFlow.collectAsState(initial = emptyList())
+
+    fun runFriendAction(successMessage: String, action: suspend () -> Unit) {
+        coroutineScope.launch {
+            try {
+                action()
+                Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, e.message ?: "Action failed.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(activeSubTab, searchQuery, repository.currentUserId) {
+        val normalizedQuery = searchQuery.trim().lowercase()
+        searchResults = emptyList()
+        if (activeSubTab != "Search" || normalizedQuery.isBlank()) {
+            isSearching = false
+            return@LaunchedEffect
+        }
+
+        isSearching = true
+        delay(400)
+        repository.searchUsersByUsername(normalizedQuery).collect { users ->
+            searchResults = users
+            isSearching = false
+        }
     }
 
     Column(
@@ -483,21 +514,29 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
         if (activeSubTab == "Search") {
             PremiumTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = "Search by username or email...",
+                onValueChange = { searchQuery = it.lowercase() },
+                placeholder = "Search by username...",
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, color = CyanNeon) }
             )
 
-            if (filteredUsers.isEmpty()) {
+            if (searchQuery.isBlank()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No citizens found matching query.", color = TextMuted, fontSize = 14.sp)
+                    Text("Search citizens by username.", color = TextMuted, fontSize = 14.sp)
+                }
+            } else if (isSearching) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = CyanNeon)
+                }
+            } else if (searchResults.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No users found", color = TextMuted, fontSize = 14.sp)
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(filteredUsers) { targetUser ->
+                    items(searchResults, key = { it.userId }) { targetUser ->
                         GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -543,9 +582,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                     "sent" -> {
                                         Button(
                                             onClick = {
-                                                coroutineScope.launch {
+                                                runFriendAction("Request cancelled.") {
                                                     repository.cancelFriendRequest(targetUser.userId)
-                                                    Toast.makeText(context, "Request cancelled.", Toast.LENGTH_SHORT).show()
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
@@ -558,9 +596,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Button(
                                                 onClick = {
-                                                    coroutineScope.launch {
+                                                    runFriendAction("Accepted request!") {
                                                         repository.acceptFriendRequest(targetUser.userId)
-                                                        Toast.makeText(context, "Accepted request!", Toast.LENGTH_SHORT).show()
                                                     }
                                                 },
                                                 colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon),
@@ -571,9 +608,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                             }
                                             OutlinedButton(
                                                 onClick = {
-                                                    coroutineScope.launch {
+                                                    runFriendAction("Rejected request.") {
                                                         repository.rejectFriendRequest(targetUser.userId)
-                                                        Toast.makeText(context, "Rejected request.", Toast.LENGTH_SHORT).show()
                                                     }
                                                 },
                                                 border = BorderStroke(1.dp, Color.Red),
@@ -587,9 +623,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                     "none" -> {
                                         Button(
                                             onClick = {
-                                                coroutineScope.launch {
+                                                runFriendAction("Friend request sent!") {
                                                     repository.sendFriendRequest(targetUser.userId)
-                                                    Toast.makeText(context, "Friend request sent!", Toast.LENGTH_SHORT).show()
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
@@ -610,8 +645,6 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
             }
         } else {
             // Received Requests view
-            val requestsList = allUsers.filter { currentUserProfile?.requestsReceived?.contains(it.userId) == true }
-            
             if (requestsList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No pending invitations received.", color = TextMuted, fontSize = 14.sp)
@@ -621,7 +654,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(requestsList) { sender ->
+                    items(requestsList, key = { it.userId }) { sender ->
                         GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -645,9 +678,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
                                         onClick = {
-                                            coroutineScope.launch {
+                                            runFriendAction("Accepted invite!") {
                                                 repository.acceptFriendRequest(sender.userId)
-                                                Toast.makeText(context, "Accepted invite!", Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon),
@@ -659,9 +691,8 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
 
                                     OutlinedButton(
                                         onClick = {
-                                            coroutineScope.launch {
+                                            runFriendAction("Rejected invite.") {
                                                 repository.rejectFriendRequest(sender.userId)
-                                                Toast.makeText(context, "Rejected invite.", Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         border = BorderStroke(1.dp, Color.Red),

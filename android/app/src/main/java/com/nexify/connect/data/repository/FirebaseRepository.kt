@@ -21,9 +21,40 @@ class FirebaseRepository {
 
     val currentUserId: String? get() = auth.currentUser?.uid
 
+    private fun List<String>?.safeIds(): List<String> = this ?: emptyList()
+
+    private fun dmChatId(userA: String, userB: String): String =
+        listOf(userA, userB).sorted().joinToString("_")
+
+    private suspend fun getUserOrThrow(userId: String): User {
+        val snap = db.collection("users").document(userId).get().await()
+        return snap.toObject(User::class.java) ?: throw Exception("User not found.")
+    }
+
+    private suspend fun ensureUserShape(userId: String) {
+        val ref = db.collection("users").document(userId)
+        val snap = ref.get().await()
+        if (!snap.exists()) return
+
+        val data = snap.data ?: return
+        val updates = mutableMapOf<String, Any>()
+        val username = data["username"] as? String
+        if (!username.isNullOrBlank() && username != username.lowercase()) {
+            updates["username"] = username.lowercase()
+        }
+        if (!data.containsKey("friends")) updates["friends"] = emptyList<String>()
+        if (!data.containsKey("requestsSent")) updates["requestsSent"] = emptyList<String>()
+        if (!data.containsKey("requestsReceived")) updates["requestsReceived"] = emptyList<String>()
+
+        if (updates.isNotEmpty()) {
+            ref.set(updates, SetOptions.merge()).await()
+        }
+    }
+
     // ── AUTHENTICATION ───────────────────────────────────────────
     suspend fun login(email: String, password: CharSequence): Boolean {
         auth.signInWithEmailAndPassword(email, password.toString()).await()
+        currentUserId?.let { ensureUserShape(it) }
         updatePresence(true)
         return true
     }
@@ -34,7 +65,7 @@ class FirebaseRepository {
         
         val user = User(
             userId = userId,
-            username = username,
+            username = username.trim().lowercase(),
             email = email,
             profileImage = "https://api.dicebear.com/7.x/avataaars/svg?seed=$userId",
             bio = "Hey! I am using Nexify Connect.",
@@ -107,73 +138,164 @@ class FirebaseRepository {
     }
 
     // ── ADD FRIEND SYSTEM (Firestore Batch/Transaction Writes) ─────
+    fun searchUsersByUsername(rawQuery: String): Flow<List<User>> = callbackFlow {
+        val uid = currentUserId
+        val search = rawQuery.trim().lowercase()
+        if (uid == null || search.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = db.collection("users")
+            .orderBy("username")
+            .startAt(search)
+            .endAt(search + "\uf8ff")
+            .limit(20)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    close(err)
+                    return@addSnapshotListener
+                }
+                val usersById = linkedMapOf<String, User>()
+                snap?.documents
+                    ?.mapNotNull { it.toObject(User::class.java) }
+                    ?.filter { it.userId != uid }
+                    ?.forEach { usersById[it.userId] = it }
+                trySend(usersById.values.toList())
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToUsersByIds(userIds: List<String>): Flow<List<User>> = callbackFlow {
+        val uniqueIds = userIds.distinct().filter { it.isNotBlank() }
+        if (uniqueIds.isEmpty()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val users = linkedMapOf<String, User>()
+        val listeners = uniqueIds.map { userId ->
+            db.collection("users").document(userId).addSnapshotListener { snap, err ->
+                if (err != null) {
+                    close(err)
+                    return@addSnapshotListener
+                }
+                val user = snap?.toObject(User::class.java)
+                if (user != null) users[userId] = user else users.remove(userId)
+                trySend(users.values.toList())
+            }
+        }
+
+        awaitClose { listeners.forEach { it.remove() } }
+    }
+
     suspend fun sendFriendRequest(targetUserId: String) {
-        val uid = currentUserId ?: return
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        if (uid == targetUserId) throw Exception("You cannot add yourself.")
+
+        val currentUser = getUserOrThrow(uid)
+        val targetUser = getUserOrThrow(targetUserId)
+        if (currentUser.friends.safeIds().contains(targetUserId) || targetUser.friends.safeIds().contains(uid)) {
+            throw Exception("You are already friends.")
+        }
+        if (currentUser.requestsSent.safeIds().contains(targetUserId) || targetUser.requestsReceived.safeIds().contains(uid)) {
+            throw Exception("Friend request already sent.")
+        }
+        if (currentUser.requestsReceived.safeIds().contains(targetUserId) || targetUser.requestsSent.safeIds().contains(uid)) {
+            throw Exception("This user already sent you a request.")
+        }
+
         val currentRef = db.collection("users").document(uid)
         val targetRef = db.collection("users").document(targetUserId)
 
-        db.runTransaction { transaction ->
-            transaction.update(currentRef, "requestsSent", FieldValue.arrayUnion(targetUserId))
-            transaction.update(targetRef, "requestsReceived", FieldValue.arrayUnion(uid))
-        }.await()
+        val batch = db.batch()
+        batch.update(currentRef, "requestsSent", FieldValue.arrayUnion(targetUserId))
+        batch.update(targetRef, "requestsReceived", FieldValue.arrayUnion(uid))
+        batch.commit().await()
     }
 
     suspend fun cancelFriendRequest(targetUserId: String) {
-        val uid = currentUserId ?: return
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
         val currentRef = db.collection("users").document(uid)
         val targetRef = db.collection("users").document(targetUserId)
 
-        db.runTransaction { transaction ->
-            transaction.update(currentRef, "requestsSent", FieldValue.arrayRemove(targetUserId))
-            transaction.update(targetRef, "requestsReceived", FieldValue.arrayRemove(uid))
-        }.await()
+        val batch = db.batch()
+        batch.update(currentRef, "requestsSent", FieldValue.arrayRemove(targetUserId))
+        batch.update(targetRef, "requestsReceived", FieldValue.arrayRemove(uid))
+        batch.commit().await()
     }
 
     suspend fun acceptFriendRequest(targetUserId: String) {
-        val uid = currentUserId ?: return
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        if (uid == targetUserId) throw Exception("Invalid friend request.")
+
+        val currentUser = getUserOrThrow(uid)
+        val targetUser = getUserOrThrow(targetUserId)
+        val alreadyFriends = currentUser.friends.safeIds().contains(targetUserId) &&
+            targetUser.friends.safeIds().contains(uid)
+        val hasRequest = currentUser.requestsReceived.safeIds().contains(targetUserId) &&
+            targetUser.requestsSent.safeIds().contains(uid)
+        if (!alreadyFriends && !hasRequest) {
+            throw Exception("Friend request is no longer available.")
+        }
+
         val currentRef = db.collection("users").document(uid)
         val targetRef = db.collection("users").document(targetUserId)
 
-        val chatId = listOf(uid, targetUserId).sorted().joinToString("_")
+        val chatId = dmChatId(uid, targetUserId)
         val chatRef = db.collection("chats").document(chatId)
 
-        db.runTransaction { transaction ->
-            transaction.update(currentRef, "friends", FieldValue.arrayUnion(targetUserId))
-            transaction.update(targetRef, "friends", FieldValue.arrayUnion(uid))
-            transaction.update(currentRef, "requestsReceived", FieldValue.arrayRemove(targetUserId))
-            transaction.update(targetRef, "requestsSent", FieldValue.arrayRemove(uid))
+        val batch = db.batch()
+        batch.update(currentRef, mapOf(
+            "friends" to FieldValue.arrayUnion(targetUserId),
+            "requestsReceived" to FieldValue.arrayRemove(targetUserId)
+        ))
+        batch.update(targetRef, mapOf(
+            "friends" to FieldValue.arrayUnion(uid),
+            "requestsSent" to FieldValue.arrayRemove(uid)
+        ))
+        batch.set(chatRef, mapOf(
+            "chatId" to chatId,
+            "participants" to listOf(uid, targetUserId).sorted(),
+            "lastMessage" to "",
+            "timestamp" to Date(),
+            "createdAt" to Date()
+        ), SetOptions.merge())
+        batch.commit().await()
+        /*
 
-            val chatMeta = mapOf(
-                "chatId" to chatId,
-                "participants" to listOf(uid, targetUserId),
                 "lastMessage" to "✨ Connected! Say hello.",
                 "timestamp" to Date(),
                 "createdAt" to Date()
             )
             transaction.set(chatRef, chatMeta, SetOptions.merge())
         }.await()
+        */
     }
 
     suspend fun rejectFriendRequest(targetUserId: String) {
-        val uid = currentUserId ?: return
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
         val currentRef = db.collection("users").document(uid)
         val targetRef = db.collection("users").document(targetUserId)
 
-        db.runTransaction { transaction ->
-            transaction.update(currentRef, "requestsReceived", FieldValue.arrayRemove(targetUserId))
-            transaction.update(targetRef, "requestsSent", FieldValue.arrayRemove(uid))
-        }.await()
+        val batch = db.batch()
+        batch.update(currentRef, "requestsReceived", FieldValue.arrayRemove(targetUserId))
+        batch.update(targetRef, "requestsSent", FieldValue.arrayRemove(uid))
+        batch.commit().await()
     }
 
     suspend fun removeFriend(targetUserId: String) {
-        val uid = currentUserId ?: return
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
         val currentRef = db.collection("users").document(uid)
         val targetRef = db.collection("users").document(targetUserId)
 
-        db.runTransaction { transaction ->
-            transaction.update(currentRef, "friends", FieldValue.arrayRemove(targetUserId))
-            transaction.update(targetRef, "friends", FieldValue.arrayRemove(uid))
-        }.await()
+        val batch = db.batch()
+        batch.update(currentRef, "friends", FieldValue.arrayRemove(targetUserId))
+        batch.update(targetRef, "friends", FieldValue.arrayRemove(uid))
+        batch.commit().await()
     }
 
     // ── STICKER SYSTEM ───────────────────────────────────────────
@@ -210,7 +332,7 @@ class FirebaseRepository {
     // ── 1-TO-1 CHAT SYSTEM (with Nexify Edge Moderation Shield) ───────
     fun getChatId(otherUserId: String): String {
         val uid = currentUserId ?: ""
-        return listOf(uid, otherUserId).sorted().joinToString("_")
+        return dmChatId(uid, otherUserId)
     }
 
     suspend fun sendMessage(
@@ -221,12 +343,20 @@ class FirebaseRepository {
         stickerId: String? = null,
         stickerUrl: String? = null
     ) {
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        val currentUser = getUserOrThrow(uid)
+        if (!currentUser.friends.safeIds().contains(otherUserId)) {
+            throw Exception("Add this user as a friend before messaging.")
+        }
+        if (chatId != dmChatId(uid, otherUserId)) {
+            throw Exception("Invalid chat.")
+        }
+
         // CONTENT MODERATION / SHIELD
         if (text != null && AiService.isOffensiveOrSpam(text)) {
             throw Exception("Transmission blocked by Nexify Edge: Spam or unsafe content detected.")
         }
 
-        val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
         val message = Message(
             messageId = messageId,
@@ -250,7 +380,8 @@ class FirebaseRepository {
             else -> text ?: ""
         }
         val chatMeta = mapOf(
-            "participants" to listOf(uid, otherUserId),
+            "chatId" to chatId,
+            "participants" to listOf(uid, otherUserId).sorted(),
             "lastMessage" to summary,
             "timestamp" to Date()
         )
@@ -261,16 +392,38 @@ class FirebaseRepository {
 
     fun subscribeToChats(): Flow<List<Chat>> = callbackFlow {
         val uid = currentUserId ?: return@callbackFlow
+        var friendIds = emptySet<String>()
+        var rawChats = emptyList<Chat>()
+
+        fun publish() {
+            trySend(rawChats.filter { chat ->
+                val otherUserId = chat.participants.firstOrNull { it != uid }
+                otherUserId != null && friendIds.contains(otherUserId) && chat.chatId == dmChatId(uid, otherUserId)
+            }.sortedByDescending { it.timestamp })
+        }
+
+        val userListener = db.collection("users").document(uid).addSnapshotListener { snap, err ->
+            if (err != null) {
+                close(err)
+                return@addSnapshotListener
+            }
+            friendIds = snap?.toObject(User::class.java)?.friends?.toSet() ?: emptySet()
+            publish()
+        }
+
         val q = db.collection("chats").whereArrayContains("participants", uid)
         val listener = q.addSnapshotListener { snap, err ->
             if (err != null) {
                 close(err)
                 return@addSnapshotListener
             }
-            val list = snap?.documents?.mapNotNull { it.toObject(Chat::class.java) } ?: emptyList()
-            trySend(list.sortedByDescending { it.timestamp })
+            rawChats = snap?.documents?.mapNotNull { it.toObject(Chat::class.java) } ?: emptyList()
+            publish()
         }
-        awaitClose { listener.remove() }
+        awaitClose {
+            userListener.remove()
+            listener.remove()
+        }
     }
 
     fun subscribeToMessages(chatId: String): Flow<List<Message>> = callbackFlow {
