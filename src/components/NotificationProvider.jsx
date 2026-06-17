@@ -1,20 +1,20 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { subscribeNotifications, markAsRead } from '../services/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X, Check } from 'lucide-react';
-
-const NotificationContext = createContext();
-
-export const useNotifications = () => useContext(NotificationContext);
+import { NotificationContext } from '../hooks/NotificationContext';
 
 export const NotificationProvider = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [activeNotification, setActiveNotification] = useState(null);
 
   useEffect(() => {
-    if (!currentUser) {
+    // Don't subscribe until auth has fully resolved — prevents the
+    // "Missing or insufficient permissions" Firebase error that fires
+    // when queries run before the user token is available.
+    if (loading || !currentUser) {
       setNotifications([]);
       return;
     }
@@ -37,7 +37,7 @@ export const NotificationProvider = ({ children }) => {
     });
 
     return () => unsub();
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, loading]);
 
   const handleMarkAsRead = async (id) => {
     await markAsRead(id);

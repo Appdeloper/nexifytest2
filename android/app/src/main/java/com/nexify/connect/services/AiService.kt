@@ -182,6 +182,63 @@ object AiService {
         }
     }
 
+    suspend fun generateReelIdea(topic: String): String {
+        if (API_KEY.isEmpty()) {
+            kotlinx.coroutines.delay(1000)
+            return """
+                🎬 Reel Blueprint: "$topic"
+                
+                🪝 HOOK (0-3s): "Stop wasting hours on repetitive tasks. Here's the neural hack."
+                
+                📹 SCENES:
+                1. Scene 1 (3-7s): Quick cuts of you coding or studying with high-tempo lofi cyberpunk beats.
+                2. Scene 2 (7-12s): Show step-by-step optimization using standard modular tools.
+                3. Scene 3 (12-15s): Zoom in on a calendar checking off completed focus objectives.
+                
+                📢 CTA: "Tag a citizen who needs this. Follow for more edge optimization! ⚡"
+            """.trimIndent()
+        }
+        val prompt = "Create a structured, highly engaging social media Reel outline for the topic: '$topic'. Provide a hook, scenes, and a call-to-action (CTA). Keep it under 150 words."
+        return askNexifyAI(prompt, emptyList())
+    }
+
+    suspend fun generateCaption(mediaDescription: String, tone: String): String {
+        if (API_KEY.isEmpty()) {
+            kotlinx.coroutines.delay(1000)
+            val toneClean = tone.trim().toLowerCase()
+            return when (toneClean) {
+                "professional" -> "Optimizing system boundaries. 💻 Deep work session completed successfully. Let's build the future, citizens. #productivity #developer #nexify"
+                "chill" -> "Just vibing in the cyber cafe. 🎧 Modular loops and coffee on repeat. Hope you're all having a great day! #chill #vibes #cyberpunk"
+                else -> "Locking in on the grid! 🚀 Edge features activated, ready for the next level. Let's make it count. #hustle #optimal #growth"
+            }
+        }
+        val prompt = "Write a catchy social media caption for a post about: '$mediaDescription'. Tone: $tone. Include 3 relevant hashtags and a cool emoji."
+        return askNexifyAI(prompt, emptyList())
+    }
+
+    suspend fun generatePrompt(taskDescription: String): String {
+        if (API_KEY.isEmpty()) {
+            kotlinx.coroutines.delay(1000)
+            return """
+                🤖 Optimized System Prompt:
+                
+                [ROLE]
+                You are a senior task assistant configured to optimize: "$taskDescription".
+                
+                [INSTRUCTIONS]
+                1. Focus strictly on modular, step-by-step breakdowns.
+                2. Expose potential edge conditions and suggest safety bounds.
+                3. Keep responses clean, concise, and structured.
+                
+                [CONSTRAINTS]
+                - Do not output generic advice.
+                - Restrict replies to developer-vetted logic.
+            """.trimIndent()
+        }
+        val prompt = "Optimize the following task description into a highly effective, structured AI system prompt: '$taskDescription'. Provide role, instructions, and constraints."
+        return askNexifyAI(prompt, emptyList())
+    }
+
     /**
      * Performs content moderation & spam filter check (Edge-simulation)
      */

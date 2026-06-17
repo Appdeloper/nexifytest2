@@ -18,12 +18,26 @@ export const ensureUserProfile = async (user) => {
   if (!user) return null;
   
   const userRef = doc(db, 'users', user.uid);
-  const snap = await getDoc(userRef);
+  let snap;
+  try {
+    snap = await getDoc(userRef);
+  } catch (e) {
+    console.error("Failed to fetch user profile:", e);
+    return {
+      uid: user.uid,
+      displayName: user.displayName || 'Nexify Citizen',
+      email: user.email,
+      role: 'member',
+      rank: 'rookie',
+      xp: 0,
+      level: 1
+    };
+  }
+  
+  const isOwner = user.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
   
   if (!snap.exists()) {
-    const isOwner = user.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
-    
-    const fallbackUsername = user.email.split('@')[0].toLowerCase();
+    const fallbackUsername = user.email ? user.email.split('@')[0].toLowerCase() : 'user';
     const normalizedUsername = (user.username || fallbackUsername).trim().toLowerCase();
 
     const profileData = {
@@ -31,8 +45,8 @@ export const ensureUserProfile = async (user) => {
       displayName: user.displayName || 'Nexify Citizen',
       displayNameLower: (user.displayName || 'Nexify Citizen').toLowerCase(),
       username: normalizedUsername,
-      email: user.email,
-      emailLower: user.email.toLowerCase(),
+      email: user.email || '',
+      emailLower: (user.email || '').toLowerCase(),
       photoURL: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
       bio: isOwner ? "Founder & Lead Architect of Nexify Connect" : "Hey, I'm using Nexify Connect",
       role: isOwner ? "owner" : "member",
@@ -48,6 +62,7 @@ export const ensureUserProfile = async (user) => {
       friends: [],
       requestsSent: [],
       requestsReceived: [],
+      blockedUsers: [],
     };
     
     await setDoc(userRef, profileData);
@@ -59,13 +74,63 @@ export const ensureUserProfile = async (user) => {
       userPhoto: profileData.photoURL,
       type: ACTIVITY_TYPES.JOIN_NEXUS,
       text: "just joined the Nexify Nexus! 👋",
-    });
+    }).catch(() => {});
 
     return profileData;
   } else {
-    const data = snap.data();
-    const isOwner = user.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
+    const rawData = snap.data();
     
+    // Clean any keys and values with trailing spaces
+    let hasSpacedKeys = false;
+    const data = {};
+    Object.keys(rawData).forEach(key => {
+      const cleanKey = key.trim();
+      let val = rawData[key];
+      if (typeof val === 'string') {
+        val = val.trim();
+      }
+      if (cleanKey !== key || (typeof rawData[key] === 'string' && rawData[key] !== val)) {
+        hasSpacedKeys = true;
+      }
+      data[cleanKey] = val;
+    });
+
+    const isIncomplete = !data.displayName || !data.role || !data.username || !data.email || !data.blockedUsers;
+
+    if (hasSpacedKeys || isIncomplete) {
+      const fallbackUsername = user.email ? user.email.split('@')[0].toLowerCase() : 'user';
+      const normalizedUsername = (data.username || fallbackUsername).trim().toLowerCase();
+
+      const repairedData = {
+        uid: user.uid,
+        displayName: data.displayName || user.displayName || 'Nexify Citizen',
+        displayNameLower: (data.displayName || user.displayName || 'Nexify Citizen').toLowerCase(),
+        username: normalizedUsername,
+        email: data.email || user.email || '',
+        emailLower: (data.email || user.email || '').toLowerCase(),
+        photoURL: data.photoURL || user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
+        bio: data.bio || (isOwner ? "Founder & Lead Architect of Nexify Connect" : "Hey, I'm using Nexify Connect"),
+        role: data.role || (isOwner ? "owner" : "member"),
+        rank: data.rank || (isOwner ? "founder" : "rookie"),
+        xp: data.xp !== undefined ? data.xp : 0,
+        level: data.level !== undefined ? data.level : 1,
+        verified: data.verified !== undefined ? data.verified : (isOwner ? true : false),
+        badges: data.badges || (isOwner ? ["founder", "owner"] : []),
+        createdAt: data.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        online: true,
+        lastSeen: serverTimestamp(),
+        friends: data.friends || [],
+        requestsSent: data.requestsSent || [],
+        requestsReceived: data.requestsReceived || [],
+        blockedUsers: data.blockedUsers || [],
+      };
+
+      // Rewrite clean and complete data (without merge to discard old keys with spaces)
+      await setDoc(userRef, repairedData);
+      return repairedData;
+    }
+
     // Check for role upgrade if matching owner email
     if (isOwner && data.role !== 'owner') {
       const updates = {
@@ -86,6 +151,43 @@ export const ensureUserProfile = async (user) => {
     }, { merge: true });
     return data;
   }
+};
+
+export const checkAndIncrementStreak = async (uid, data) => {
+  if (!uid || !data) return;
+  const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const lastActiveDate = data.lastActiveDate || '';
+  
+  if (lastActiveDate === todayStr) {
+    return;
+  }
+
+  let newStreak = data.streak || 0;
+  
+  if (lastActiveDate) {
+    const today = new Date(todayStr);
+    const lastActive = new Date(lastActiveDate);
+    const diffTime = Math.abs(today - lastActive);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) {
+      newStreak += 1;
+      import('./xp').then(({ addXP }) => addXP(uid, 'dailyLogin')).catch(() => {});
+    } else if (diffDays > 1) {
+      newStreak = 1;
+    }
+  } else {
+    newStreak = 1;
+  }
+
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    streak: newStreak,
+    lastActiveDate: todayStr,
+    updatedAt: serverTimestamp()
+  }).catch((err) => {
+    console.warn("Failed to update daily login streak:", err.message);
+  });
 };
 
 export const registerUser = async (email, password, username) => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { RoleBadge, RankBadge } from '../components/Badges';
 import { useAuth } from '../hooks/useAuth';
@@ -13,8 +13,12 @@ import {
 import { 
   subscribeRoomMessages, sendRoomMessage, sendRoomMediaMessage, 
   uploadRoomAttachment, sendRoomGifMessage, leaveRoom,
-  togglePinRoomMessage, reactToRoomMessage, removeReactionFromRoomMessage
+  togglePinRoomMessage, reactToRoomMessage, removeReactionFromRoomMessage,
+  removeRoomMember, joinRoom
 } from '../services/rooms';
+import { subscribeFriends } from '../services/friends';
+import { getUserData } from '../services/users';
+import { sendNotification, NOTIFICATION_TYPES } from '../services/notifications';
 
 const REACTION_EMOJIS = ['❤️', '🔥', '😂', '😮', '😢', '💯'];
 
@@ -32,17 +36,19 @@ const MemberManagementSheet = ({ members, profiles, roomData, currentUser, onRem
   const [friends, setFriends] = useState([]);
   
   useEffect(() => {
-    const { subscribeFriends } = import('../services/friends').then(m => {
-      m.subscribeFriends(currentUser.uid, async (frList) => {
-        const friendIds = frList.map(f => f.users.find(id => id !== currentUser.uid));
-        const profiles = await Promise.all(friendIds.map(async id => {
-           const { getUserData } = await import('../services/users');
+    const unsub = subscribeFriends(currentUser.uid, async (frList) => {
+      const friendIds = frList.map(f => f.users.find(id => id !== currentUser.uid));
+      const profiles = await Promise.all(friendIds.map(async id => {
+         try {
            return await getUserData(id);
-        }));
-        setFriends(profiles.filter(p => p && !members.includes(p.uid)));
-      });
+         } catch {
+           return null;
+         }
+      }));
+      setFriends(profiles.filter(p => p && !members.includes(p.uid)));
     });
-  }, [members]);
+    return () => unsub();
+  }, [members, currentUser.uid]);
 
   return (
     <motion.div
@@ -152,6 +158,7 @@ const RoomChat = () => {
   const [typingUsers, setTypingUsers] = useState([]);
 
   const messagesEndRef = useRef(null);
+  const lastProcessedMsgIdRef = useRef(null);
 
   useEffect(() => {
     if (!currentUser || !roomId) return;
@@ -191,9 +198,13 @@ const RoomChat = () => {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       
       // AI Tag Detection
-      import('../services/ai').then(({ processAITag }) => {
-        processAITag(roomId, true, msgs);
-      });
+      const lastMsg = msgs[msgs.length - 1];
+      if (lastMsg && lastMsg.id !== lastProcessedMsgIdRef.current) {
+        lastProcessedMsgIdRef.current = lastMsg.id;
+        import('../services/ai').then(({ processAITag }) => {
+          processAITag(roomId, true, msgs);
+        });
+      }
     });
 
     return () => { 
@@ -314,10 +325,8 @@ const RoomChat = () => {
   const handleRemoveMember = async (uid) => {
     if (window.confirm(`Are you sure you want to remove this member?`)) {
       try {
-        import('../services/rooms').then(async ({ removeRoomMember }) => {
-          await removeRoomMember(roomId, uid);
-          showToast('Member removed');
-        });
+        await removeRoomMember(roomId, uid);
+        showToast('Member removed');
       } catch (e) {
         showToast('Failed to remove member');
       }
@@ -326,11 +335,9 @@ const RoomChat = () => {
 
   const handleInviteMember = async (uid) => {
     try {
-      const { joinRoom } = await import('../services/rooms');
       await joinRoom(roomId, uid);
       
       // Notify the friend
-      const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notifications');
       await sendNotification(uid, {
         title: 'Room Invitation',
         body: `You've been invited to join ${roomData?.name || 'a room'}.`,

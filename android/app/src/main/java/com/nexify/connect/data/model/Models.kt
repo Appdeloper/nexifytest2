@@ -13,7 +13,10 @@ data class User(
     val lastSeen: Date? = null,
     val friends: List<String> = emptyList(),
     val requestsSent: List<String> = emptyList(),
-    val requestsReceived: List<String> = emptyList()
+    val requestsReceived: List<String> = emptyList(),
+    val blockedUsers: List<String> = emptyList(),
+    val xp: Long = 0L,
+    val streak: Int = 0
 )
 
 data class Chat(
@@ -21,6 +24,7 @@ data class Chat(
     val participants: List<String> = emptyList(),
     val lastMessage: String = "",
     val timestamp: Date? = null,
+    val lastTimestamp: Date? = null,
     val typingStatus: Map<String, Boolean> = emptyMap()
 )
 
@@ -32,7 +36,16 @@ data class Message(
     val stickerId: String? = null,
     val stickerUrl: String? = null,
     val timestamp: Date? = null,
-    val seen: Boolean = false
+    val seen: Boolean = false,
+    
+    // Cross-platform fields for Room messages compatibility
+    val type: String = "text",
+    val mediaURL: String? = null,
+    val fileName: String? = null,
+    val fileSize: Long? = null,
+    val createdAt: Date? = null,
+    val isPinned: Boolean = false,
+    val reactions: Map<String, List<String>> = emptyMap()
 )
 
 data class Group(
@@ -51,7 +64,11 @@ data class Room(
     val members: List<String> = emptyList(),
     val createdBy: String = "",
     val isPrivate: Boolean = false,
-    val category: String = "General"
+    val category: String = "General",
+    
+    // Cross-platform voice and status tracking fields
+    val voiceMembers: List<String> = emptyList(),
+    val typing: Map<String, Boolean> = emptyMap()
 )
 
 data class Sticker(
@@ -59,3 +76,35 @@ data class Sticker(
     val imageUrl: String = "",
     val category: String = "Futuristic"
 )
+
+data class AiChatMessage(
+    val sender: String = "", // "user" or "ai"
+    val text: String = "",
+    val timestamp: Long = 0L
+)
+
+data class FocusSession(
+    @DocumentId val sessionId: String = "",
+    val userId: String = "",
+    val durationMinutes: Int = 0,
+    val xpEarned: Long = 0L,
+    val timestamp: Long = 0L
+)
+
+data class ChatRoom(
+    @DocumentId val roomId: String = "",
+    val name: String = "",
+    val createdBy: String = "",
+    val participants: List<String> = emptyList(),
+    val createdAt: Date? = null
+)
+
+data class CallSession(
+    @DocumentId val callId: String = "",
+    val callerId: String = "",
+    val receiverId: String = "",
+    val status: String = "ringing", // "dialing", "ringing", "connected", "ended"
+    val timestamp: Long = 0L
+)
+
+

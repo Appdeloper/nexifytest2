@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 
-import { useNotifications } from '../components/NotificationProvider';
+import { useNotifications } from '../hooks/useNotifications';
 
 const Notifications = () => {
   const navigate = useNavigate();

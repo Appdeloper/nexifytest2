@@ -12,7 +12,7 @@ const ITEMS = [
   { to: '/profile', icon: User, label: 'Profile' },
 ];
 
-import { useNotifications } from './NotificationProvider';
+import { useNotifications } from '../hooks/useNotifications';
 
 const BottomNav = () => {
   const location = useLocation();

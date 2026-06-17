@@ -17,7 +17,7 @@ import { getRankForXP, getNextRank, getRankProgress } from '../services/xp';
 import { subscribeActivityFeed, ACTIVITY_TYPES } from '../services/activity';
 import { RoleBadge, RankBadge } from '../components/Badges';
 import { subscribeLeaderboard } from '../services/admin';
-import { useFitness } from '../hooks/useFitness';
+import { useFitness } from '../hooks/useFitnessContext';
 import { subscribeNotifications } from '../services/notifications';
 
 /* ── Ultra-Premium Particle System ── */
@@ -67,11 +67,12 @@ const Home = () => {
   const [activities, setActivities] = useState([]);
 
   useEffect(() => {
+    if (!currentUser) return;
     const unsub = subscribeActivityFeed((data) => {
       setActivities(data.slice(0, 4));
     });
     return () => unsub();
-  }, []);
+  }, [currentUser?.uid]);
 
   const [timerProgress, setTimerProgress] = useState(0.75);
   const [leaderboard, setLeaderboard] = useState([]);
@@ -88,11 +89,12 @@ const Home = () => {
   }, [currentUser?.uid]);
 
   useEffect(() => {
+    if (!currentUser) return;
     const unsub = subscribeLeaderboard((data) => {
       setLeaderboard(data.slice(0, 3));
     });
     return () => unsub();
-  }, []);
+  }, [currentUser?.uid]);
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#000', color: 'white', position: 'relative', overflow: 'hidden' }}>
@@ -520,8 +522,8 @@ const Home = () => {
                   </motion.div>
                   <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#c0c0c0', color: 'black', fontSize: 11, fontWeight: 900, width: 22, height: 22, borderRadius: '50%', border: '2px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>{leaderboard[1].displayName.split(' ')[0]}</div>
-                <div style={{ fontSize: 12, color: '#00dfd8', fontWeight: 700, marginTop: 2 }}>{leaderboard[1].xp.toLocaleString()}</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{(leaderboard[1].displayName || 'Anonymous').split(' ')[0]}</div>
+                <div style={{ fontSize: 12, color: '#00dfd8', fontWeight: 700, marginTop: 2 }}>{(leaderboard[1].xp || 0).toLocaleString()}</div>
               </div>
             )}
             {leaderboard.length >= 1 && (
@@ -533,8 +535,8 @@ const Home = () => {
                   <img src={leaderboard[0].photoURL || `https://api.dicebear.com/7.x/big-smile/svg?seed=${leaderboard[0].uid}`} style={{ width: 80, height: 80, borderRadius: '50%', border: '4px solid #facc15', padding: 4 }} alt="" />
                   <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: '#facc15', color: 'black', fontSize: 12, fontWeight: 900, width: 26, height: 26, borderRadius: '50%', border: '2.5px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px #facc15' }}>1</div>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 900 }}>{leaderboard[0].displayName.split(' ')[0]}</div>
-                <div style={{ fontSize: 14, color: '#00dfd8', fontWeight: 800, marginTop: 2 }}>{leaderboard[0].xp.toLocaleString()}</div>
+                <div style={{ fontSize: 16, fontWeight: 900 }}>{(leaderboard[0].displayName || 'Anonymous').split(' ')[0]}</div>
+                <div style={{ fontSize: 14, color: '#00dfd8', fontWeight: 800, marginTop: 2 }}>{(leaderboard[0].xp || 0).toLocaleString()}</div>
               </div>
             )}
             {leaderboard.length >= 3 && (
@@ -543,8 +545,8 @@ const Home = () => {
                   <img src={leaderboard[2].photoURL || `https://api.dicebear.com/7.x/big-smile/svg?seed=${leaderboard[2].uid}`} style={{ width: 52, height: 52, borderRadius: '50%', border: '2.5px solid #cd7f32', padding: 2 }} alt="" />
                   <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#cd7f32', color: 'black', fontSize: 11, fontWeight: 900, width: 22, height: 22, borderRadius: '50%', border: '2px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>{leaderboard[2].displayName.split(' ')[0]}</div>
-                <div style={{ fontSize: 12, color: '#00dfd8', fontWeight: 700, marginTop: 2 }}>{leaderboard[2].xp.toLocaleString()}</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{(leaderboard[2].displayName || 'Anonymous').split(' ')[0]}</div>
+                <div style={{ fontSize: 12, color: '#00dfd8', fontWeight: 700, marginTop: 2 }}>{(leaderboard[2].xp || 0).toLocaleString()}</div>
               </div>
             )}
           </div>
@@ -555,9 +557,9 @@ const Home = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <span style={{ fontSize: 13, opacity: 0.3, fontWeight: 900, width: 14 }}>{i + 4}</span>
                   <img src={u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.uid}`} style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)' }} alt="" />
-                  <span style={{ fontSize: 14, fontWeight: 800 }}>{u.displayName.split(' ')[0]}</span>
+                  <span style={{ fontSize: 14, fontWeight: 800 }}>{(u.displayName || 'Anonymous').split(' ')[0]}</span>
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>{u.xp.toLocaleString()}</span>
+                <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>{(u.xp || 0).toLocaleString()}</span>
               </motion.div>
             ))}
             {leaderboard.length <= 3 && (

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, UserPlus, UserCheck, UserX, ArrowLeft, Users,
-  Clock, CheckCircle, X, MessageSquare, Loader
+  Clock, CheckCircle, X, MessageSquare, Loader, Ban
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
@@ -10,12 +10,10 @@ import {
   sendFriendRequest, cancelFriendRequest,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   subscribeIncomingRequests, subscribeSentRequests, subscribeFriends,
-  subscribeSearchUsers
+  subscribeSearchUsers, blockUser, unblockUser
 } from '../services/friends';
 import { getUserData } from '../services/users';
 import { createOrGetDMChat } from '../services/chat';
-
-/* ── helpers ── */
 import Avatar from '../components/Avatar';
 
 const Pill = ({ color, bg, children }) => (
@@ -63,12 +61,13 @@ const Friends = () => {
 
   const getStatus = useCallback((uid) => {
     try {
+      if (currentUser?.blockedUsers?.includes(uid)) return 'blocked';
       if (friends?.some(f => f.users?.includes(uid))) return 'friends';
       if (incoming?.some(r => r.from === uid)) return 'received';
       if (sent?.some(r => r.to === uid)) return 'sent';
     } catch (e) { console.error("Status derivation error:", e); }
     return 'none';
-  }, [friends, incoming, sent]);
+  }, [friends, incoming, sent, currentUser?.blockedUsers]);
 
   /* subscriptions */
   useEffect(() => {
@@ -178,6 +177,16 @@ const Friends = () => {
     showToast('Friend removed.');
   });
 
+  const handleBlock = (uid) => withLoading(uid, async () => {
+    await blockUser(currentUid, uid);
+    showToast('User blocked.');
+  });
+
+  const handleUnblock = (uid) => withLoading(uid, async () => {
+    await unblockUser(currentUid, uid);
+    showToast('User unblocked.');
+  });
+
   const handleMessage = async (uid) => {
     try {
       const chatId = await createOrGetDMChat(currentUid, uid);
@@ -252,6 +261,8 @@ const Friends = () => {
               </div>
               <div>
                 <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>No friends yet</h3>
+
+
                 <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>Search for users and send friend requests.</p>
               </div>
               <button onClick={() => setTab('Find')} style={{ background: 'var(--primary-gradient)', border: 'none', borderRadius: 14, padding: '12px 24px', color: 'white', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,223,216,0.3)' }}>
@@ -284,6 +295,9 @@ const Friends = () => {
                   </button>
                   <button onClick={() => handleRemoveFriend(otherId)} style={{ background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.2)', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ff5555' }}>
                     <UserX size={15} />
+                  </button>
+                  <button onClick={() => handleBlock(otherId)} style={{ background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.2)', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ff5555' }}>
+                    <Ban size={15} />
                   </button>
                 </div>
               );
@@ -422,28 +436,51 @@ const Friends = () => {
                       {user.email}
                     </div>
                   </div>
-                  {status === 'none' && (
-                    <Btn onClick={() => handleAddFriend(user.uid)} color="white" bg="var(--primary-gradient)" disabled={loadingActions[user.uid]}>
-                      {loadingActions[user.uid] ? <Loader size={13} /> : <UserPlus size={13} />} Add
+                  {status === 'blocked' && (
+                    <Btn onClick={() => handleUnblock(user.uid)} color="white" bg="#ff5555" disabled={loadingActions[user.uid]}>
+                      {loadingActions[user.uid] ? <Loader size={13} /> : <Ban size={13} />} Blocked
                     </Btn>
+                  )}
+                  {status === 'none' && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn onClick={() => handleAddFriend(user.uid)} color="white" bg="var(--primary-gradient)" disabled={loadingActions[user.uid]}>
+                        {loadingActions[user.uid] ? <Loader size={13} /> : <UserPlus size={13} />} Add
+                      </Btn>
+                      <Btn onClick={() => handleBlock(user.uid)} color="#ff5555" border="1.5px solid rgba(255,85,85,0.3)" disabled={loadingActions[user.uid]}>
+                        Block
+                      </Btn>
+                    </div>
                   )}
                   {status === 'sent' && (
-                    <Btn onClick={() => handleCancelRequest(user.uid)} color="var(--text-muted)" border="1px solid rgba(255,255,255,0.12)" disabled={loadingActions[user.uid]}>
-                      <Clock size={13} /> Pending
-                    </Btn>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn onClick={() => handleCancelRequest(user.uid)} color="var(--text-muted)" border="1px solid rgba(255,255,255,0.12)" disabled={loadingActions[user.uid]}>
+                        <Clock size={13} /> Pending
+                      </Btn>
+                      <Btn onClick={() => handleBlock(user.uid)} color="#ff5555" border="1.5px solid rgba(255,85,85,0.3)" disabled={loadingActions[user.uid]}>
+                        Block
+                      </Btn>
+                    </div>
                   )}
                   {status === 'received' && (
-                    <Btn onClick={() => handleAccept(user.uid)} color="black" bg="var(--primary-gradient)" disabled={loadingActions[user.uid + '_accept']}>
-                      {loadingActions[user.uid + '_accept'] ? <Loader size={13} /> : <CheckCircle size={13} />} Accept
-                    </Btn>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn onClick={() => handleAccept(user.uid)} color="black" bg="var(--primary-gradient)" disabled={loadingActions[user.uid + '_accept']}>
+                        {loadingActions[user.uid + '_accept'] ? <Loader size={13} /> : <CheckCircle size={13} />} Accept
+                      </Btn>
+                      <Btn onClick={() => handleDecline(user.uid)} color="#ff5555" border="1px solid rgba(255,85,85,0.3)" disabled={loadingActions[user.uid + '_decline']}>
+                        <X size={13} />
+                      </Btn>
+                      <Btn onClick={() => handleBlock(user.uid)} color="#ff5555" border="1.5px solid rgba(255,85,85,0.3)" disabled={loadingActions[user.uid]}>
+                        Block
+                      </Btn>
+                    </div>
                   )}
                   {status === 'friends' && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <Btn onClick={() => handleMessage(user.uid)} bg="rgba(0,223,216,0.1)" color="#00dfd8" border="1.5px solid rgba(0,223,216,0.3)">
                         <MessageSquare size={13} /> Message
                       </Btn>
-                      <Btn color="#00dfd8" border="1px solid rgba(0,223,216,0.15)">
-                        <UserCheck size={13} />
+                      <Btn onClick={() => handleBlock(user.uid)} color="#ff5555" border="1.5px solid rgba(255,85,85,0.3)" disabled={loadingActions[user.uid]}>
+                        Block
                       </Btn>
                     </div>
                   )}

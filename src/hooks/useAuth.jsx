@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { ensureUserProfile } from '../services/auth';
+import { ensureUserProfile, checkAndIncrementStreak } from '../services/auth';
 import { ensureAIUser } from '../services/users';
 
 const AuthContext = createContext();
@@ -21,7 +21,10 @@ export const AuthProvider = ({ children }) => {
       if (user) {
         // Ensure profile exists before subscribing or updating status
         try {
-          await ensureUserProfile(user);
+          const profile = await ensureUserProfile(user);
+          if (profile) {
+            await checkAndIncrementStreak(user.uid, profile);
+          }
           await ensureAIUser().catch(() => {});
         } catch (e) {
           console.error("Auth Setup Error:", e);
@@ -30,7 +33,16 @@ export const AuthProvider = ({ children }) => {
         // Subscribe to full Firestore profile for live role/rank/xp updates
         profileUnsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
           if (snap.exists()) {
-            const data = snap.data();
+            const rawData = snap.data();
+            const data = {};
+            Object.keys(rawData).forEach(key => {
+              const cleanKey = key.trim();
+              let val = rawData[key];
+              if (typeof val === 'string') {
+                val = val.trim();
+              }
+              data[cleanKey] = val;
+            });
             setUserProfile(data);
             // Merge Firestore fields onto currentUser object for easy access
             setCurrentUser({ ...user, ...data });

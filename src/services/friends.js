@@ -34,6 +34,12 @@ export const sendFriendRequest = async (fromUid, toUid) => {
     getRequiredUser(toUid)
   ]);
 
+  if (getArray(fromUser, 'blockedUsers').includes(toUid)) {
+    throw new Error('You have blocked this user.');
+  }
+  if (getArray(toUser, 'blockedUsers').includes(fromUid)) {
+    throw new Error('Action blocked.');
+  }
   if (getArray(fromUser, 'friends').includes(toUid) || getArray(toUser, 'friends').includes(fromUid)) {
     throw new Error('You are already friends.');
   }
@@ -93,6 +99,10 @@ export const acceptFriendRequest = async (fromUid, toUid) => {
     getRequiredUser(toUid)
   ]);
 
+  if (getArray(fromUser, 'blockedUsers').includes(toUid) || getArray(toUser, 'blockedUsers').includes(fromUid)) {
+    throw new Error('Cannot accept request. Block active.');
+  }
+
   const alreadyFriends = getArray(toUser, 'friends').includes(fromUid) && getArray(fromUser, 'friends').includes(toUid);
   const hasIncomingRequest = getArray(toUser, 'requestsReceived').includes(fromUid)
     && getArray(fromUser, 'requestsSent').includes(toUid);
@@ -102,7 +112,9 @@ export const acceptFriendRequest = async (fromUid, toUid) => {
   }
 
   const chatId = getDMChatId(fromUid, toUid);
+  const chatSnap = await getDoc(doc(db, 'chats', chatId));
   const batch = writeBatch(db);
+  
   batch.update(doc(db, 'users', toUid), {
     friends: arrayUnion(fromUid),
     requestsReceived: arrayRemove(fromUid),
@@ -115,19 +127,22 @@ export const acceptFriendRequest = async (fromUid, toUid) => {
     requestsReceived: arrayRemove(toUid),
     updatedAt: serverTimestamp()
   });
-  batch.set(doc(db, 'chats', chatId), {
-    type: 'dm',
-    participants: [fromUid, toUid].sort(),
-    members: [fromUid, toUid],
-    memberMap: {
-      [fromUid]: true,
-      [toUid]: true
-    },
-    lastMessage: '',
-    lastMessageAt: null,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+
+  if (!chatSnap.exists()) {
+    batch.set(doc(db, 'chats', chatId), {
+      type: 'dm',
+      participants: [fromUid, toUid].sort(),
+      members: [fromUid, toUid],
+      memberMap: {
+        [fromUid]: true,
+        [toUid]: true
+      },
+      lastMessage: '',
+      lastMessageAt: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }
   await batch.commit();
 
   try {
@@ -291,4 +306,35 @@ export const subscribeAllUsers = (currentUid, callback) => {
     console.warn('Subscribe all users failed:', err);
     callback([]);
   });
+};
+
+export const blockUser = async (fromUid, toUid) => {
+  if (!fromUid || !toUid) throw new Error('Missing user.');
+  if (fromUid === toUid) throw new Error('Cannot block yourself.');
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', fromUid), {
+    blockedUsers: arrayUnion(toUid),
+    friends: arrayRemove(toUid),
+    requestsSent: arrayRemove(toUid),
+    requestsReceived: arrayRemove(toUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(doc(db, 'users', toUid), {
+    friends: arrayRemove(fromUid),
+    requestsSent: arrayRemove(fromUid),
+    requestsReceived: arrayRemove(fromUid),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+};
+
+export const unblockUser = async (fromUid, toUid) => {
+  if (!fromUid || !toUid) throw new Error('Missing user.');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', fromUid), {
+    blockedUsers: arrayRemove(toUid),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
 };

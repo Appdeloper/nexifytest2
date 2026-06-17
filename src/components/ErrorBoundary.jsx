@@ -1,6 +1,8 @@
 import React from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { auth } from '../services/firebase';
+import { signOut } from 'firebase/auth';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -64,6 +66,27 @@ class ErrorBoundary extends React.Component {
               }}
             >
               <Home size={18} /> Back to Home
+            </button>
+            <button 
+              onClick={async () => {
+                try {
+                  await signOut(auth);
+                  localStorage.clear();
+                  window.location.href = '#/login';
+                  window.location.reload();
+                } catch (e) {
+                  console.error(e);
+                  window.location.href = '#/login';
+                }
+              }}
+              style={{ 
+                background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.2)', 
+                borderRadius: 14, padding: '16px', color: '#ff5555', fontWeight: 700, 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer',
+                marginTop: 8
+              }}
+            >
+              <LogOut size={18} /> Sign Out & Reset Session
             </button>
           </div>
 

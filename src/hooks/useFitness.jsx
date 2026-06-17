@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { subscribeFitnessData, updateFitnessData } from '../services/fitness';
-
-const FitnessContext = createContext();
+import { FitnessContext } from './FitnessContext';
 
 export const FitnessProvider = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const [stats, setStats] = useState({
     steps: 0, stepGoal: 10000, calories: 0, calorieGoal: 500,
     hydration: 0, hydrationGoal: 8, sleep: 0, sleepGoal: 8,
@@ -17,7 +16,7 @@ export const FitnessProvider = ({ children }) => {
   const syncTimeout = useRef(null);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (loading || !currentUser) return;
     
     // Subscribe to Firestore data
     const unsub = subscribeFitnessData(currentUser.uid, (data) => {
@@ -35,6 +34,13 @@ export const FitnessProvider = ({ children }) => {
       });
     });
 
+    const syncSteps = () => {
+      if (currentSteps.current > lastSyncSteps.current) {
+         updateFitnessData(currentUser.uid, { steps: currentSteps.current }).catch(() => {});
+         lastSyncSteps.current = currentSteps.current;
+      }
+    };
+
     const handleStep = () => {
       currentSteps.current += 1;
       setStats(prev => ({ ...prev, steps: currentSteps.current }));
@@ -45,13 +51,6 @@ export const FitnessProvider = ({ children }) => {
       } else {
         clearTimeout(syncTimeout.current);
         syncTimeout.current = setTimeout(syncSteps, 5000);
-      }
-    };
-
-    const syncSteps = () => {
-      if (currentSteps.current > lastSyncSteps.current) {
-         updateFitnessData(currentUser.uid, { steps: currentSteps.current }).catch(() => {});
-         lastSyncSteps.current = currentSteps.current;
       }
     };
 
@@ -80,7 +79,7 @@ export const FitnessProvider = ({ children }) => {
       if (devicemotionListener) window.removeEventListener('devicemotion', devicemotionListener);
       syncSteps();
     };
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, loading]);
 
   return (
     <FitnessContext.Provider value={{ stats, setStats }}>
@@ -88,5 +87,3 @@ export const FitnessProvider = ({ children }) => {
     </FitnessContext.Provider>
   );
 };
-
-export const useFitness = () => useContext(FitnessContext);

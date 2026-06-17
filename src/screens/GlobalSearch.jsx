@@ -13,7 +13,7 @@ const QUICK_FILTERS = ['All', 'Chats', 'Rooms', 'Edge', 'Fit', 'Pods'];
 
 const GlobalSearch = () => {
   const navigate = useNavigate();
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState([]);
@@ -40,7 +40,7 @@ const GlobalSearch = () => {
   }, [currentUser?.uid]);
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!searchQuery.trim()) {
       setResults([]);
       setIsSearching(false);
       return;
@@ -48,7 +48,7 @@ const GlobalSearch = () => {
     
     setIsSearching(true);
     const timeout = setTimeout(() => {
-      const lowerQuery = query.toLowerCase();
+      const lowerQuery = searchQuery.toLowerCase();
       const matched = [];
       
       // Match users
@@ -95,7 +95,7 @@ const GlobalSearch = () => {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [query, activeFilter, allUsers, allRooms]);
+  }, [searchQuery, activeFilter, allUsers, allRooms]);
 
   return (
     <div className="fade-in col" style={{ height: '100dvh', background: 'var(--bg-main)' }}>
@@ -107,8 +107,8 @@ const GlobalSearch = () => {
           <input 
             type="text" 
             placeholder="Search anything (Chats, Rooms, Fit...)" 
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', flex: 1, marginLeft: '8px', fontSize: '16px' }} 
             autoFocus
           />
@@ -138,12 +138,12 @@ const GlobalSearch = () => {
       </div>
 
       <div className="flex-1 col p-4 gap-4" style={{ overflowY: 'auto' }}>
-        {!query.trim() ? (
+        {!searchQuery.trim() ? (
           <div className="col gap-4 fade-in">
             <h3 className="font-bold text-sm text-muted">RECENT SEARCHES</h3>
             <div className="col gap-2">
               {RECENT_SEARCHES.map((search, i) => (
-                <div key={i} className="row align-center flex-between p-3 ripple" onClick={() => setQuery(search)} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', cursor: 'pointer' }}>
+                <div key={i} className="row align-center flex-between p-3 ripple" onClick={() => setSearchQuery(search)} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', cursor: 'pointer' }}>
                   <div className="row gap-3 align-center">
                     <Clock size={16} className="text-muted" />
                     <span className="text-sm">{search}</span>
@@ -162,7 +162,7 @@ const GlobalSearch = () => {
           <div className="col gap-3 fade-in">
             {results.length === 0 ? (
               <div className="flex-center p-8 text-center text-muted">
-                No results found for "{query}". Try a different filter.
+                No results found for "{searchQuery}". Try a different filter.
               </div>
             ) : (
               results.map(result => (

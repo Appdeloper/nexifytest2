@@ -1,12 +1,14 @@
 package com.nexify.connect.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import com.nexify.connect.data.model.*
 import com.nexify.connect.services.AiService
+import com.nexify.connect.services.NexifyLog
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -45,6 +47,7 @@ class FirebaseRepository {
         if (!data.containsKey("friends")) updates["friends"] = emptyList<String>()
         if (!data.containsKey("requestsSent")) updates["requestsSent"] = emptyList<String>()
         if (!data.containsKey("requestsReceived")) updates["requestsReceived"] = emptyList<String>()
+        if (!data.containsKey("blockedUsers")) updates["blockedUsers"] = emptyList<String>()
 
         if (updates.isNotEmpty()) {
             ref.set(updates, SetOptions.merge()).await()
@@ -59,7 +62,21 @@ class FirebaseRepository {
         return true
     }
 
-    suspend fun signUp(email: String, password: CharSequence, username: String): Boolean {
+    suspend fun signUp(email: String, password: CharSequence, username: String, inviteCode: String): Boolean {
+        val trimmedCode = inviteCode.trim()
+        if (trimmedCode.isEmpty()) {
+            throw Exception("Invite / Access code is required to join this sector.")
+        }
+        val inviteRef = db.collection("invites").document(trimmedCode)
+        val inviteSnap = inviteRef.get().await()
+        if (!inviteSnap.exists()) {
+            throw Exception("Invalid access/invite code. Access sector closed.")
+        }
+        val status = inviteSnap.getString("status") ?: "available"
+        if (status == "used") {
+            throw Exception("Invite code has already been claimed by another citizen.")
+        }
+
         val result = auth.createUserWithEmailAndPassword(email, password.toString()).await()
         val userId = result.user?.uid ?: throw Exception("Sign up failed.")
         
@@ -72,7 +89,47 @@ class FirebaseRepository {
             onlineStatus = true,
             lastSeen = Date()
         )
-        db.collection("users").document(userId).set(user).await()
+
+        val referrerId = inviteSnap.getString("createdBy") ?: ""
+        val batch = db.batch()
+        batch.set(db.collection("users").document(userId), user)
+        batch.update(inviteRef, mapOf(
+            "status" to "used",
+            "usedBy" to userId,
+            "timestamp" to System.currentTimeMillis()
+        ))
+        if (referrerId.isNotEmpty()) {
+            val referrerRef = db.collection("users").document(referrerId)
+            batch.update(referrerRef, "xp", FieldValue.increment(500L))
+        }
+        batch.commit().await()
+
+        updatePresence(true)
+        return true
+    }
+
+    suspend fun signInWithGoogle(idToken: String): Boolean {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        val result = auth.signInWithCredential(credential).await()
+        val userId = result.user?.uid ?: throw Exception("Google auth failed.")
+        
+        val userRef = db.collection("users").document(userId)
+        val snap = userRef.get().await()
+        if (!snap.exists()) {
+            val user = User(
+                userId = userId,
+                username = (result.user?.displayName ?: "citizen_${userId.take(6)}").trim().lowercase().replace(" ", "_"),
+                email = result.user?.email ?: "",
+                profileImage = result.user?.photoUrl?.toString() ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$userId",
+                bio = "Hey! I am using Nexify Connect.",
+                onlineStatus = true,
+                lastSeen = Date()
+            )
+            userRef.set(user).await()
+        } else {
+            ensureUserShape(userId)
+        }
+        updatePresence(true)
         return true
     }
 
@@ -198,6 +255,12 @@ class FirebaseRepository {
 
         val currentUser = getUserOrThrow(uid)
         val targetUser = getUserOrThrow(targetUserId)
+        if (currentUser.blockedUsers.safeIds().contains(targetUserId)) {
+            throw Exception("You have blocked this user.")
+        }
+        if (targetUser.blockedUsers.safeIds().contains(uid)) {
+            throw Exception("Action blocked.")
+        }
         if (currentUser.friends.safeIds().contains(targetUserId) || targetUser.friends.safeIds().contains(uid)) {
             throw Exception("You are already friends.")
         }
@@ -234,6 +297,11 @@ class FirebaseRepository {
 
         val currentUser = getUserOrThrow(uid)
         val targetUser = getUserOrThrow(targetUserId)
+        
+        if (currentUser.blockedUsers.safeIds().contains(targetUserId) || targetUser.blockedUsers.safeIds().contains(uid)) {
+            throw Exception("Block action exists. Friend request cannot be accepted.")
+        }
+
         val alreadyFriends = currentUser.friends.safeIds().contains(targetUserId) &&
             targetUser.friends.safeIds().contains(uid)
         val hasRequest = currentUser.requestsReceived.safeIds().contains(targetUserId) &&
@@ -251,29 +319,26 @@ class FirebaseRepository {
         val batch = db.batch()
         batch.update(currentRef, mapOf(
             "friends" to FieldValue.arrayUnion(targetUserId),
-            "requestsReceived" to FieldValue.arrayRemove(targetUserId)
+            "requestsReceived" to FieldValue.arrayRemove(targetUserId),
+            "requestsSent" to FieldValue.arrayRemove(targetUserId)
         ))
         batch.update(targetRef, mapOf(
             "friends" to FieldValue.arrayUnion(uid),
-            "requestsSent" to FieldValue.arrayRemove(uid)
+            "requestsSent" to FieldValue.arrayRemove(uid),
+            "requestsReceived" to FieldValue.arrayRemove(uid)
         ))
         batch.set(chatRef, mapOf(
             "chatId" to chatId,
+            "type" to "dm",
             "participants" to listOf(uid, targetUserId).sorted(),
+            "members" to listOf(uid, targetUserId).sorted(),
+            "memberMap" to mapOf(uid to true, targetUserId to true),
             "lastMessage" to "",
+            "lastMessageAt" to null,
             "timestamp" to Date(),
             "createdAt" to Date()
         ), SetOptions.merge())
         batch.commit().await()
-        /*
-
-                "lastMessage" to "✨ Connected! Say hello.",
-                "timestamp" to Date(),
-                "createdAt" to Date()
-            )
-            transaction.set(chatRef, chatMeta, SetOptions.merge())
-        }.await()
-        */
     }
 
     suspend fun rejectFriendRequest(targetUserId: String) {
@@ -296,6 +361,34 @@ class FirebaseRepository {
         batch.update(currentRef, "friends", FieldValue.arrayRemove(targetUserId))
         batch.update(targetRef, "friends", FieldValue.arrayRemove(uid))
         batch.commit().await()
+    }
+
+    suspend fun blockUser(targetUserId: String) {
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        if (uid == targetUserId) throw Exception("You cannot block yourself.")
+
+        val currentRef = db.collection("users").document(uid)
+        val targetRef = db.collection("users").document(targetUserId)
+
+        val batch = db.batch()
+        batch.update(currentRef, mapOf(
+            "blockedUsers" to FieldValue.arrayUnion(targetUserId),
+            "friends" to FieldValue.arrayRemove(targetUserId),
+            "requestsSent" to FieldValue.arrayRemove(targetUserId),
+            "requestsReceived" to FieldValue.arrayRemove(targetUserId)
+        ))
+        batch.update(targetRef, mapOf(
+            "friends" to FieldValue.arrayRemove(uid),
+            "requestsSent" to FieldValue.arrayRemove(uid),
+            "requestsReceived" to FieldValue.arrayRemove(uid)
+        ))
+        batch.commit().await()
+    }
+
+    suspend fun unblockUser(targetUserId: String) {
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        val currentRef = db.collection("users").document(uid)
+        currentRef.update("blockedUsers", FieldValue.arrayRemove(targetUserId)).await()
     }
 
     // ── STICKER SYSTEM ───────────────────────────────────────────
@@ -335,6 +428,34 @@ class FirebaseRepository {
         return dmChatId(uid, otherUserId)
     }
 
+    suspend fun createChatIfNotExists(chatId: String, otherUserId: String) {
+        val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        val chatRef = db.collection("chats").document(chatId)
+        val snap = chatRef.get().await()
+
+        if (!snap.exists()) {
+            val currentUser = getUserOrThrow(uid)
+            if (!currentUser.friends.safeIds().contains(otherUserId)) {
+                throw Exception("Add this user as a friend before messaging.")
+            }
+
+            val chatData = mapOf(
+                "chatId" to chatId,
+                "type" to "dm",
+                "participants" to listOf(uid, otherUserId).sorted(),
+                "members" to listOf(uid, otherUserId).sorted(),
+                "memberMap" to mapOf(uid to true, otherUserId to true),
+                "lastMessage" to "",
+                "lastMessageAt" to null,
+                "timestamp" to Date(),
+                "lastTimestamp" to Date(),
+                "createdAt" to Date()
+            )
+            chatRef.set(chatData).await()
+            NexifyLog.i("ChatCreation", "Created non-existent chat: $chatId")
+        }
+    }
+
     suspend fun sendMessage(
         chatId: String, 
         otherUserId: String, 
@@ -344,6 +465,8 @@ class FirebaseRepository {
         stickerUrl: String? = null
     ) {
         val uid = currentUserId ?: throw Exception("Unauthenticated.")
+        createChatIfNotExists(chatId, otherUserId)
+        
         val currentUser = getUserOrThrow(uid)
         if (!currentUser.friends.safeIds().contains(otherUserId)) {
             throw Exception("Add this user as a friend before messaging.")
@@ -357,7 +480,11 @@ class FirebaseRepository {
             throw Exception("Transmission blocked by Nexify Edge: Spam or unsafe content detected.")
         }
 
-        val messageId = UUID.randomUUID().toString()
+        val type = when {
+            imageUrl != null -> "image"
+            stickerId != null || stickerUrl != null -> "sticker"
+            else -> "text"
+        }
         val message = Message(
             messageId = messageId,
             senderId = uid,
@@ -365,25 +492,29 @@ class FirebaseRepository {
             imageUrl = imageUrl,
             stickerId = stickerId,
             stickerUrl = stickerUrl,
+            type = type,
             timestamp = Date(),
+            createdAt = Date(),
             seen = false
         )
 
         val batch = db.batch()
-        val msgRef = db.collection("messages").document(chatId).collection("chat_messages").document(messageId)
+        val msgRef = db.collection("chats").document(chatId).collection("messages").document(messageId)
         batch.set(msgRef, message)
 
         val chatRef = db.collection("chats").document(chatId)
         val summary = when {
             imageUrl != null -> "📷 Sent an image"
-            stickerId != null -> "👾 Sent a sticker"
+            stickerId != null || stickerUrl != null -> "👾 Sent a sticker"
             else -> text ?: ""
         }
         val chatMeta = mapOf(
             "chatId" to chatId,
             "participants" to listOf(uid, otherUserId).sorted(),
             "lastMessage" to summary,
-            "timestamp" to Date()
+            "timestamp" to Date(),
+            "lastMessageAt" to Date(),
+            "updatedAt" to Date()
         )
         batch.set(chatRef, chatMeta, SetOptions.merge())
 
@@ -426,15 +557,19 @@ class FirebaseRepository {
         }
     }
 
-    fun subscribeToMessages(chatId: String): Flow<List<Message>> = callbackFlow {
-        val q = db.collection("messages").document(chatId).collection("chat_messages").orderBy("timestamp")
+    fun listenMessages(chatId: String, limit: Int = 50): Flow<List<Message>> = subscribeToMessages(chatId, limit)
+
+    fun subscribeToMessages(chatId: String, limit: Int = 50): Flow<List<Message>> = callbackFlow {
+        val q = db.collection("chats").document(chatId).collection("messages")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
         val listener = q.addSnapshotListener { snap, err ->
             if (err != null) {
                 close(err)
                 return@addSnapshotListener
             }
             val list = snap?.documents?.mapNotNull { it.toObject(Message::class.java) } ?: emptyList()
-            trySend(list)
+            trySend(list.reversed())
         }
         awaitClose { listener.remove() }
     }
@@ -446,7 +581,7 @@ class FirebaseRepository {
 
     fun markMessagesAsSeen(chatId: String) {
         val uid = currentUserId ?: return
-        db.collection("messages").document(chatId).collection("chat_messages")
+        db.collection("chats").document(chatId).collection("messages")
             .whereNotEqualTo("senderId", uid)
             .whereEqualTo("seen", false)
             .get()
@@ -460,57 +595,316 @@ class FirebaseRepository {
     }
 
     // ── NEXIFY INTELLIGENT ASSISTANT (Nexify AI Chat System) ───────────
-    fun subscribeToAiMessages(userId: String): Flow<List<Message>> = callbackFlow {
-        val q = db.collection("ai_chats").document(userId).collection("chat_messages").orderBy("timestamp")
+    fun subscribeToAiMessages(userId: String): Flow<List<AiChatMessage>> = callbackFlow {
+        val q = db.collection("ai_chats").document(userId).collection("messages").orderBy("timestamp")
         val listener = q.addSnapshotListener { snap, err ->
             if (err != null) {
                 close(err)
                 return@addSnapshotListener
             }
-            val list = snap?.documents?.mapNotNull { it.toObject(Message::class.java) } ?: emptyList()
+            val list = snap?.documents?.mapNotNull { doc ->
+                try {
+                    doc.toObject(AiChatMessage::class.java)
+                } catch (e: Exception) {
+                    // Fallback to manual parsing if document is malformed
+                    val sender = doc.getString("sender") ?: "user"
+                    val text = doc.getString("text") ?: ""
+                    val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                    AiChatMessage(sender, text, timestamp)
+                }
+            } ?: emptyList()
             trySend(list)
         }
         awaitClose { listener.remove() }
     }
 
-    suspend fun sendAiMessage(userId: String, text: String, onAiTyping: (Boolean) -> Unit) {
-        // CONTENT MODERATION CHECK ON USER PROMPT
+    suspend fun receiveAIResponse(userId: String, prompt: String, history: List<AiChatMessage>): String {
+        // Map history to standard Message shape for the OkHttp REST API call context
+        val mappedHistory = history.map {
+            Message(
+                senderId = if (it.sender == "ai") "AI" else userId,
+                text = it.text,
+                timestamp = Date(it.timestamp)
+            )
+        }
+        return AiService.askNexifyAI(prompt, mappedHistory)
+    }
+
+    suspend fun sendAIMessage(userId: String, text: String, onAiTyping: (Boolean) -> Unit) {
         if (AiService.isOffensiveOrSpam(text)) {
             throw Exception("Transmission blocked by Nexify Edge: Prompt violates moderation rules.")
         }
 
-        val messageId = UUID.randomUUID().toString()
-        val userMessage = Message(
-            messageId = messageId,
-            senderId = userId,
+        val chatRef = db.collection("ai_chats").document(userId)
+        val messagesRef = chatRef.collection("messages")
+
+        // Ensure parent document existence in ai_chats
+        chatRef.set(mapOf(
+            "chatId" to userId,
+            "userId" to userId,
+            "createdAt" to Date()
+        ), SetOptions.merge()).await()
+
+        // Write user's message document
+        val userMsgId = UUID.randomUUID().toString()
+        val userMessage = AiChatMessage(
+            sender = "user",
             text = text,
-            timestamp = Date()
+            timestamp = System.currentTimeMillis()
         )
-        val ref = db.collection("ai_chats").document(userId).collection("chat_messages")
-        ref.document(messageId).set(userMessage).await()
+        messagesRef.document(userMsgId).set(userMessage).await()
 
-        // Get context chat history
-        val historySnap = ref.orderBy("timestamp").limitToLast(10).get().await()
-        val history = historySnap.documents.mapNotNull { it.toObject(Message::class.java) }
+        // Fetch context history for query limits
+        val historySnap = messagesRef.orderBy("timestamp").limitToLast(10).get().await()
+        val history = historySnap.documents.mapNotNull { it.toObject(AiChatMessage::class.java) }
 
-        // Start typing animation delay
         onAiTyping(true)
-        
-        // Secure AI Call
-        val response = AiService.askNexifyAI(text, history)
-        
-        // Delay to simulate computation
-        kotlinx.coroutines.delay(1200)
-        onAiTyping(false)
+        try {
+            val response = receiveAIResponse(userId, text, history)
+            
+            // Artificial delay to simulate thinking time
+            kotlinx.coroutines.delay(1200)
 
-        val aiMessageId = UUID.randomUUID().toString()
-        val aiMessage = Message(
-            messageId = aiMessageId,
-            senderId = "AI",
-            text = response,
-            timestamp = Date()
-        )
-        ref.document(aiMessageId).set(aiMessage).await()
+            // Write AI's response document
+            val aiMsgId = UUID.randomUUID().toString()
+            val aiMessage = AiChatMessage(
+                sender = "ai",
+                text = response,
+                timestamp = System.currentTimeMillis()
+            )
+            messagesRef.document(aiMsgId).set(aiMessage).await()
+        } catch (e: Exception) {
+            NexifyLog.e("AiChat", "Failed to retrieve AI response", e)
+            throw e
+        } finally {
+            onAiTyping(false)
+        }
+    }
+
+    suspend fun sendAiMessage(userId: String, text: String, onAiTyping: (Boolean) -> Unit) {
+        sendAIMessage(userId, text, onAiTyping)
+    }
+
+    // ── AI TOOLS SYSTEM WRAPPERS ──────────────────────────────────────
+    suspend fun generateReelIdea(userId: String, topic: String, onAiTyping: (Boolean) -> Unit) {
+        val userPrompt = "[Reel Tool] Generate Reel ideas for topic: '$topic'"
+        val chatRef = db.collection("ai_chats").document(userId)
+        val messagesRef = chatRef.collection("messages")
+
+        chatRef.set(mapOf(
+            "chatId" to userId,
+            "userId" to userId,
+            "createdAt" to Date()
+        ), SetOptions.merge()).await()
+
+        val userMsgId = UUID.randomUUID().toString()
+        messagesRef.document(userMsgId).set(AiChatMessage(
+            sender = "user",
+            text = userPrompt,
+            timestamp = System.currentTimeMillis()
+        )).await()
+
+        onAiTyping(true)
+        try {
+            val response = AiService.generateReelIdea(topic)
+            val aiMsgId = UUID.randomUUID().toString()
+            messagesRef.document(aiMsgId).set(AiChatMessage(
+                sender = "ai",
+                text = response,
+                timestamp = System.currentTimeMillis()
+            )).await()
+        } catch (e: Exception) {
+            NexifyLog.e("ReelIdeaTool", "Tool failed", e)
+            throw e
+        } finally {
+            onAiTyping(false)
+        }
+    }
+
+    suspend fun generateCaption(userId: String, mediaDescription: String, tone: String, onAiTyping: (Boolean) -> Unit) {
+        val userPrompt = "[Caption Tool] Write a caption for: '$mediaDescription' (Tone: $tone)"
+        val chatRef = db.collection("ai_chats").document(userId)
+        val messagesRef = chatRef.collection("messages")
+
+        chatRef.set(mapOf(
+            "chatId" to userId,
+            "userId" to userId,
+            "createdAt" to Date()
+        ), SetOptions.merge()).await()
+
+        val userMsgId = UUID.randomUUID().toString()
+        messagesRef.document(userMsgId).set(AiChatMessage(
+            sender = "user",
+            text = userPrompt,
+            timestamp = System.currentTimeMillis()
+        )).await()
+
+        onAiTyping(true)
+        try {
+            val response = AiService.generateCaption(mediaDescription, tone)
+            val aiMsgId = UUID.randomUUID().toString()
+            messagesRef.document(aiMsgId).set(AiChatMessage(
+                sender = "ai",
+                text = response,
+                timestamp = System.currentTimeMillis()
+            )).await()
+        } catch (e: Exception) {
+            NexifyLog.e("CaptionTool", "Tool failed", e)
+            throw e
+        } finally {
+            onAiTyping(false)
+        }
+    }
+
+    suspend fun generatePrompt(userId: String, taskDescription: String, onAiTyping: (Boolean) -> Unit) {
+        val userPrompt = "[Prompt Tool] Optimize prompt for task: '$taskDescription'"
+        val chatRef = db.collection("ai_chats").document(userId)
+        val messagesRef = chatRef.collection("messages")
+
+        chatRef.set(mapOf(
+            "chatId" to userId,
+            "userId" to userId,
+            "createdAt" to Date()
+        ), SetOptions.merge()).await()
+
+        val userMsgId = UUID.randomUUID().toString()
+        messagesRef.document(userMsgId).set(AiChatMessage(
+            sender = "user",
+            text = userPrompt,
+            timestamp = System.currentTimeMillis()
+        )).await()
+
+        onAiTyping(true)
+        try {
+            val response = AiService.generatePrompt(taskDescription)
+            val aiMsgId = UUID.randomUUID().toString()
+            messagesRef.document(aiMsgId).set(AiChatMessage(
+                sender = "ai",
+                text = response,
+                timestamp = System.currentTimeMillis()
+            )).await()
+        } catch (e: Exception) {
+            NexifyLog.e("PromptOptimizerTool", "Tool failed", e)
+            throw e
+        } finally {
+            onAiTyping(false)
+        }
+    }
+
+    suspend fun processRoomAITag(roomId: String, messages: List<Message>) {
+        val lastMsg = messages.lastOrNull() ?: return
+        if (lastMsg.senderId == "nexify_ai") return
+
+        val text = lastMsg.text ?: ""
+        val isTagged = text.contains("@nexifyai", ignoreCase = true)
+        if (!isTagged) return
+
+        val roomRef = db.collection("rooms").document(roomId)
+        
+        try {
+            // Set AI typing to true in Room
+            roomRef.update("typing.nexify_ai", true).await()
+
+            // Get context history matching the Message model shapes
+            val history = messages.takeLast(10)
+
+            // Secure Gemini / Local simulation call
+            val response = AiService.askNexifyAI(text, history)
+
+            // Small delay to simulate thoughts processing
+            kotlinx.coroutines.delay(1200)
+
+            // Write AI message payload
+            val aiMessageId = UUID.randomUUID().toString()
+            val now = Date()
+            val aiMessage = Message(
+                messageId = aiMessageId,
+                senderId = "nexify_ai",
+                text = response,
+                type = "text",
+                timestamp = now,
+                createdAt = now,
+                seen = true
+            )
+            val msgRef = roomRef.collection("messages").document(aiMessageId)
+            
+            val batch = db.batch()
+            batch.set(msgRef, aiMessage)
+            
+            // Update parent room summaries
+            val roomUpdates = mapOf(
+                "lastMessage" to response,
+                "lastMessageAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+                "typing.nexify_ai" to false
+            )
+            batch.update(roomRef, roomUpdates)
+            batch.commit().await()
+
+        } catch (e: Exception) {
+            NexifyLog.e("RoomAITag", "Failed to process AI tag reply.", e)
+            try {
+                roomRef.update("typing.nexify_ai", false).await()
+            } catch (ignore: Exception) {}
+        }
+    }
+
+    suspend fun processChatAITag(chatId: String, messages: List<Message>) {
+        val lastMsg = messages.lastOrNull() ?: return
+        if (lastMsg.senderId == "nexify_ai") return
+
+        val text = lastMsg.text ?: ""
+        val isTagged = text.contains("@nexifyai", ignoreCase = true)
+        if (!isTagged) return
+
+        val chatRef = db.collection("chats").document(chatId)
+        
+        try {
+            // Set AI typing to true in Chat
+            chatRef.update("typingStatus.nexify_ai", true).await()
+
+            // Get context history matching the Message model shapes
+            val history = messages.takeLast(10)
+
+            // Secure Gemini / Local simulation call
+            val response = AiService.askNexifyAI(text, history)
+
+            // Small delay to simulate thoughts processing
+            kotlinx.coroutines.delay(1200)
+
+            // Write AI message payload
+            val aiMessageId = UUID.randomUUID().toString()
+            val now = Date()
+            val aiMessage = Message(
+                messageId = aiMessageId,
+                senderId = "nexify_ai",
+                text = response,
+                type = "text",
+                timestamp = now,
+                createdAt = now,
+                seen = false
+            )
+            val msgRef = chatRef.collection("messages").document(aiMessageId)
+            
+            val batch = db.batch()
+            batch.set(msgRef, aiMessage)
+            
+            // Update parent chat summaries
+            val chatUpdates = mapOf(
+                "lastMessage" to response,
+                "timestamp" to now,
+                "lastMessageAt" to now,
+                "typingStatus.nexify_ai" to false
+            )
+            batch.update(chatRef, chatUpdates)
+            batch.commit().await()
+
+        } catch (e: Exception) {
+            NexifyLog.e("ChatAITag", "Failed to process AI tag reply.", e)
+            try {
+                chatRef.update("typingStatus.nexify_ai", false).await()
+            } catch (ignore: Exception) {}
+        }
     }
 
     // ── GROUP CHAT SYSTEM (with Moderation) ──────────────────────
@@ -620,19 +1014,110 @@ class FirebaseRepository {
         db.collection("rooms").document(roomId).update("members", FieldValue.arrayRemove(uid)).await()
     }
 
-    suspend fun sendRoomMessage(roomId: String, text: String) {
-        if (AiService.isOffensiveOrSpam(text)) {
+    suspend fun sendRoomMessage(
+        roomId: String,
+        text: String? = null,
+        mediaUrl: String? = null,
+        type: String = "text",
+        fileName: String? = null,
+        fileSize: Long? = null
+    ) {
+        val uid = currentUserId ?: return
+        if (text != null && text.trim().isNotEmpty() && AiService.isOffensiveOrSpam(text)) {
             throw Exception("Transmission blocked by Nexify Edge: Moderation filter triggered.")
         }
-        val uid = currentUserId ?: return
         val messageId = UUID.randomUUID().toString()
+        val now = Date()
         val message = Message(
             messageId = messageId,
             senderId = uid,
             text = text,
-            timestamp = Date()
+            mediaURL = mediaUrl,
+            type = type,
+            fileName = fileName,
+            fileSize = fileSize,
+            timestamp = now,
+            createdAt = now,
+            isPinned = false,
+            reactions = emptyMap()
         )
-        db.collection("room_messages").document(roomId).collection("messages").document(messageId).set(message).await()
+        
+        val batch = db.batch()
+        val msgRef = db.collection("rooms").document(roomId).collection("messages").document(messageId)
+        batch.set(msgRef, message)
+        
+        val roomRef = db.collection("rooms").document(roomId)
+        val lastMsgText = when (type) {
+            "image" -> "📷 Sent an image"
+            "gif" -> "👾 Sent a GIF"
+            "file" -> "📁 Sent a file: ${fileName ?: "attachment"}"
+            else -> text ?: ""
+        }
+        val roomUpdates = mapOf(
+            "lastMessage" to lastMsgText,
+            "lastMessageAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        batch.update(roomRef, roomUpdates)
+        
+        batch.commit().await()
+    }
+
+    suspend fun joinVoice(roomId: String) {
+        val uid = currentUserId ?: return
+        db.collection("rooms").document(roomId)
+            .update("voiceMembers", FieldValue.arrayUnion(uid))
+            .await()
+    }
+
+    suspend fun leaveVoice(roomId: String) {
+        val uid = currentUserId ?: return
+        db.collection("rooms").document(roomId)
+            .update("voiceMembers", FieldValue.arrayRemove(uid))
+            .await()
+    }
+
+    suspend fun togglePinRoomMessage(roomId: String, messageId: String, currentPinStatus: Boolean) {
+        db.collection("rooms").document(roomId).collection("messages").document(messageId)
+            .update("isPinned", !currentPinStatus)
+            .await()
+    }
+
+    suspend fun reactToRoomMessage(roomId: String, messageId: String, emoji: String) {
+        val uid = currentUserId ?: return
+        db.collection("rooms").document(roomId).collection("messages").document(messageId)
+            .update("reactions.$emoji", FieldValue.arrayUnion(uid))
+            .await()
+    }
+
+    suspend fun removeReactionFromRoomMessage(roomId: String, messageId: String, emoji: String) {
+        val uid = currentUserId ?: return
+        db.collection("rooms").document(roomId).collection("messages").document(messageId)
+            .update("reactions.$emoji", FieldValue.arrayRemove(uid))
+            .await()
+    }
+
+    suspend fun setRoomTypingStatus(roomId: String, isTyping: Boolean) {
+        val uid = currentUserId ?: return
+        db.collection("rooms").document(roomId)
+            .update("typing.$uid", isTyping)
+            .await()
+    }
+
+    suspend fun removeRoomMember(roomId: String, userId: String) {
+        val batch = db.batch()
+        val roomRef = db.collection("rooms").document(roomId)
+        batch.update(roomRef, "members", FieldValue.arrayRemove(userId))
+        batch.update(roomRef, "memberMap.$userId", FieldValue.delete())
+        batch.commit().await()
+    }
+
+    suspend fun inviteFriendToRoom(roomId: String, friendId: String) {
+        val batch = db.batch()
+        val roomRef = db.collection("rooms").document(roomId)
+        batch.update(roomRef, "members", FieldValue.arrayUnion(friendId))
+        batch.update(roomRef, "memberMap.$friendId", true)
+        batch.commit().await()
     }
 
     fun subscribeToRooms(): Flow<List<Room>> = callbackFlow {
@@ -647,16 +1132,277 @@ class FirebaseRepository {
         awaitClose { listener.remove() }
     }
 
-    fun subscribeToRoomMessages(roomId: String): Flow<List<Message>> = callbackFlow {
-        val q = db.collection("room_messages").document(roomId).collection("messages").orderBy("timestamp")
+    fun subscribeToRoom(roomId: String): Flow<Room?> = callbackFlow {
+        val listener = db.collection("rooms").document(roomId).addSnapshotListener { snap, err ->
+            if (err != null) {
+                close(err)
+                return@addSnapshotListener
+            }
+            val room = snap?.toObject(Room::class.java)
+            trySend(room)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToRoomMessages(roomId: String, limit: Int = 50): Flow<List<Message>> = callbackFlow {
+        val q = db.collection("rooms").document(roomId).collection("messages")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
         val listener = q.addSnapshotListener { snap, err ->
             if (err != null) {
                 close(err)
                 return@addSnapshotListener
             }
             val list = snap?.documents?.mapNotNull { it.toObject(Message::class.java) } ?: emptyList()
+            trySend(list.reversed())
+        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun rewardUserXp(amount: Long) {
+        val uid = currentUserId ?: return
+        db.collection("users").document(uid)
+            .update("xp", FieldValue.increment(amount))
+            .await()
+    }
+
+    suspend fun saveFocusSession(durationMinutes: Int, xpEarned: Long) {
+        val uid = currentUserId ?: return
+        val sessionId = UUID.randomUUID().toString()
+        val session = FocusSession(
+            sessionId = sessionId,
+            userId = uid,
+            durationMinutes = durationMinutes,
+            xpEarned = xpEarned,
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("focus_sessions").document(sessionId).set(session).await()
+        rewardUserXp(xpEarned)
+    }
+
+    fun subscribeToFocusSessions(): Flow<List<FocusSession>> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val q = db.collection("focus_sessions")
+            .whereEqualTo("userId", uid)
+            .orderBy("timestamp")
+        val listener = q.addSnapshotListener { snap, err ->
+            if (err != null) {
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { doc ->
+                try {
+                    doc.toObject(FocusSession::class.java)
+                } catch (e: Exception) {
+                    val sId = doc.id
+                    val uId = doc.getString("userId") ?: ""
+                    val dur = doc.getLong("durationMinutes")?.toInt() ?: 0
+                    val xp = doc.getLong("xpEarned") ?: 0L
+                    val ts = doc.getLong("timestamp") ?: 0L
+                    FocusSession(sId, uId, dur, xp, ts)
+                }
+            } ?: emptyList()
             trySend(list)
         }
         awaitClose { listener.remove() }
     }
+
+    suspend fun createChatRoom(name: String) {
+        val uid = currentUserId ?: return
+        val roomId = UUID.randomUUID().toString()
+        val room = ChatRoom(
+            roomId = roomId,
+            name = name,
+            createdBy = uid,
+            participants = listOf(uid),
+            createdAt = Date()
+        )
+        db.collection("chat_rooms").document(roomId).set(room).await()
+    }
+
+    suspend fun joinChatRoom(roomId: String) {
+        val uid = currentUserId ?: return
+        db.collection("chat_rooms").document(roomId)
+            .update("participants", FieldValue.arrayUnion(uid))
+            .await()
+    }
+
+    fun subscribeToChatRooms(): Flow<List<ChatRoom>> = callbackFlow {
+        val listener = db.collection("chat_rooms")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val list = snap?.documents?.mapNotNull { it.toObject(ChatRoom::class.java) } ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToChatRoom(roomId: String): Flow<ChatRoom?> = callbackFlow {
+        val listener = db.collection("chat_rooms").document(roomId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    trySend(null)
+                    return@addSnapshotListener
+                }
+                trySend(snap?.toObject(ChatRoom::class.java))
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToChatRoomMessages(roomId: String, limit: Int = 50): Flow<List<Message>> = callbackFlow {
+        val q = db.collection("chat_rooms").document(roomId).collection("messages")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+        val listener = q.addSnapshotListener { snap, err ->
+            if (err != null) {
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { it.toObject(Message::class.java) } ?: emptyList()
+            trySend(list.reversed())
+        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun sendChatRoomMessage(roomId: String, text: String) {
+        val uid = currentUserId ?: return
+        if (AiService.isOffensiveOrSpam(text)) {
+            throw Exception("Transmission blocked by moderation check.")
+        }
+        val messageId = UUID.randomUUID().toString()
+        val msg = Message(
+            messageId = messageId,
+            senderId = uid,
+            text = text,
+            timestamp = Date(),
+            type = "text"
+        )
+        db.collection("chat_rooms").document(roomId).collection("messages")
+            .document(messageId).set(msg).await()
+        rewardUserXp(10L)
+    }
+
+    fun subscribeToLeaderboard(): Flow<List<User>> = callbackFlow {
+        val q = db.collection("users")
+            .orderBy("xp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(50)
+        val listener = q.addSnapshotListener { snap, err ->
+            if (err != null) {
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { it.toObject(User::class.java) } ?: emptyList()
+            trySend(list)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun startCall(receiverId: String): String {
+        val uid = currentUserId ?: throw Exception("Not logged in")
+        val callId = "${uid}_${receiverId}"
+        val call = CallSession(
+            callId = callId,
+            callerId = uid,
+            receiverId = receiverId,
+            status = "dialing",
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("calls").document(callId).set(call).await()
+        return callId
+    }
+
+    suspend fun answerCall(callId: String) {
+        db.collection("calls").document(callId)
+            .update("status", "connected")
+            .await()
+    }
+
+    suspend fun endCall(callId: String) {
+        db.collection("calls").document(callId)
+            .update("status", "ended")
+            .await()
+    }
+
+    fun subscribeToIncomingCalls(): Flow<List<CallSession>> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val q = db.collection("calls")
+            .whereEqualTo("receiverId", uid)
+            .whereNotEqualTo("status", "ended")
+        val listener = q.addSnapshotListener { snap, err ->
+            if (err != null) {
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { it.toObject(CallSession::class.java) } ?: emptyList()
+            trySend(list)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToCallState(callId: String): Flow<CallSession?> = callbackFlow {
+        val listener = db.collection("calls").document(callId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    trySend(null)
+                    return@addSnapshotListener
+                }
+                trySend(snap?.toObject(CallSession::class.java))
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun generateInviteCode(): String {
+        val uid = currentUserId ?: throw Exception("Not logged in")
+        val code = "NEXIFY-" + UUID.randomUUID().toString().take(8).toUpperCase()
+        db.collection("invites").document(code).set(mapOf(
+            "code" to code,
+            "createdBy" to uid,
+            "status" to "available",
+            "createdAt" to Date()
+        )).await()
+        return code
+    }
+
+    suspend fun logFeatureUsage(featureName: String) {
+        val uid = currentUserId ?: return
+        try {
+            val ref = db.collection("users").document(uid).collection("behavior_analytics").document("current_metrics")
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(ref)
+                val rawMap = snapshot.get("featureUsageFreq") as? Map<*, *>
+                val updatedFreq = mutableMapOf<String, Long>()
+                rawMap?.forEach { (k, v) ->
+                    if (k is String && v is Number) {
+                        updatedFreq[k] = v.toLong()
+                    }
+                }
+                updatedFreq[featureName] = (updatedFreq[featureName] ?: 0L) + 1L
+
+                val updates = mapOf(
+                    "lastActiveTimestamp" to System.currentTimeMillis(),
+                    "featureUsageFreq" to updatedFreq
+                )
+                transaction.set(ref, updates, SetOptions.merge())
+                null
+            }.await()
+        } catch (e: Exception) {
+            NexifyLog.e("Telemetry", "Failed to log feature usage for $featureName", e)
+        }
+    }
 }
+
+

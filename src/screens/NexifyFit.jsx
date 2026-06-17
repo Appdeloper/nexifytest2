@@ -5,7 +5,7 @@ import { useToast } from '../components/ToastProvider';
 import { useAuth } from '../hooks/useAuth';
 import { updateFitnessData } from '../services/fitness';
 import { Footprints } from 'lucide-react';
-import { useFitness } from '../hooks/useFitness';
+import { useFitness } from '../hooks/useFitnessContext';
 
 const WORKOUTS = [
   { id: 1, title: 'Full Body Beginner', category: 'Beginner', duration: 45, calories: 320, exercises: 8, level: 'Beginner', color: '#10b981',

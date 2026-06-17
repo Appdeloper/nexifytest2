@@ -39,13 +39,30 @@ import com.nexify.connect.data.model.*
 import com.nexify.connect.data.repository.FirebaseRepository
 import com.nexify.connect.services.AiService
 import com.nexify.connect.services.CloudinaryService
+import com.nexify.connect.services.safeCollect
+import com.nexify.connect.services.LocalErrorReporter
+import com.nexify.connect.services.NexifyLog
 import com.nexify.connect.ui.components.*
+import kotlinx.coroutines.flow.catch
 import com.nexify.connect.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.ExperimentalFoundationApi
 
 // ── RELATIVE PRESENCE PARSER ──────────────────────────────────
 fun getRelativeTimeString(date: Date?, onlineStatus: Boolean): String {
@@ -143,7 +160,11 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                 )
             }
 
-            TextButton(onClick = { navController.navigate("signup") }) {
+            TextButton(onClick = { 
+                navController.navigate("signup") {
+                    popUpTo("login") { inclusive = true }
+                }
+            }) {
                 Text("Create new avatar profile", color = PurpleNeon)
             }
         }
@@ -156,6 +177,7 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
+    var inviteCode by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -202,6 +224,13 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, color = PurpleNeon) }
             )
 
+            PremiumTextField(
+                value = inviteCode,
+                onValueChange = { inviteCode = it },
+                placeholder = "Access / Invite Code",
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, color = PurpleNeon) }
+            )
+
             Spacer(modifier = Modifier.height(12.dp))
 
             if (isLoading) {
@@ -210,11 +239,11 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                 PremiumButton(
                     text = "REGISTER CITIZEN",
                     onClick = {
-                        if (email.isEmpty() || password.isEmpty() || username.isEmpty()) return@PremiumButton
+                        if (email.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) return@PremiumButton
                         coroutineScope.launch {
                             isLoading = true
                             try {
-                                repository.signUp(email, password, username)
+                                repository.signUp(email, password, username, inviteCode)
                                 navController.navigate("home") {
                                     popUpTo("signup") { inclusive = true }
                                 }
@@ -230,7 +259,11 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                 )
             }
 
-            TextButton(onClick = { navController.navigate("login") }) {
+            TextButton(onClick = { 
+                navController.navigate("login") {
+                    popUpTo("signup") { inclusive = true }
+                }
+            }) {
                 Text("Already registered? Login", color = CyanNeon)
             }
         }
@@ -241,7 +274,7 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
 @Composable
 fun ProfileCustomizationScreen(navController: NavController, repository: FirebaseRepository) {
     val uid = repository.currentUserId ?: ""
-    val userProfile by repository.subscribeToUser(uid).collectAsState(initial = null)
+    val userProfile by repository.subscribeToUser(uid).safeCollect("ProfileCustomizationScreen", null).collectAsState(initial = null)
     
     var bioText by remember { mutableStateOf("") }
     var isUploading by remember { mutableStateOf(false) }
@@ -436,7 +469,7 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
 @Composable
 fun FindFriendsScreen(navController: NavController, repository: FirebaseRepository) {
     var searchQuery by remember { mutableStateOf("") }
-    val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").collectAsState(initial = null)
+    val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").safeCollect("FindFriendsScreen_currentUser", null).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -448,7 +481,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
     val requestUsersFlow = remember(receivedRequestIds) {
         repository.subscribeToUsersByIds(receivedRequestIds)
     }
-    val requestsList by requestUsersFlow.collectAsState(initial = emptyList())
+    val requestsList by requestUsersFlow.safeCollect("FindFriendsScreen_requests", emptyList()).collectAsState(initial = emptyList())
 
     fun runFriendAction(successMessage: String, action: suspend () -> Unit) {
         coroutineScope.launch {
@@ -558,6 +591,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                 }
 
                                 val status = when {
+                                    currentUserProfile?.blockedUsers?.contains(targetUser.userId) == true -> "blocked"
                                     currentUserProfile?.friends?.contains(targetUser.userId) == true -> "friends"
                                     currentUserProfile?.requestsSent?.contains(targetUser.userId) == true -> "sent"
                                     currentUserProfile?.requestsReceived?.contains(targetUser.userId) == true -> "received"
@@ -565,35 +599,83 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                 }
 
                                 when (status) {
-                                    "friends" -> {
+                                    "blocked" -> {
                                         Button(
                                             onClick = {
-                                                val chatId = repository.getChatId(targetUser.userId)
-                                                navController.navigate("chat/$chatId/${targetUser.userId}")
+                                                runFriendAction("User unblocked.") {
+                                                    repository.unblockUser(targetUser.userId)
+                                                }
                                             },
-                                            colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
                                             shape = RoundedCornerShape(20.dp)
                                         ) {
-                                            Icon(Icons.Default.Message, contentDescription = null, color = Color.Black)
+                                            Icon(Icons.Default.Block, contentDescription = null, color = Color.White, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Message", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text("Blocked", color = Color.White, fontSize = 12.sp)
+                                        }
+                                    }
+                                    "friends" -> {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Button(
+                                                onClick = {
+                                                    val chatId = repository.getChatId(targetUser.userId)
+                                                    navController.navigate("chat/$chatId/${targetUser.userId}")
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
+                                                shape = RoundedCornerShape(20.dp)
+                                            ) {
+                                                Icon(Icons.Default.Message, contentDescription = null, color = Color.Black)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Message", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    runFriendAction("User blocked.") {
+                                                        repository.blockUser(targetUser.userId)
+                                                    }
+                                                },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                            }
                                         }
                                     }
                                     "sent" -> {
-                                        Button(
-                                            onClick = {
-                                                runFriendAction("Request cancelled.") {
-                                                    repository.cancelFriendRequest(targetUser.userId)
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                                            shape = RoundedCornerShape(20.dp)
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Pending", color = Color.White, fontSize = 12.sp)
+                                            Button(
+                                                onClick = {
+                                                    runFriendAction("Request cancelled.") {
+                                                        repository.cancelFriendRequest(targetUser.userId)
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                                shape = RoundedCornerShape(20.dp)
+                                            ) {
+                                                Text("Pending", color = Color.White, fontSize = 12.sp)
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    runFriendAction("User blocked.") {
+                                                        repository.blockUser(targetUser.userId)
+                                                    }
+                                                },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                            }
                                         }
                                     }
                                     "received" -> {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Button(
                                                 onClick = {
                                                     runFriendAction("Accepted request!") {
@@ -618,23 +700,48 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                             ) {
                                                 Text("Reject", color = Color.Red, fontSize = 11.sp)
                                             }
+                                            IconButton(
+                                                onClick = {
+                                                    runFriendAction("User blocked.") {
+                                                        repository.blockUser(targetUser.userId)
+                                                    }
+                                                },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                            }
                                         }
                                     }
                                     "none" -> {
-                                        Button(
-                                            onClick = {
-                                                runFriendAction("Friend request sent!") {
-                                                    repository.sendFriendRequest(targetUser.userId)
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                                            shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier
-                                                .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), RoundedCornerShape(20.dp))
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Add", color = Color.White, fontSize = 12.sp)
+                                            Button(
+                                                onClick = {
+                                                    runFriendAction("Friend request sent!") {
+                                                        repository.sendFriendRequest(targetUser.userId)
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                                shape = RoundedCornerShape(20.dp),
+                                                modifier = Modifier
+                                                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), RoundedCornerShape(20.dp))
+                                            ) {
+                                                Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Add", color = Color.White, fontSize = 12.sp)
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    runFriendAction("User blocked.") {
+                                                        repository.blockUser(targetUser.userId)
+                                                    }
+                                                },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                            }
                                         }
                                     }
                                 }
@@ -714,9 +821,9 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
 // ── DIRECT MESSAGES & GROUP LISTS (with AI Shortcut) ───────────────────
 @Composable
 fun ChatListScreen(navController: NavController, repository: FirebaseRepository) {
-    val chats by repository.subscribeToChats().collectAsState(initial = emptyList())
-    val groups by repository.subscribeToGroups().collectAsState(initial = emptyList())
-    val allUsers by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
+    val chats by repository.subscribeToChats().safeCollect("ChatListScreen_chats", emptyList()).collectAsState(initial = emptyList())
+    val groups by repository.subscribeToGroups().safeCollect("ChatListScreen_groups", emptyList()).collectAsState(initial = emptyList())
+    val allUsers by repository.subscribeToAllUsers().safeCollect("ChatListScreen_users", emptyList()).collectAsState(initial = emptyList())
     
     var currentTab by remember { mutableStateOf("DMs") }
 
@@ -737,14 +844,20 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                 IconButton(onClick = { navController.navigate("ai_chat") }) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon)
                 }
-                IconButton(onClick = { navController.navigate("profile") }) {
-                    Icon(Icons.Default.Settings, contentDescription = null, color = Color.White)
+                IconButton(onClick = { navController.navigate("settings") }) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", color = Color.White)
                 }
                 IconButton(onClick = { navController.navigate("find") }) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White)
                 }
                 IconButton(onClick = { navController.navigate("rooms") }) {
                     Icon(Icons.Default.Explore, contentDescription = null, color = Color.White)
+                }
+                IconButton(onClick = { navController.navigate("chat_rooms") }) {
+                    Icon(Icons.Default.Groups, contentDescription = "Chat Rooms", tint = CyanNeon)
+                }
+                IconButton(onClick = { navController.navigate("leaderboard") }) {
+                    Icon(Icons.Default.Star, contentDescription = "Leaderboard", tint = Color.White)
                 }
                 IconButton(onClick = {
                     repository.logout()
@@ -754,6 +867,41 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                 }) {
                     Icon(Icons.Default.ExitToApp, contentDescription = null, color = Color.Red)
                 }
+            }
+        }
+
+        // Nexify Apps Quick Launcher Bar
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 4.dp)
+        ) {
+            item {
+                AppLaunchChip(
+                    label = "⏱️ Focus Pod",
+                    onClick = { navController.navigate("focus_pod") }
+                )
+            }
+            item {
+                AppLaunchChip(
+                    label = "🏋️ Fit (Soon)",
+                    onClick = { /* Locked */ },
+                    enabled = false
+                )
+            }
+            item {
+                AppLaunchChip(
+                    label = "⚡ Edge (Soon)",
+                    onClick = { /* Locked */ },
+                    enabled = false
+                )
+            }
+            item {
+                AppLaunchChip(
+                    label = "🌊 Waves (Soon)",
+                    onClick = { /* Locked */ },
+                    enabled = false
+                )
             }
         }
 
@@ -878,17 +1026,78 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
             }
         }
     }
+
+    val incomingCalls by repository.subscribeToIncomingCalls().safeCollect("ChatList_incomingCalls", emptyList()).collectAsState(initial = emptyList())
+    val activeIncomingCall = incomingCalls.firstOrNull()
+    if (activeIncomingCall != null) {
+        val callerProfile = allUsers.find { it.userId == activeIncomingCall.callerId }
+        val callerName = callerProfile?.username ?: "Citizen"
+        val isConnected = activeIncomingCall.status == "connected"
+
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(if (isConnected) "📞 Active Voice Channel" else "📞 Incoming Voice Signal...", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "@$callerName",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = if (isConnected) "CONNECTED" else "RINGING...",
+                        color = if (isConnected) Color.Green else CyanNeon,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                if (!isConnected) {
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                repository.answerCall(activeIncomingCall.callId)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+                    ) {
+                        Text("ANSWER", color = Color.White)
+                    }
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            repository.endCall(activeIncomingCall.callId)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text(if (isConnected) "DISCONNECT" else "DECLINE", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
 
 // ── DIRECT DM CONVERSATION SCREEN (with AI Smart Reply Chips) ─────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatConversationScreen(navController: NavController, repository: FirebaseRepository, chatId: String, otherUserId: String) {
-    val messages by repository.subscribeToMessages(chatId).collectAsState(initial = emptyList())
-    val otherUserProfile by repository.subscribeToUser(otherUserId).collectAsState(initial = null)
-    val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").collectAsState(initial = null)
-    val chatMeta by repository.subscribeToChats().collectAsState(initial = emptyList())
-    val stickers by repository.subscribeToStickers().collectAsState(initial = emptyList())
+    val messages by repository.subscribeToMessages(chatId).safeCollect("ChatConversationScreen_messages", emptyList()).collectAsState(initial = emptyList())
+    val otherUserProfile by repository.subscribeToUser(otherUserId).safeCollect("ChatConversationScreen_otherUser", null).collectAsState(initial = null)
+    val currentUserProfile by repository.subscribeToUser(repository.currentUserId ?: "").safeCollect("ChatConversationScreen_currentUser", null).collectAsState(initial = null)
+    val chatMeta by repository.subscribeToChats().safeCollect("ChatConversationScreen_meta", emptyList()).collectAsState(initial = emptyList())
+    val stickers by repository.subscribeToStickers().safeCollect("ChatConversationScreen_stickers", emptyList()).collectAsState(initial = emptyList())
 
     var typedText by remember { mutableStateOf("") }
     var isUploadingMedia by remember { mutableStateOf(false) }
@@ -902,6 +1111,16 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    LaunchedEffect(chatId, otherUserId) {
+        coroutineScope.launch {
+            try {
+                repository.createChatIfNotExists(chatId, otherUserId)
+            } catch (e: Exception) {
+                NexifyLog.e("ChatConversationScreen", "Failed to auto-create DM metadata doc.", e)
+            }
+        }
+    }
+
     LaunchedEffect(messages.size) {
         repository.markMessagesAsSeen(chatId)
     }
@@ -909,6 +1128,20 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // AI tag check on incoming DM messages
+    LaunchedEffect(messages) {
+        val lastMsg = messages.lastOrNull()
+        if (lastMsg != null && lastMsg.senderId == repository.currentUserId && lastMsg.text?.contains("@nexifyai", ignoreCase = true) == true) {
+            coroutineScope.launch {
+                try {
+                    repository.processChatAITag(chatId, messages)
+                } catch (e: Exception) {
+                    NexifyLog.e("ChatConversationScreen", "Failed to auto-trigger AI reply", e)
+                }
+            }
         }
     }
 
@@ -1241,7 +1474,7 @@ fun CreateGroupScreen(navController: NavController, repository: FirebaseReposito
     var uploadedImageUrl by remember { mutableStateOf("") }
     var isUploading by remember { mutableStateOf(false) }
 
-    val friendsList by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
+    val friendsList by repository.subscribeToAllUsers().safeCollect("CreateGroupScreen_friends", emptyList()).collectAsState(initial = emptyList())
     val selectedMembers = remember { mutableStateListOf<String>() }
 
     val context = LocalContext.current
@@ -1388,10 +1621,10 @@ fun CreateGroupScreen(navController: NavController, repository: FirebaseReposito
 @Composable
 fun GroupChatScreen(navController: NavController, repository: FirebaseRepository, groupId: String) {
     val uid = repository.currentUserId ?: ""
-    val groups by repository.subscribeToGroups().collectAsState(initial = emptyList())
-    val messages by repository.subscribeToGroupMessages(groupId).collectAsState(initial = emptyList())
-    val stickers by repository.subscribeToStickers().collectAsState(initial = emptyList())
-    val friendsList by repository.subscribeToAllUsers().collectAsState(initial = emptyList())
+    val groups by repository.subscribeToGroups().safeCollect("GroupChatScreen_groups", emptyList()).collectAsState(initial = emptyList())
+    val messages by repository.subscribeToGroupMessages(groupId).safeCollect("GroupChatScreen_messages", emptyList()).collectAsState(initial = emptyList())
+    val stickers by repository.subscribeToStickers().safeCollect("GroupChatScreen_stickers", emptyList()).collectAsState(initial = emptyList())
+    val friendsList by repository.subscribeToAllUsers().safeCollect("GroupChatScreen_friends", emptyList()).collectAsState(initial = emptyList())
 
     val currentGroup = groups.find { it.groupId == groupId }
     val isAdmin = currentGroup?.adminId == uid
@@ -1754,7 +1987,7 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
 // ── DISCORD-STYLE ROOMS SCREEN ──────────────────────────────────────
 @Composable
 fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
-    val rooms by repository.subscribeToRooms().collectAsState(initial = emptyList())
+    val rooms by repository.subscribeToRooms().safeCollect("RoomsScreen_rooms", emptyList()).collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
     
     var newRoomName by remember { mutableStateOf("") }
@@ -1916,14 +2149,28 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
 // ── 🤖 INTELLIGENT AI COMPANION PORTAL (Nexify AI Chat Screen) ────────
 @Composable
 fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
+    LaunchedEffect(Unit) {
+        repository.logFeatureUsage("ai_chat")
+    }
     val uid = repository.currentUserId ?: ""
-    val messages by repository.subscribeToAiMessages(uid).collectAsState(initial = emptyList())
+    val messages by repository.subscribeToAiMessages(uid).safeCollect("AiChatScreen_messages", emptyList()).collectAsState(initial = emptyList())
     var typedText by remember { mutableStateOf("") }
     var isAiGenerating by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // Dialog state variables for tools
+    var showReelDialog by remember { mutableStateOf(false) }
+    var reelTopic by remember { mutableStateOf("") }
+
+    var showCaptionDialog by remember { mutableStateOf(false) }
+    var captionDesc by remember { mutableStateOf("") }
+    var captionTone by remember { mutableStateOf("Chill") }
+
+    var showPromptDialog by remember { mutableStateOf(false) }
+    var promptTask by remember { mutableStateOf("") }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -1997,7 +2244,7 @@ fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
             }
 
             items(messages) { message ->
-                val isAi = message.senderId == "AI"
+                val isAi = message.sender == "ai"
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = if (isAi) Alignment.CenterStart else Alignment.CenterEnd
@@ -2030,16 +2277,14 @@ fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
                                     .border(1.dp, if (isAi) CyanNeon.copy(0.4f) else CardBorder, RoundedCornerShape(16.dp))
                                     .padding(12.dp)
                             ) {
-                                Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
+                                Text(message.text, color = Color.White, fontSize = 14.sp)
                             }
-                            message.timestamp?.let {
-                                Text(
-                                    text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
-                                    color = TextMuted,
-                                    fontSize = 9.sp,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
+                            Text(
+                                text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp)),
+                                color = TextMuted,
+                                fontSize = 9.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
                         }
                     }
                 }
@@ -2057,6 +2302,34 @@ fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
             ) {
                 CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(14.dp))
                 Text("Nexify AI is generating response...", color = CyanNeon, fontSize = 11.sp)
+            }
+        }
+
+        // AI Quick Tools Row
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            item {
+                ToolChip(
+                    text = "🎬 Reel Idea",
+                    onClick = { showReelDialog = true }
+                )
+            }
+            item {
+                ToolChip(
+                    text = "✍️ Caption Gen",
+                    onClick = { showCaptionDialog = true }
+                )
+            }
+            item {
+                ToolChip(
+                    text = "🤖 Optimize Prompt",
+                    onClick = { showPromptDialog = true }
+                )
             }
         }
 
@@ -2100,4 +2373,2177 @@ fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
             }
         }
     }
+
+    // --- Tool Dialogs ---
+
+    if (showReelDialog) {
+        AlertDialog(
+            onDismissRequest = { showReelDialog = false },
+            title = { Text("🎬 Reel Idea Generator", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter a topic or niche to brainstorm a structured viral Reel idea.", color = TextMuted, fontSize = 12.sp)
+                    PremiumTextField(
+                        value = reelTopic,
+                        onValueChange = { reelTopic = it },
+                        placeholder = "e.g., coding routine, gym hacks"
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (reelTopic.isNotBlank()) {
+                            val topic = reelTopic
+                            reelTopic = ""
+                            showReelDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    repository.generateReelIdea(uid, topic) { generating ->
+                                        isAiGenerating = generating
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
+                ) {
+                    Text("Generate", color = Color.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReelDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (showCaptionDialog) {
+        AlertDialog(
+            onDismissRequest = { showCaptionDialog = false },
+            title = { Text("✍️ AI Caption Generator", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Describe your post and select the tone.", color = TextMuted, fontSize = 12.sp)
+                    PremiumTextField(
+                        value = captionDesc,
+                        onValueChange = { captionDesc = it },
+                        placeholder = "e.g., A developer debugging at 2 AM"
+                    )
+                    Text("Tone Selection", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val tones = listOf("Chill", "Professional", "Hustle")
+                        tones.forEach { t ->
+                            val selected = captionTone == t
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { captionTone = t }
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        1.dp,
+                                        if (selected) CyanNeon else Color.Gray.copy(alpha = 0.4f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .background(if (selected) CyanNeon.copy(alpha = 0.2f) else Color.Transparent)
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = t,
+                                    color = if (selected) CyanNeon else Color.White,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (captionDesc.isNotBlank()) {
+                            val desc = captionDesc
+                            val tone = captionTone
+                            captionDesc = ""
+                            showCaptionDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    repository.generateCaption(uid, desc, tone) { generating ->
+                                        isAiGenerating = generating
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
+                ) {
+                    Text("Generate", color = Color.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCaptionDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (showPromptDialog) {
+        AlertDialog(
+            onDismissRequest = { showPromptDialog = false },
+            title = { Text("🤖 AI Prompt Optimizer", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Turn a simple task description into a high-quality system prompt.", color = TextMuted, fontSize = 12.sp)
+                    PremiumTextField(
+                        value = promptTask,
+                        onValueChange = { promptTask = it },
+                        placeholder = "e.g., Translate text to SQL"
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (promptTask.isNotBlank()) {
+                            val task = promptTask
+                            promptTask = ""
+                            showPromptDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    repository.generatePrompt(uid, task) { generating ->
+                                        isAiGenerating = generating
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
+                ) {
+                    Text("Optimize", color = Color.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPromptDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
+
+@Composable
+fun ToolChip(
+    text: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(20.dp))
+            .border(1.dp, Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), RoundedCornerShape(20.dp)),
+        color = CardBg.copy(alpha = 0.6f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = text,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+
+// ── ROOM CHAT SCREEN ──────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun RoomChatScreen(
+    navController: NavController,
+    repository: FirebaseRepository,
+    roomId: String
+) {
+    val uid = repository.currentUserId ?: ""
+    val room by repository.subscribeToRoom(roomId).safeCollect("RoomChatScreen_room", null).collectAsState(initial = null)
+    val messages by repository.subscribeToRoomMessages(roomId).safeCollect("RoomChatScreen_messages", emptyList()).collectAsState(initial = emptyList())
+    val stickers by repository.subscribeToStickers().safeCollect("RoomChatScreen_stickers", emptyList()).collectAsState(initial = emptyList())
+    val allUsers by repository.subscribeToAllUsers().safeCollect("RoomChatScreen_allUsers", emptyList()).collectAsState(initial = emptyList())
+    
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    var typedText by remember { mutableStateOf("") }
+    var isUploadingMedia by remember { mutableStateOf(false) }
+    var showStickerSheet by remember { mutableStateOf(false) }
+    var showAdminPanel by remember { mutableStateOf(false) }
+    
+    val listState = rememberLazyListState()
+    
+    // Auto-scroll on new messages
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // AI tag check on incoming room messages
+    LaunchedEffect(messages) {
+        val lastMsg = messages.lastOrNull()
+        if (lastMsg != null && lastMsg.senderId == uid && lastMsg.text?.contains("@nexifyai", ignoreCase = true) == true) {
+            coroutineScope.launch {
+                try {
+                    repository.processRoomAITag(roomId, messages)
+                } catch (e: Exception) {
+                    NexifyLog.e("RoomChatScreen", "Failed to auto-trigger AI reply", e)
+                }
+            }
+        }
+    }
+    
+    // Auto-disconnect from voice when screen is disposed
+    DisposableEffect(roomId) {
+        onDispose {
+            coroutineScope.launch {
+                repository.leaveVoice(roomId)
+            }
+        }
+    }
+    
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                isUploadingMedia = true
+                try {
+                    val imageUrl = CloudinaryService.uploadImage(context, it)
+                    repository.sendRoomMessage(roomId, mediaUrl = imageUrl, type = "image")
+                } catch (e: Exception) {
+                    Toast.makeText(context, e.message ?: "Upload failed.", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isUploadingMedia = false
+                }
+            }
+        }
+    }
+    
+    val inVoice = room?.voiceMembers?.contains(uid) == true
+    val isCurrentUserCreator = room?.createdBy == uid
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 1. App Bar Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(CardBg)
+                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
+                    }
+                    
+                    Box(modifier = Modifier.size(40.dp)) {
+                        AsyncImage(
+                            model = "https://api.dicebear.com/7.x/identicon/svg?seed=$roomId",
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CardBorder)
+                                .align(Alignment.Center)
+                        )
+                        if (inVoice) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981))
+                                    .border(1.5.dp, CardBg, CircleShape)
+                                    .align(Alignment.BottomEnd)
+                            )
+                        }
+                    }
+                    
+                    Column {
+                        Text(room?.name ?: "Loading...", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("${room?.members?.size ?: 0} CITIZENS", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Voice Control Toggle
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                try {
+                                    if (inVoice) {
+                                        repository.leaveVoice(roomId)
+                                    } else {
+                                        repository.joinVoice(roomId)
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Voice gateway error.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (inVoice) Color(0xFF10B981).copy(0.15f) else CardBg
+                        ),
+                        border = BorderStroke(1.dp, if (inVoice) Color(0xFF10B981).copy(0.3f) else CardBorder),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (inVoice) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
+                                contentDescription = null,
+                                tint = if (inVoice) Color(0xFF10B981) else Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = if (inVoice) "VOICE ON" else "JOIN VOICE",
+                                color = if (inVoice) Color(0xFF10B981) else Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    IconButton(onClick = { showAdminPanel = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = null, tint = TextMuted)
+                    }
+                }
+            }
+            
+            // 2. Voice Strip Panel (Top 30% area if users are in voice)
+            val voiceMembersList = room?.voiceMembers ?: emptyList()
+            if (voiceMembersList.isNotEmpty()) {
+                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                val pulseScale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.12f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(800),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "scale"
+                )
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CardBg.copy(0.4f))
+                        .border(1.dp, CardBorder.copy(0.3f), RoundedCornerShape(0.dp))
+                        .padding(vertical = 10.dp, horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("ACTIVE VOICE CHANNEL", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = CyanNeon, letterSpacing = 1.sp)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(voiceMembersList) { vMemberId ->
+                            val vUser = allUsers.find { it.userId == vMemberId }
+                            val mockSpeaking = vMemberId.hashCode() % 3 == 0 // dynamic mock speaking animation for premium visual response
+                            val userScale = if (mockSpeaking) pulseScale else 1f
+                            val borderColor = if (mockSpeaking) Color(0xFF10B981) else CyanNeon.copy(0.6f)
+                            
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .graphicsLayer(scaleX = userScale, scaleY = userScale),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AsyncImage(
+                                        model = vUser?.profileImage?.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=$vMemberId" }
+                                            ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$vMemberId",
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(CardBg)
+                                            .border(2.dp, borderColor, CircleShape)
+                                    )
+                                    if (mockSpeaking) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF10B981))
+                                                .border(1.dp, CardBg, CircleShape)
+                                                .align(Alignment.BottomEnd)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = vUser?.username ?: "Citizen",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 3. Threaded Messages List (Bottom 70%)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                items(messages) { message ->
+                    val isMe = message.senderId == uid
+                    val sender = allUsers.find { it.userId == message.senderId }
+                    val senderName = sender?.username ?: "Citizen"
+                    var showMenu by remember { mutableStateOf(false) }
+                    
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
+                    ) {
+                        Column(
+                            horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                            modifier = Modifier.fillMaxWidth(0.85f)
+                        ) {
+                            if (!isMe) {
+                                Text(
+                                    text = senderName,
+                                    color = CyanNeon,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
+                                )
+                            }
+                            
+                            Box {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(
+                                            RoundedCornerShape(
+                                                topStart = 14.dp,
+                                                topEnd = 14.dp,
+                                                bottomStart = if (isMe) 14.dp else 0.dp,
+                                                bottomEnd = if (isMe) 0.dp else 14.dp
+                                            )
+                                        )
+                                        .background(if (isMe) PurpleNeon else CardBg)
+                                        .border(
+                                            1.dp,
+                                            if (message.isPinned) CyanNeon else CardBorder,
+                                            RoundedCornerShape(
+                                                topStart = 14.dp,
+                                                topEnd = 14.dp,
+                                                bottomStart = if (isMe) 14.dp else 0.dp,
+                                                bottomEnd = if (isMe) 0.dp else 14.dp
+                                            )
+                                        )
+                                        .pointerInput(message.messageId) {
+                                            detectTapGestures(
+                                                onDoubleTap = {
+                                                    coroutineScope.launch {
+                                                        repository.reactToRoomMessage(roomId, message.messageId, "❤️")
+                                                    }
+                                                },
+                                                onLongPress = {
+                                                    showMenu = true
+                                                }
+                                            )
+                                        }
+                                        .padding(10.dp)
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        if (message.isPinned) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(Icons.Default.PushPin, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(10.dp))
+                                                Text("PINNED", color = CyanNeon, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+                                            }
+                                        }
+                                        
+                                        when {
+                                            message.type == "image" && message.mediaURL != null -> {
+                                                AsyncImage(
+                                                    model = message.mediaURL,
+                                                    contentDescription = null,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .size(width = 180.dp, height = 220.dp)
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                )
+                                            }
+                                            message.type == "sticker" && message.mediaURL != null -> {
+                                                AsyncImage(
+                                                    model = message.mediaURL,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(100.dp)
+                                                )
+                                            }
+                                            message.type == "gif" && message.mediaURL != null -> {
+                                                AsyncImage(
+                                                    model = message.mediaURL,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(120.dp).clip(RoundedCornerShape(8.dp))
+                                                )
+                                            }
+                                            else -> {
+                                                Text(
+                                                    text = message.text ?: "",
+                                                    color = Color.White,
+                                                    fontSize = 13.5.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Context Actions Dropdown
+                                DropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false },
+                                    modifier = Modifier.background(CardBg)
+                                ) {
+                                    // Reaction row inside dropdown
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        listOf("❤️", "🔥", "😂", "😮", "😢", "💯").forEach { emoji ->
+                                            Text(
+                                                text = emoji,
+                                                fontSize = 18.sp,
+                                                modifier = Modifier
+                                                    .clickable {
+                                                        coroutineScope.launch {
+                                                            repository.reactToRoomMessage(roomId, message.messageId, emoji)
+                                                            showMenu = false
+                                                        }
+                                                    }
+                                                    .padding(2.dp)
+                                            )
+                                        }
+                                    }
+                                    Divider(color = CardBorder, thickness = 0.5.dp)
+                                    DropdownMenuItem(
+                                        text = { Text(if (message.isPinned) "Unpin Message" else "Pin Message", color = Color.White) },
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                repository.togglePinRoomMessage(roomId, message.messageId, message.isPinned)
+                                                showMenu = false
+                                            }
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, tint = CyanNeon) }
+                                    )
+                                }
+                            }
+                            
+                            // Reactions display row
+                            val activeReactions = message.reactions.filter { it.value.isNotEmpty() }
+                            if (activeReactions.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    activeReactions.forEach { (emoji, userList) ->
+                                        val reactedByMe = userList.contains(uid)
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (reactedByMe) CyanNeon.copy(0.15f) else CardBg.copy(0.6f))
+                                                .border(1.dp, if (reactedByMe) CyanNeon else CardBorder, RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    coroutineScope.launch {
+                                                        if (reactedByMe) {
+                                                            repository.removeReactionFromRoomMessage(roomId, message.messageId, emoji)
+                                                        } else {
+                                                            repository.reactToRoomMessage(roomId, message.messageId, emoji)
+                                                        }
+                                                    }
+                                                }
+                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(emoji, fontSize = 10.sp)
+                                            Text(userList.size.toString(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            message.timestamp?.let {
+                                Text(
+                                    text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.padding(top = 2.dp, end = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Media Uploading Loader
+            if (isUploadingMedia) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(color = PurpleNeon, modifier = Modifier.size(14.dp))
+                    Text("Uploading media to cloud...", color = PurpleNeon, fontSize = 11.sp)
+                }
+            }
+            
+            // Smart quick-replies pill list
+            if (typedText.isEmpty()) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(listOf("Awesome!", "Count me in!", "Nice work!", "Let's go!", "🔥")) { reply ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(CyanNeon.copy(0.08f))
+                                .border(1.dp, CyanNeon.copy(0.25f), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    coroutineScope.launch {
+                                        repository.sendRoomMessage(roomId, text = reply)
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(reply, color = CyanNeon, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            
+            // Typing indicators row
+            val typingUserIds = room?.typing?.filter { it.value && it.key != uid }?.keys ?: emptyList()
+            if (typingUserIds.isNotEmpty()) {
+                val typingUserNames = typingUserIds.map { allUsers.find { u -> u.userId == it }?.username ?: "Someone" }
+                val typingText = when {
+                    typingUserNames.size == 1 -> "${typingUserNames.first()} is typing..."
+                    typingUserNames.size > 1 -> "Several citizens are typing..."
+                    else -> ""
+                }
+                if (typingText.isNotEmpty()) {
+                    Text(
+                        text = typingText,
+                        color = TextMuted,
+                        fontSize = 10.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            
+            // 4. Input Composer Form
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(onClick = { imageLauncher.launch("image/*") }) {
+                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = CyanNeon)
+                }
+                IconButton(onClick = { showStickerSheet = true }) {
+                    Icon(Icons.Default.SentimentSatisfied, contentDescription = null, tint = CyanNeon)
+                }
+                
+                PremiumTextField(
+                    value = typedText,
+                    onValueChange = {
+                        typedText = it
+                        if (it.isNotEmpty()) {
+                            coroutineScope.launch {
+                                repository.setRoomTypingStatus(roomId, true)
+                                delay(2000)
+                                if (typedText == it) {
+                                    repository.setRoomTypingStatus(roomId, false)
+                                }
+                            }
+                        } else {
+                            coroutineScope.launch {
+                                repository.setRoomTypingStatus(roomId, false)
+                            }
+                        }
+                    },
+                    placeholder = "Message room...",
+                    modifier = Modifier.weight(1f)
+                )
+                
+                IconButton(
+                    onClick = {
+                        if (typedText.isEmpty()) return@IconButton
+                        coroutineScope.launch {
+                            try {
+                                repository.sendRoomMessage(roomId, text = typedText)
+                                typedText = ""
+                                repository.setRoomTypingStatus(roomId, false)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, e.message ?: "Moderated.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                }
+            }
+        }
+        
+        // 5. Right-Sliding Room Console/Admin Side Panel
+        AnimatedVisibility(
+            visible = showAdminPanel,
+            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { showAdminPanel = false }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .fillMaxWidth(0.8f)
+                        .background(CardBg)
+                        .border(1.dp, CardBorder, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+                        .clickable(enabled = false) {}
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // Title header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Room Admin Panel", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = CyanNeon)
+                            IconButton(onClick = { showAdminPanel = false }) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                            }
+                        }
+                        
+                        Divider(color = CardBorder, thickness = 1.dp)
+                        
+                        // Summon Citizens Section
+                        Text("SUMMON FRIENDS", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = PurpleNeon, letterSpacing = 1.sp)
+                        val nonMemberFriends = allUsers.filter { (room?.members?.contains(it.userId) == false) && it.userId != uid }
+                        if (nonMemberFriends.isEmpty()) {
+                            Text("All friends are already members.", color = TextMuted, fontSize = 12.sp)
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(nonMemberFriends) { friend ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(CardBg.copy(0.5f))
+                                            .padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            AsyncImage(
+                                                model = friend.profileImage.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.userId}" },
+                                                contentDescription = null,
+                                                modifier = Modifier.size(32.dp).clip(CircleShape)
+                                            )
+                                            Text(friend.username, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    try {
+                                                        repository.inviteFriendToRoom(roomId, friend.userId)
+                                                        Toast.makeText(context, "${friend.username} summoned.", Toast.LENGTH_SHORT).show()
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "Summoning failed.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(28.dp)
+                                        ) {
+                                            Text("Summon", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Divider(color = CardBorder, thickness = 0.5.dp)
+                        
+                        // Citizens List Section
+                        Text("MEMBERS (${room?.members?.size ?: 0})", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = PurpleNeon, letterSpacing = 1.sp)
+                        val roomMembers = allUsers.filter { room?.members?.contains(it.userId) == true }
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(roomMembers) { member ->
+                                val isOwner = member.userId == room?.createdBy
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(CardBg.copy(0.5f))
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = member.profileImage.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${member.userId}" },
+                                            contentDescription = null,
+                                            modifier = Modifier.size(32.dp).clip(CircleShape)
+                                        )
+                                        Column {
+                                            Text(member.username, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            if (isOwner) {
+                                                Text("Creator", color = CyanNeon, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    if (isCurrentUserCreator && !isOwner && member.userId != uid) {
+                                        IconButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    try {
+                                                        repository.removeRoomMember(roomId, member.userId)
+                                                        Toast.makeText(context, "${member.username} dismissed.", Toast.LENGTH_SHORT).show()
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "Dismissal failed.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(Icons.Default.RemoveCircle, contentDescription = null, tint = Color.Red.copy(0.7f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Divider(color = CardBorder, thickness = 0.5.dp)
+                        
+                        // Disconnect Button
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    try {
+                                        repository.leaveRoom(roomId)
+                                        navController.popBackStack()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Failed to disconnect.", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.15f)),
+                            border = BorderStroke(1.dp, Color.Red),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Disconnect from Room", color = Color.Red, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Sticker Dialog
+    if (showStickerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showStickerSheet = false },
+            containerColor = Color(0xFF161128)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Send Room Sticker", color = Color.White, fontWeight = FontWeight.Bold)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(stickers) { sticker ->
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .background(CardBg, RoundedCornerShape(12.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                                .clickable {
+                                    coroutineScope.launch {
+                                        repository.sendRoomMessage(roomId, mediaUrl = sticker.imageUrl, type = "sticker")
+                                        showStickerSheet = false
+                                    }
+                                }
+                                .padding(12.dp)
+                        ) {
+                            AsyncImage(model = sticker.imageUrl, contentDescription = null, modifier = Modifier.size(65.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppLaunchChip(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Surface(
+        modifier = Modifier
+            .clickable(enabled = enabled, onClick = onClick)
+            .clip(RoundedCornerShape(12.dp))
+            .border(
+                1.dp,
+                if (enabled) Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon))
+                else Brush.linearGradient(listOf(Color.Gray.copy(alpha = 0.3f), Color.Gray.copy(alpha = 0.3f))),
+                RoundedCornerShape(12.dp)
+            ),
+        color = if (enabled) CardBg.copy(alpha = 0.6f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = label,
+                color = if (enabled) Color.White else Color.Gray,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FocusPodScreen(navController: NavController, repository: FirebaseRepository) {
+    LaunchedEffect(Unit) {
+        repository.logFeatureUsage("focus_pod")
+    }
+    val uid = repository.currentUserId ?: ""
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var selectedDurationMinutes by remember { mutableStateOf(25) }
+    var secondsRemaining by remember { mutableStateOf(25 * 60) }
+    var isTimerRunning by remember { mutableStateOf(false) }
+    var initialSecondsSelected by remember { mutableStateOf(25 * 60) }
+
+    val userProfile by repository.subscribeToProfile(uid).safeCollect("FocusPod_profile", null).collectAsState(initial = null)
+    val focusSessions by repository.subscribeToFocusSessions().safeCollect("FocusPod_sessions", emptyList()).collectAsState(initial = emptyList())
+
+    var showCompletionDialog by remember { mutableStateOf(false) }
+    var earnedXpAmount by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(isTimerRunning) {
+        if (isTimerRunning) {
+            while (secondsRemaining > 0) {
+                delay(1000L)
+                secondsRemaining--
+            }
+            isTimerRunning = false
+            earnedXpAmount = selectedDurationMinutes * 10L
+            coroutineScope.launch {
+                try {
+                    repository.saveFocusSession(selectedDurationMinutes, earnedXpAmount)
+                    showCompletionDialog = true
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Cloud sync failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(selectedDurationMinutes) {
+        if (!isTimerRunning) {
+            secondsRemaining = selectedDurationMinutes * 60
+            initialSecondsSelected = selectedDurationMinutes * 60
+        }
+    }
+
+    val progressFraction = if (initialSecondsSelected > 0) {
+        secondsRemaining.toFloat() / initialSecondsSelected.toFloat()
+    } else {
+        1f
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Text("Focus Pod", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
+            Spacer(modifier = Modifier.weight(1f))
+            Surface(
+                color = CardBg,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, CyanNeon.copy(0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(16.dp))
+                    Text("${userProfile?.xp ?: 0} XP", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .size(260.dp)
+                .padding(20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                progress = progressFraction,
+                modifier = Modifier.fillMaxSize(),
+                color = CyanNeon,
+                strokeWidth = 10.dp,
+                trackColor = Color.White.copy(alpha = 0.05f)
+            )
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val mins = secondsRemaining / 60
+                val secs = secondsRemaining % 60
+                val formattedTime = String.format("%02d:%02d", mins, secs)
+                Text(
+                    text = formattedTime,
+                    color = Color.White,
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = if (isTimerRunning) "LOCKING IN" else "STANDBY",
+                    color = if (isTimerRunning) CyanNeon else TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = { isTimerRunning = !isTimerRunning },
+                modifier = Modifier
+                    .height(50.dp)
+                    .width(140.dp)
+                    .clip(RoundedCornerShape(25.dp)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isTimerRunning) Color.DarkGray else CyanNeon
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = if (isTimerRunning) Color.White else Color.Black
+                    )
+                    Text(
+                        text = if (isTimerRunning) "PAUSE" else "START",
+                        color = if (isTimerRunning) Color.White else Color.Black,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = {
+                    isTimerRunning = false
+                    secondsRemaining = selectedDurationMinutes * 60
+                    initialSecondsSelected = selectedDurationMinutes * 60
+                },
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(0.08f))
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = Color.White)
+            }
+        }
+
+        if (!isTimerRunning) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("FOCUS RANGE PRESETS", color = CyanNeon, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val presets = listOf(15, 25, 45, 60)
+                    presets.forEach { duration ->
+                        val selected = selectedDurationMinutes == duration
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedDurationMinutes = duration }
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp,
+                                    if (selected) CyanNeon else Color.Gray.copy(alpha = 0.3f),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .background(if (selected) CyanNeon.copy(alpha = 0.15f) else Color.Transparent)
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${duration}m",
+                                color = if (selected) CyanNeon else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "CUSTOM FOCUS: ${selectedDurationMinutes} MIN",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+                Slider(
+                    value = selectedDurationMinutes.toFloat(),
+                    onValueChange = { selectedDurationMinutes = it.toInt() },
+                    valueRange = 5f..120f,
+                    steps = 23,
+                    colors = SliderDefaults.colors(
+                        thumbColor = CyanNeon,
+                        activeTrackColor = CyanNeon,
+                        inactiveTrackColor = Color.Gray.copy(0.2f)
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 30.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Distraction-free mode active. Stay focused, citizen. 🌌",
+                    color = TextMuted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        if (focusSessions.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("TODAY'S SHIFT RECORDS", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(focusSessions.takeLast(5).reversed()) { sess ->
+                        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(16.dp))
+                                    Text("Focused for ${sess.durationMinutes}m", color = Color.White, fontSize = 13.sp)
+                                }
+                                Text("+${sess.xpEarned} XP", color = Color.Green, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+
+    if (showCompletionDialog) {
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatRoomsListScreen(navController: NavController, repository: FirebaseRepository) {
+    val uid = repository.currentUserId ?: ""
+    val rooms by repository.subscribeToChatRooms().safeCollect("ChatRooms_rooms", emptyList()).collectAsState(initial = emptyList())
+    val allUsers by repository.subscribeToAllUsers().safeCollect("ChatRooms_users", emptyList()).collectAsState(initial = emptyList())
+
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newRoomName by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Appbar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Text("Global Chat Hubs", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = { showCreateDialog = true },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(CyanNeon)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
+            }
+        }
+
+        Text("Select a global pod room to join real-time chat with other citizens.", color = TextMuted, fontSize = 12.sp)
+
+        if (rooms.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text("No active global rooms. Initialize one!", color = TextMuted, fontSize = 14.sp)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(rooms) { room ->
+                    val isParticipant = room.participants.contains(uid)
+                    val creator = allUsers.find { it.userId == room.createdBy }?.username ?: "Citizen"
+
+                    GlassmorphicCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            coroutineScope.launch {
+                                if (!isParticipant) {
+                                    repository.joinChatRoom(room.roomId)
+                                }
+                                navController.navigate("chat_room/${room.roomId}")
+                            }
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(room.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("Initialized by: @$creator", color = TextMuted, fontSize = 11.sp)
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("${room.participants.size} active", color = CyanNeon, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.NavigateNext, contentDescription = null, tint = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text("Initialize Global Room", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Provide a topic name for your group discussion board.", color = TextMuted, fontSize = 12.sp)
+                    PremiumTextField(
+                        value = newRoomName,
+                        onValueChange = { newRoomName = it },
+                        placeholder = "e.g., Coding Pod, Muscle Grind"
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newRoomName.isNotBlank()) {
+                            val name = newRoomName
+                            newRoomName = ""
+                            showCreateDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    repository.createChatRoom(name)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Failed to create room: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
+                ) {
+                    Text("Create", color = Color.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatRoomConversationScreen(navController: NavController, repository: FirebaseRepository, roomId: String) {
+    LaunchedEffect(Unit) {
+        repository.logFeatureUsage("chat_rooms")
+    }
+    val uid = repository.currentUserId ?: ""
+    val room by repository.subscribeToChatRoom(roomId).safeCollect("ChatRoomConv_room", null).collectAsState(initial = null)
+    val messages by repository.subscribeToChatRoomMessages(roomId).safeCollect("ChatRoomConv_messages", emptyList()).collectAsState(initial = emptyList())
+    val allUsers by repository.subscribeToAllUsers().safeCollect("ChatRoomConv_users", emptyList()).collectAsState(initial = emptyList())
+
+    var typedText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    var activeOutgoingCallId by remember { mutableStateOf<String?>(null) }
+    val activeCallState by remember(activeOutgoingCallId) {
+        if (activeOutgoingCallId != null) {
+            repository.subscribeToCallState(activeOutgoingCallId!!)
+        } else {
+            kotlinx.coroutines.flow.flow { emit(null) }
+        }
+    }.collectAsState(initial = null)
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CardBg)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(room?.name ?: "Chat Room", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                Text("${room?.participants?.size ?: 0} citizens connected", color = CyanNeon, fontSize = 11.sp)
+            }
+            
+            if (room != null && room!!.participants.size >= 2) {
+                IconButton(onClick = {
+                    val otherMember = room!!.participants.find { it != uid }
+                    if (otherMember != null) {
+                        coroutineScope.launch {
+                            try {
+                                val callId = repository.startCall(otherMember)
+                                activeOutgoingCallId = callId
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Call gateway fail: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Phone, contentDescription = "Call", tint = CyanNeon)
+                }
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            items(messages) { message ->
+                val isMe = message.senderId == uid
+                val senderName = allUsers.find { it.userId == message.senderId }?.username ?: "Citizen"
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
+                ) {
+                    Column(
+                        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                        modifier = Modifier.fillMaxWidth(0.85f)
+                    ) {
+                        if (!isMe) {
+                            Text(
+                                text = "@$senderName",
+                                color = CyanNeon,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isMe) PurpleNeon else CardBg)
+                                .border(1.dp, if (isMe) CardBorder else CyanNeon.copy(0.4f), RoundedCornerShape(16.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
+                        }
+                        message.timestamp?.let {
+                            Text(
+                                text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(it),
+                                color = TextMuted,
+                                fontSize = 9.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PremiumTextField(
+                value = typedText,
+                onValueChange = { typedText = it },
+                placeholder = "Message room...",
+                modifier = Modifier.weight(1f)
+            )
+
+            IconButton(
+                onClick = {
+                    if (typedText.isEmpty()) return@IconButton
+                    val prompt = typedText
+                    typedText = ""
+                    coroutineScope.launch {
+                        try {
+                            repository.sendChatRoomMessage(roomId, prompt)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+            ) {
+                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+            }
+        }
+    }
+
+    if (activeCallState != null && activeCallState!!.status != "ended") {
+        val call = activeCallState!!
+        val receiverProfile = allUsers.find { it.userId == call.receiverId }
+        val callStatus = call.status.toUpperCase()
+
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("📞 Outgoing Signal...", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = receiverProfile?.username ?: "Calling User",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "STATUS: $callStatus",
+                        color = if (call.status == "connected") Color.Green else CyanNeon,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            repository.endCall(call.callId)
+                            activeOutgoingCallId = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("DISCONNECT", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+@Composable
+fun LeaderboardScreen(navController: NavController, repository: FirebaseRepository) {
+    LaunchedEffect(Unit) {
+        repository.logFeatureUsage("leaderboard")
+    }
+    val uid = repository.currentUserId ?: ""
+    val leaderboardUsers by repository.subscribeToLeaderboard().safeCollect("Leaderboard_users", emptyList()).collectAsState(initial = emptyList())
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Text("Citizen Board", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
+        }
+
+        Text("Real-time rankings based on focus logs, work shifts, and social activities.", color = TextMuted, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+
+        if (leaderboardUsers.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = CyanNeon)
+            }
+        } else {
+            val top3 = leaderboardUsers.take(3)
+            if (top3.size >= 2) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        PodiumCard(rank = 2, user = top3[1], color = Color.LightGray)
+                    }
+                    Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                        PodiumCard(rank = 1, user = top3[0], color = Color(0xFFFFD700))
+                    }
+                    if (top3.size >= 3) {
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            PodiumCard(rank = 3, user = top3[2], color = Color(0xFFCD7F32))
+                        }
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(leaderboardUsers.size) { index ->
+                    val user = leaderboardUsers[index]
+                    val isMe = user.userId == uid
+                    val rank = index + 1
+                    GlassmorphicCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {}
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "#$rank",
+                                    color = if (rank <= 3) CyanNeon else TextMuted,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isMe) CyanNeon else Color.Gray.copy(0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = user.username.take(2).toUpperCase(),
+                                        color = if (isMe) Color.Black else Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = if (isMe) "${user.username} (You)" else user.username,
+                                        color = if (isMe) CyanNeon else Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text("${user.email}", color = TextMuted, fontSize = 10.sp)
+                                }
+                            }
+                            Text(
+                                text = "${user.xp} XP",
+                                color = if (isMe) CyanNeon else Color.Green,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PodiumCard(rank: Int, user: User, color: Color) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(2.dp, color, RoundedCornerShape(12.dp)),
+        color = CardBg
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = if (rank == 1) "🏆 Rank 1" else "Rank $rank",
+                color = color,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp
+            )
+            Text(
+                text = user.username,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                maxLines = 1
+            )
+            Text(
+                text = "${user.xp} XP",
+                color = Color.Green,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun OnboardingScreen(navController: NavController) {
+    val context = LocalContext.current
+    var currentSlideIndex by remember { mutableStateOf(0) }
+
+    val slides = remember {
+        listOf(
+            OnboardingSlide(
+                "NEXIFY CONNECT",
+                "Unlock the future of social productivity. Sync, study, and build pods with citizens worldwide.",
+                Icons.Default.Groups
+            ),
+            OnboardingSlide(
+                "FOCUS PODS",
+                "Lock in with custom Pomodoro focus runs. Keep your eyes on the grid and earn XP rewards.",
+                Icons.Default.Schedule
+            ),
+            OnboardingSlide(
+                "AI SIDEKICK",
+                "Vibe check with Nexify AI. Brainstorm viral reels, optimize system prompts, and get coding advice instantly.",
+                Icons.Default.AutoAwesome
+            ),
+            OnboardingSlide(
+                "CITIZEN BOARD",
+                "Track focus stats, stay on streaks, and climb the real-time global leaderboard ranking.",
+                Icons.Default.Star
+            )
+        )
+    }
+
+    val slide = slides[currentSlideIndex]
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = {
+                val sharedPrefs = context.getSharedPreferences("nexify_connect_prefs", 0)
+                sharedPrefs.edit().putBoolean("onboarding_complete", true).apply()
+                navController.navigate("login") {
+                    popUpTo("onboarding") { inclusive = true }
+                }
+            }) {
+                Text("SKIP", color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                    .border(2.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = slide.icon,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+
+            Text(
+                text = slide.title,
+                color = CyanNeon,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            Text(
+                text = slide.description,
+                color = Color.White,
+                fontSize = 14.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 20.sp
+            )
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                slides.forEachIndexed { idx, _ ->
+                    val active = idx == currentSlideIndex
+                    Box(
+                        modifier = Modifier
+                            .size(if (active) 10.dp else 8.dp)
+                            .clip(CircleShape)
+                            .background(if (active) CyanNeon else Color.Gray.copy(0.4f))
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    if (currentSlideIndex < slides.size - 1) {
+                        currentSlideIndex++
+                    } else {
+                        val sharedPrefs = context.getSharedPreferences("nexify_connect_prefs", 0)
+                        sharedPrefs.edit().putBoolean("onboarding_complete", true).apply()
+                        navController.navigate("login") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .clip(RoundedCornerShape(25.dp))
+            ) {
+                Text(
+                    text = if (currentSlideIndex == slides.size - 1) "GET STARTED" else "CONTINUE",
+                    color = Color.Black,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+data class OnboardingSlide(
+    val title: String,
+    val description: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(navController: NavController, repository: FirebaseRepository) {
+    val context = LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("nexify_connect_prefs", 0) }
+
+    var notificationsEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("notifications_enabled", true)) }
+    var privacyReceiptsEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("privacy_receipts", true)) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AmoledBg)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Text("Workspace Controls", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
+        }
+
+        Text("CITIZEN IDENTITY", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        GlassmorphicCard(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { navController.navigate("profile") }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.AccountCircle, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(24.dp))
+                    Column {
+                        Text("Customize Profile Avatar & Bio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Update public bios or details", color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+                Icon(Icons.Default.NavigateNext, contentDescription = null, tint = Color.White)
+            }
+        }
+
+        Text("ALERT CHANNELS & PREFERENCES", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Notifications, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Workspace Push Notifications", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Toggle new messages or XP reward reminders", color = TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { checked ->
+                            notificationsEnabled = checked
+                            sharedPrefs.edit().putBoolean("notifications_enabled", checked).apply()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.Black,
+                            checkedTrackColor = CyanNeon,
+                            uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Palette, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("System Visual Environment", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("AMOLED Dark Mode enabled by default", color = TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                    Text("DARK", color = CyanNeon, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
+
+        Text("SECURITY & GRID PROTECTION", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Private Status Sync", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Show presence records to DM contacts", color = TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                    Switch(
+                        checked = privacyReceiptsEnabled,
+                        onCheckedChange = { checked ->
+                            privacyReceiptsEnabled = checked
+                            sharedPrefs.edit().putBoolean("privacy_receipts", checked).apply()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.Black,
+                            checkedTrackColor = CyanNeon,
+                            uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+            }
+        }
+
+        Text("REFERRAL NETWORK", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        GlassmorphicCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Refer a fellow citizen to Nexify Connect. Once they initialize profile using your access code, both of you will receive +500 XP.",
+                    color = Color.White,
+                    fontSize = 13.sp
+                )
+                
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            try {
+                                val code = repository.generateInviteCode()
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("invite_code", code)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "Access code generated & copied: $code", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black)
+                        Text("GENERATE ACCESS CODE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(
+            onClick = {
+                repository.logout()
+                navController.navigate("login") {
+                    popUpTo(0) { inclusive = true }
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.15f)),
+            border = BorderStroke(1.dp, Color.Red),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .clip(RoundedCornerShape(25.dp))
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red)
+                Text("LOGOUT CITIZEN SESSION", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+

@@ -16,7 +16,7 @@ import { RoleBadge, RankBadge } from '../components/Badges';
 import { getRankForXP, getNextRank, getRankProgress } from '../services/xp';
 import { uploadAvatar } from '../services/profile';
 import { subscribeUserMusicStatus } from '../services/waves';
-import { useFitness } from '../hooks/useFitness';
+import { useFitness } from '../hooks/useFitnessContext';
 import { subscribeFocusData } from '../services/focus';
 
 const ProfileRow = ({ icon: Icon, color, label, onClick, delay = 0 }) => (

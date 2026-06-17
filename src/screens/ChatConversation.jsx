@@ -11,7 +11,7 @@ import { useToast } from '../components/ToastProvider';
 import {
   subscribeToMessages, sendTextMessage, sendMediaMessage,
   uploadChatAttachment, sendGifMessage, deleteMessage, addReaction,
-  canUserAccessChat
+  canUserAccessChat, createOrGetDMChat
 } from '../services/chat';
 import { getUserData, subscribeUserData } from '../services/users';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
@@ -128,6 +128,7 @@ const ChatConversation = () => {
   const messagesEndRef = useRef(null);
   const scrollRef = useRef(null);
   const typingTimer = useRef(null);
+  const lastProcessedMsgIdRef = useRef(null);
 
   /* load chat/user */
   useEffect(() => {
@@ -137,7 +138,23 @@ const ChatConversation = () => {
     let unsubChat = () => {};
     let unsubUser;
     const initChat = async () => {
-      const chatDoc = await getDoc(doc(db, 'chats', chatId));
+      let chatDoc = await getDoc(doc(db, 'chats', chatId));
+      if (!chatDoc.exists()) {
+        if (chatId.includes('_')) {
+          const parts = chatId.split('_');
+          const otherId = parts.find(id => id !== currentUser.uid);
+          if (otherId) {
+            try {
+              // Try to create the DM chat on the fly if users are friends
+              await createOrGetDMChat(currentUser.uid, otherId);
+              chatDoc = await getDoc(doc(db, 'chats', chatId));
+            } catch (err) {
+              console.warn("Failed to auto-create chat:", err);
+            }
+          }
+        }
+      }
+
       if (!chatDoc.exists()) {
         if (!didCancel) {
           setChatBlocked(true);
@@ -172,9 +189,13 @@ const ChatConversation = () => {
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         
         // AI Tag Detection
-        import('../services/ai').then(({ processAITag }) => {
-          processAITag(chatId, false, msgs);
-        });
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg && lastMsg.id !== lastProcessedMsgIdRef.current) {
+          lastProcessedMsgIdRef.current = lastMsg.id;
+          import('../services/ai').then(({ processAITag }) => {
+            processAITag(chatId, false, msgs);
+          });
+        }
       });
 
       unsubChat = onSnapshot(doc(db, 'chats', chatId), (snap) => {

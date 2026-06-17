@@ -64,16 +64,22 @@ import { subscribeSystemConfig } from './services/xp';
 import { NotificationProvider } from './components/NotificationProvider';
 
 const AppContent = () => {
+  const { currentUser } = useAuth();
+
   useEffect(() => {
     const splash = document.getElementById('splash');
     if (splash) {
       splash.style.opacity = '0';
       setTimeout(() => splash.remove(), 500);
     }
+  }, []);
 
+  // Only subscribe to system config (ranks/roles) after auth resolves
+  useEffect(() => {
+    if (!currentUser) return;
     const unsubSystem = subscribeSystemConfig();
     return () => { if (unsubSystem) unsubSystem(); };
-  }, []);
+  }, [currentUser?.uid]);
 
   return (
     <Router>
