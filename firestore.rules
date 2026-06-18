@@ -69,7 +69,7 @@ service cloud.firestore {
       return isSignedIn()
         && isChatParticipant(data)
         && isDeterministicDm(chatId, data)
-        && areFriends(data.participants[0], data.participants[1]);
+        && (areFriends(data.participants[0], data.participants[1]) || areFriendsAfter(data.participants[0], data.participants[1]));
     }
 
     function canCreateDmChat(chatId) {

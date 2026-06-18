@@ -67,7 +67,7 @@ const Chats = () => {
     const isOnline = otherUser.online;
     
     let timeStr = '';
-    if (chat.lastMessageAt) {
+    if (chat.lastMessageAt && typeof chat.lastMessageAt.toDate === 'function') {
       const date = chat.lastMessageAt.toDate();
       const now = new Date();
       if (date.toDateString() === now.toDateString()) {

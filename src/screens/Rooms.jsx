@@ -145,7 +145,14 @@ const Rooms = () => {
               ? "You haven't initialized any rooms. Create a new dimension to start your journey." 
               : "No public dimensions found in this frequency. Try another frequency."}
             actionText={activeTab === 'My Rooms' ? "INITIALIZE" : "RESCAN"}
-            onAction={() => activeTab === 'My Rooms' ? navigate('/create-room') : setLoading(true)}
+            onAction={() => {
+              if (activeTab === 'My Rooms') {
+                navigate('/create-room');
+              } else {
+                setLoading(true);
+                setTimeout(() => setLoading(false), 500);
+              }
+            }}
           />
         )}
 

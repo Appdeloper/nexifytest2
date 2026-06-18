@@ -58,6 +58,19 @@ export const subscribeUserChats = (uid, callback) => {
       const otherUid = members.find(id => id !== uid);
       return otherUid && friendIds.has(otherUid) && chat.id === getDMChatId(uid, otherUid);
     });
+
+    // Sort visibleChats in-memory by updatedAt (descending)
+    visibleChats.sort((a, b) => {
+      const getMillis = (timestamp) => {
+        if (!timestamp) return 0;
+        if (typeof timestamp.toMillis === 'function') return timestamp.toMillis();
+        if (typeof timestamp.toDate === 'function') return timestamp.toDate().getTime();
+        if (timestamp.seconds) return timestamp.seconds * 1000;
+        return new Date(timestamp).getTime() || 0;
+      };
+      return getMillis(b.updatedAt) - getMillis(a.updatedAt);
+    });
+
     callback(visibleChats);
   };
 
@@ -75,8 +88,7 @@ export const subscribeUserChats = (uid, callback) => {
 
   const q = query(
     collection(db, 'chats'),
-    where(`memberMap.${uid}`, '==', true),
-    orderBy('updatedAt', 'desc')
+    where(`memberMap.${uid}`, '==', true)
   );
   
   const unsubChats = onSnapshot(q, (snapshot) => {

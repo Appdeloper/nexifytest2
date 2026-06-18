@@ -100,8 +100,6 @@ const Tasks = () => {
 
   const handleComplete = async (task) => {
     await completeTask(currentUser.uid, task.id);
-    // Award actual task XP directly to Firestore (bypasses daily limit for tasks)
-    await awardXPWithLimit(currentUser.uid, 'COMPLETE_TASK');
     showToast(`+${task.xpReward} XP earned! 🎉`);
   };
 

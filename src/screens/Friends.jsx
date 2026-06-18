@@ -72,36 +72,47 @@ const Friends = () => {
   /* subscriptions */
   useEffect(() => {
     if (!currentUid) return;
-    const unsubFr = subscribeFriends(currentUid, async list => {
+    const unsubFr = subscribeFriends(currentUid, list => {
       setFriends(list);
-      const profiles = {};
-      for (const fr of list) {
+      list.forEach(async fr => {
         const otherId = fr.users.find(u => u !== currentUid);
-        if (otherId && !profiles[otherId]) {
-          profiles[otherId] = await getUserData(otherId);
+        if (otherId) {
+          try {
+            const profile = await getUserData(otherId);
+            if (profile) {
+              setFriendProfiles(prev => ({ ...prev, [otherId]: profile }));
+            }
+          } catch (e) {
+            console.error("Failed to load friend profile:", otherId, e);
+          }
         }
-      }
-      setFriendProfiles(profiles);
+      });
     });
-    const unsubIn = subscribeIncomingRequests(currentUid, async list => {
+    const unsubIn = subscribeIncomingRequests(currentUid, list => {
       setIncoming(list);
-      const profiles = {};
-      for (const r of list) {
-        if (!profiles[r.from]) {
-          try { profiles[r.from] = await getUserData(r.from); } catch { /* Profile is optional. */ }
+      list.forEach(async r => {
+        try {
+          const profile = await getUserData(r.from);
+          if (profile) {
+            setIncomingProfiles(prev => ({ ...prev, [r.from]: profile }));
+          }
+        } catch (e) {
+          console.error("Failed to load incoming request profile:", r.from, e);
         }
-      }
-      setIncomingProfiles(profiles);
+      });
     });
-    const unsubSent = subscribeSentRequests(currentUid, async list => {
+    const unsubSent = subscribeSentRequests(currentUid, list => {
       setSent(list);
-      const profiles = {};
-      for (const r of list) {
-        if (!profiles[r.to]) {
-          try { profiles[r.to] = await getUserData(r.to); } catch { /* Profile is optional. */ }
+      list.forEach(async r => {
+        try {
+          const profile = await getUserData(r.to);
+          if (profile) {
+            setSentProfiles(prev => ({ ...prev, [r.to]: profile }));
+          }
+        } catch (e) {
+          console.error("Failed to load sent request profile:", r.to, e);
         }
-      }
-      setSentProfiles(profiles);
+      });
     });
     return () => { unsubFr(); unsubIn(); unsubSent(); };
   }, [currentUid]);
