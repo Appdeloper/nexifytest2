@@ -26,6 +26,7 @@ import coil.compose.AsyncImage
 import com.nexify.connect.data.model.CallSession
 import com.nexify.connect.data.repository.FirebaseRepository
 import com.nexify.connect.services.safeCollect
+import com.nexify.connect.ui.components.UniversalBackButton
 import com.nexify.connect.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -75,6 +76,12 @@ fun CallScreen(
             .background(AmoledBg),
         contentAlignment = Alignment.Center
     ) {
+        UniversalBackButton(
+            navController = navController,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 16.dp, top = 40.dp)
+        )
         // Futuristic radial background glow
         Box(
             modifier = Modifier

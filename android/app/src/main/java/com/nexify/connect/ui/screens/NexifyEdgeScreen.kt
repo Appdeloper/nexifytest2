@@ -34,6 +34,7 @@ import com.nexify.connect.services.safeCollect
 import com.nexify.connect.ui.components.PremiumButton
 import com.nexify.connect.ui.components.PremiumCard
 import com.nexify.connect.ui.components.PremiumTextField
+import com.nexify.connect.ui.components.UniversalBackButton
 import com.nexify.connect.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -64,9 +65,7 @@ fun NexifyEdgeScreen(navController: NavController, repository: FirebaseRepositor
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
-            }
+            UniversalBackButton(navController = navController)
             Text("NEXIFY EDGE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
         }
 

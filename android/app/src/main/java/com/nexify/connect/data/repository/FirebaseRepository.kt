@@ -1141,13 +1141,29 @@ class FirebaseRepository {
     }
 
     suspend fun joinRoom(roomId: String) {
-        val uid = currentUserId ?: return
-        db.collection("rooms").document(roomId).update("members", FieldValue.arrayUnion(uid)).await()
+        val uid = currentUserId ?: throw Exception("Unauthorized session.")
+        val roomRef = db.collection("rooms").document(roomId)
+        val roomSnap = roomRef.get().await()
+        if (!roomSnap.exists()) {
+            throw Exception("Room sector not found.")
+        }
+        val batch = db.batch()
+        batch.update(roomRef, "members", FieldValue.arrayUnion(uid))
+        batch.update(roomRef, "memberMap.$uid", true)
+        val userRef = db.collection("users").document(uid)
+        batch.update(userRef, "joinedRooms", FieldValue.arrayUnion(roomId))
+        batch.commit().await()
     }
 
     suspend fun leaveRoom(roomId: String) {
         val uid = currentUserId ?: return
-        db.collection("rooms").document(roomId).update("members", FieldValue.arrayRemove(uid)).await()
+        val batch = db.batch()
+        val roomRef = db.collection("rooms").document(roomId)
+        batch.update(roomRef, "members", FieldValue.arrayRemove(uid))
+        batch.update(roomRef, "memberMap.$uid", FieldValue.delete())
+        val userRef = db.collection("users").document(uid)
+        batch.update(userRef, "joinedRooms", FieldValue.arrayRemove(roomId))
+        batch.commit().await()
     }
 
     suspend fun sendRoomMessage(
@@ -1668,6 +1684,39 @@ class FirebaseRepository {
         } catch (e: Exception) {
             NexifyLog.e("Telemetry", "Failed to log feature usage for $featureName", e)
         }
+    }
+
+    suspend fun updateProfileDetails(username: String, email: String, bio: String): Boolean {
+        val uid = currentUserId ?: return false
+        val updates = mapOf(
+            "username" to username.trim().lowercase(),
+            "email" to email.trim().lowercase(),
+            "bio" to bio
+        )
+        db.collection("users").document(uid).update(updates).await()
+        
+        try {
+            val user = auth.currentUser
+            if (user != null && user.email != email) {
+                user.updateEmail(email.trim().lowercase()).await()
+            }
+        } catch (e: Exception) {
+            NexifyLog.e("FirebaseRepository", "Failed to update auth email: ${e.message}")
+        }
+        return true
+    }
+
+    suspend fun reportBug(title: String, description: String, deviceDetails: String): Boolean {
+        val uid = currentUserId ?: "anonymous"
+        val bugMap = mapOf(
+            "title" to title,
+            "description" to description,
+            "deviceDetails" to deviceDetails,
+            "reportedBy" to uid,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+        db.collection("bugs").add(bugMap).await()
+        return true
     }
 }
 

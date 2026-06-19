@@ -1,26 +1,36 @@
 package com.nexify.connect.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.nexify.connect.ui.theme.*
 
@@ -88,26 +98,61 @@ fun PremiumButton(
     modifier: Modifier = Modifier,
     colors: List<Color> = listOf(PurpleNeon, CyanNeon)
 ) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues(),
+    val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    
+    val buttonGlowAlpha by animateFloatAsState(if (isPressed) 0.6f else 0.25f)
+    val scaleFactor by animateFloatAsState(if (isPressed) 0.97f else 1.0f)
+    
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(Brush.horizontalGradient(colors))
+            .padding(vertical = 4.dp)
     ) {
+        // Neon ambient shadow glow behind button
         Box(
             modifier = Modifier
+                .matchParentSize()
+                .blur(8.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    Brush.horizontalGradient(colors),
+                    alpha = buttonGlowAlpha
+                )
+        )
+        
+        Button(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+            interactionSource = interactionSource,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            contentPadding = PaddingValues(),
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 24.dp),
-            contentAlignment = Alignment.Center
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.horizontalGradient(colors))
+                .border(
+                    BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                    RoundedCornerShape(24.dp)
+                )
         ) {
-            Text(
-                text = text,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp, horizontal = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = text,
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp
+                )
+            }
         }
     }
 }
@@ -141,4 +186,58 @@ fun PremiumTextField(
         shape = RoundedCornerShape(16.dp),
         modifier = modifier.fillMaxWidth()
     )
+}
+
+@Composable
+fun UniversalBackButton(
+    navController: NavController,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
+    val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    
+    val glowAlpha by animateFloatAsState(if (isPressed) 0.8f else 0.0f)
+    val borderGlowColor = if (isPressed) CyanNeon else Color.White.copy(alpha = 0.15f)
+    
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size(44.dp)
+    ) {
+        // Glowing halo behind the button when pressed
+        if (glowAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .blur(6.dp)
+                    .clip(CircleShape)
+                    .background(CyanNeon.copy(alpha = glowAlpha))
+            )
+        }
+        
+        IconButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (onClick != null) {
+                    onClick()
+                } else {
+                    navController.popBackStack()
+                }
+            },
+            interactionSource = interactionSource,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(0x66161128)) // glass transparent fill
+                .border(BorderStroke(1.dp, borderGlowColor), CircleShape)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Navigate Back",
+                tint = if (isPressed) CyanNeon else Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
 }
