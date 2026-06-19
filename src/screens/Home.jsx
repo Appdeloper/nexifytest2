@@ -425,7 +425,12 @@ const Home = () => {
         {/* FITNESS & MUSIC ROW */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 40 }}>
           {/* Nexify Fit */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 28, padding: 20, backdropFilter: 'blur(20px)' }}>
+          <motion.div 
+            whileHover={{ y: -4, backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+            transition={{ duration: 0.2 }}
+            onClick={() => navigate('/nexify-fit')}
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 28, padding: 20, backdropFilter: 'blur(20px)', cursor: 'pointer' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
               <Activity size={20} color="#10b981" />
               <span style={{ fontSize: 15, fontWeight: 900 }}>Nexify Fit</span>
@@ -444,15 +449,18 @@ const Home = () => {
                     <circle cx="25" cy="25" r="22" fill="none" stroke="rgba(16, 185, 129, 0.1)" strokeWidth="4" />
                     <motion.circle 
                       cx="25" cy="25" r="22" fill="none" stroke="#10b981" strokeWidth="4" 
-                      strokeDasharray="138" initial={{ strokeDashoffset: 138 }} animate={{ strokeDashoffset: 138 * (1 - 0.68) }} 
+                      strokeDasharray="138" initial={{ strokeDashoffset: 138 }} 
+                      animate={{ strokeDashoffset: 138 * (1 - Math.min((fitnessStats?.steps || 0) / (fitnessStats?.stepGoal || 10000), 1)) }} 
                       transition={{ duration: 2 }} strokeLinecap="round" 
                     />
                   </svg>
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900 }}>68%</div>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900 }}>
+                    {Math.min(Math.round(((fitnessStats?.steps || 0) / (fitnessStats?.stepGoal || 10000)) * 100), 100)}%
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Nexify Waves */}
           <div style={{ 

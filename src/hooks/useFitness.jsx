@@ -15,6 +15,46 @@ export const FitnessProvider = ({ children }) => {
   const currentSteps = useRef(0);
   const syncTimeout = useRef(null);
 
+  const addSteps = async (amount) => {
+    if (!currentUser) return;
+    const extraCalories = Math.round(amount * 0.04);
+    
+    let targetSteps = currentSteps.current + amount;
+    let targetCalories = (stats.calories || 0) + extraCalories;
+
+    setStats(prev => {
+      targetSteps = (prev.steps || 0) + amount;
+      targetCalories = (prev.calories || 0) + extraCalories;
+      currentSteps.current = targetSteps;
+      lastSyncSteps.current = targetSteps;
+      return {
+        ...prev,
+        steps: targetSteps,
+        calories: targetCalories
+      };
+    });
+
+    await updateFitnessData(currentUser.uid, {
+      steps: targetSteps,
+      calories: targetCalories
+    }).catch(() => {});
+  };
+
+  const requestMotionPermission = async () => {
+    if (typeof window !== 'undefined' && 
+        typeof DeviceMotionEvent !== 'undefined' && 
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const permissionState = await DeviceMotionEvent.requestPermission();
+        return permissionState === 'granted';
+      } catch (e) {
+        console.error("DeviceMotion permission request failed:", e);
+        return false;
+      }
+    }
+    return true;
+  };
+
   useEffect(() => {
     if (loading || !currentUser) return;
     
@@ -82,7 +122,7 @@ export const FitnessProvider = ({ children }) => {
   }, [currentUser?.uid, loading]);
 
   return (
-    <FitnessContext.Provider value={{ stats, setStats }}>
+    <FitnessContext.Provider value={{ stats, setStats, addSteps, requestMotionPermission }}>
       {children}
     </FitnessContext.Provider>
   );

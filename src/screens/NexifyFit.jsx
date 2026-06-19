@@ -41,14 +41,27 @@ const NexifyFit = () => {
   const { showToast } = useToast();
   const { currentUser } = useAuth();
   
-  const { stats, setStats } = useFitness();
-
+  const { stats, setStats, addSteps, requestMotionPermission } = useFitness();
   const [cat, setCat] = useState('All');
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [exIdx, setExIdx] = useState(0);
   const [timer, setTimer] = useState(0);
   const [running, setRunning] = useState(false);
   const timerRef = useRef(null);
+
+  const [simulating, setSimulating] = useState(false);
+  const simIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (simulating) {
+      simIntervalRef.current = setInterval(() => {
+        addSteps(3);
+      }, 1000);
+    } else {
+      clearInterval(simIntervalRef.current);
+    }
+    return () => clearInterval(simIntervalRef.current);
+  }, [simulating, addSteps]);
 
   useEffect(() => {
     return () => clearInterval(timerRef.current);
@@ -167,6 +180,7 @@ const NexifyFit = () => {
               <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Steps</div>
             </Ring>
             <div style={{ fontSize: 10, color: '#00dfd8', marginTop: 8, fontWeight: 700 }}>Active: {Math.floor(stats.steps / 100)}m {stats.steps % 60}s</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontWeight: 600 }}>Distance: {(stats.steps * 0.00075).toFixed(2)} km</div>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Goal: {stats.stepGoal}</div>
           </div>
           
@@ -179,6 +193,73 @@ const NexifyFit = () => {
             </Ring>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>Goal: {stats.calorieGoal}</div>
           </div>
+        </div>
+
+        {/* Step Engine Controller */}
+        <div style={{ background: 'rgba(10,15,31,0.8)', border: '1px solid rgba(0,223,216,0.15)', borderRadius: 16, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Footprints size={18} color="#00dfd8" />
+              <span style={{ fontWeight: 800, fontSize: 14 }}>Step Engine Controller</span>
+            </div>
+            {simulating && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,223,216,0.1)', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(0,223,216,0.2)' }}>
+                <span className="sim-dot" />
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#00dfd8', letterSpacing: 0.5 }}>SIMULATING</span>
+              </div>
+            )}
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <button 
+              onClick={() => { addSteps(1000); showToast('+1,000 steps logged! 👟'); }} 
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s' }}
+            >
+              Log +1,000 Steps
+            </button>
+            <button 
+              onClick={() => { addSteps(5000); showToast('+5,000 steps logged! 🏃‍♂️'); }} 
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s' }}
+            >
+              Log +5,000 Steps
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' ? '1fr 1fr' : '1fr', gap: 8 }}>
+            <button 
+              onClick={() => { setSimulating(!simulating); showToast(simulating ? 'Simulation stopped.' : 'Walking simulation activated! 🚶‍♂️'); }} 
+              style={{ background: simulating ? 'linear-gradient(135deg, #00dfd8, #0072ff)' : 'rgba(0,223,216,0.1)', border: simulating ? 'none' : '1px solid rgba(0,223,216,0.25)', borderRadius: 10, padding: '12px', color: simulating ? 'black' : '#00dfd8', fontWeight: 800, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s' }}
+            >
+              {simulating ? <Pause size={14} /> : <Play size={14} />}
+              {simulating ? 'Pause Simulation' : 'Activate Walk Simulation'}
+            </button>
+
+            {typeof window !== 'undefined' && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && (
+              <button 
+                onClick={async () => {
+                  const ok = await requestMotionPermission();
+                  showToast(ok ? 'Motion sensor active! ✓' : 'Motion sensor denied.');
+                }} 
+                style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 10, padding: '12px', color: '#a78bfa', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s' }}
+              >
+                Enable Motion Sensor
+              </button>
+            )}
+          </div>
+          
+          <style>{`
+            .sim-dot {
+              width: 6px;
+              height: 6px;
+              background-color: #00dfd8;
+              border-radius: 50%;
+              animation: simPulse 1.2s infinite ease-in-out;
+            }
+            @keyframes simPulse {
+              0%, 100% { opacity: 0.3; transform: scale(0.8); }
+              50% { opacity: 1; transform: scale(1.2); }
+            }
+          `}</style>
         </div>
 
         {/* Stats row */}
