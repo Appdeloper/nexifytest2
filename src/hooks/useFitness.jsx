@@ -14,6 +14,11 @@ export const FitnessProvider = ({ children }) => {
   const lastSyncSteps = useRef(0);
   const currentSteps = useRef(0);
   const syncTimeout = useRef(null);
+  
+  // Pedometer Algorithm State
+  const magnitudeHistory = useRef([]);
+  const lastStepTime = useRef(0);
+  const stepState = useRef('below');
 
   const addSteps = async (amount) => {
     if (!currentUser) return;
@@ -98,16 +103,58 @@ export const FitnessProvider = ({ children }) => {
 
     // Use device motion API if available (mobile)
     if (typeof window !== 'undefined' && window.DeviceMotionEvent) {
-      let lastZ = null;
-      let threshold = 2.0; // Acceleration threshold
-      
+      const HISTORY_SIZE = 15;
+      const STEP_DEBOUNCE_MS = 380; // Minimum time between human steps
+      const ACCEL_THRESHOLD_DELTA = 1.35; // Min peak-to-peak difference to register step (filters noise)
+
       devicemotionListener = (e) => {
-        if (e.acceleration && e.acceleration.z !== null) {
-          let z = e.acceleration.z;
-          if (lastZ !== null && Math.abs(z - lastZ) > threshold) {
-             handleStep();
+        // Fallback to acceleration (no gravity) if accelerationIncludingGravity is not supported
+        const acc = e.accelerationIncludingGravity || e.acceleration;
+        if (!acc) return;
+
+        const x = acc.x || 0;
+        const y = acc.y || 0;
+        const z = acc.z || 0;
+        
+        // Calculate magnitude of 3D acceleration vector (orientation independent)
+        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        
+        // Add to rolling history window
+        magnitudeHistory.current.push(magnitude);
+        if (magnitudeHistory.current.length > HISTORY_SIZE) {
+          magnitudeHistory.current.shift();
+        }
+        
+        if (magnitudeHistory.current.length < HISTORY_SIZE) return;
+        
+        // Calculate min, max, average to establish dynamic threshold
+        let minVal = magnitudeHistory.current[0];
+        let maxVal = magnitudeHistory.current[0];
+        let sum = 0;
+        
+        for (let i = 0; i < magnitudeHistory.current.length; i++) {
+          const val = magnitudeHistory.current[i];
+          if (val < minVal) minVal = val;
+          if (val > maxVal) maxVal = val;
+          sum += val;
+        }
+        
+        const avg = sum / magnitudeHistory.current.length;
+        const dynamicThreshold = avg;
+        const delta = maxVal - minVal;
+        
+        // Peak detection logic
+        const now = Date.now();
+        if (delta > ACCEL_THRESHOLD_DELTA) {
+          if (magnitude > dynamicThreshold) {
+            if (stepState.current === 'below' && (now - lastStepTime.current) > STEP_DEBOUNCE_MS) {
+              handleStep();
+              lastStepTime.current = now;
+              stepState.current = 'above';
+            }
+          } else {
+            stepState.current = 'below';
           }
-          lastZ = z;
         }
       };
       window.addEventListener('devicemotion', devicemotionListener);
