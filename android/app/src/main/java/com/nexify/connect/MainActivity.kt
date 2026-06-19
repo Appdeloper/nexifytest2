@@ -243,6 +243,31 @@ class MainActivity : ComponentActivity() {
                                 composable("leaderboard") {
                                     LeaderboardScreen(navController = navController, repository = repository)
                                 }
+                                composable("fitness") {
+                                    FitnessScreen(navController = navController, repository = repository)
+                                }
+                                composable("nexify_edge") {
+                                    NexifyEdgeScreen(navController = navController, repository = repository)
+                                }
+                                composable(
+                                    route = "call/{callId}/{otherUserId}/{isOutgoing}",
+                                    arguments = listOf(
+                                        navArgument("callId") { type = NavType.StringType },
+                                        navArgument("otherUserId") { type = NavType.StringType },
+                                        navArgument("isOutgoing") { type = NavType.BoolType }
+                                    )
+                                ) { backStackEntry ->
+                                    val callId = backStackEntry.arguments?.getString("callId") ?: ""
+                                    val otherUserId = backStackEntry.arguments?.getString("otherUserId") ?: ""
+                                    val isOutgoing = backStackEntry.arguments?.getBoolean("isOutgoing") ?: false
+                                    CallScreen(
+                                        navController = navController,
+                                        repository = repository,
+                                        callId = callId,
+                                        otherUserId = otherUserId,
+                                        isOutgoing = isOutgoing
+                                    )
+                                }
                             }
                         }
                     }

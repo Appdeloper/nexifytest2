@@ -1365,6 +1365,136 @@ class FirebaseRepository {
         awaitClose { listener.remove() }
     }
 
+    suspend fun saveFitnessData(date: String, steps: Int, calories: Double, streak: Int, xpRewarded: Long) {
+        val uid = currentUserId ?: return
+        val record = FitnessRecord(
+            date = date,
+            steps = steps,
+            calories = calories,
+            streak = streak,
+            xpRewarded = xpRewarded,
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("fitness").document(uid).collection("records").document(date).set(record).await()
+        if (xpRewarded > 0L) {
+            rewardUserXp(xpRewarded)
+        }
+    }
+
+    fun subscribeToFitnessData(): Flow<List<FitnessRecord>> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val q = db.collection("fitness").document(uid).collection("records")
+            .orderBy("timestamp")
+        val listener = q.addSnapshotListener { snap, err ->
+            if (err != null) {
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            val list = snap?.documents?.mapNotNull { it.toObject(FitnessRecord::class.java) } ?: emptyList()
+            trySend(list)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToEdgePosts(): Flow<List<EdgePost>> = callbackFlow {
+        val listener = db.collection("edge_posts")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val list = snap?.documents?.mapNotNull { it.toObject(EdgePost::class.java) } ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun subscribeToSavedEdgePosts(): Flow<List<String>> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val ref = db.collection("users").document(uid).collection("saved_edge").document("posts")
+        val listener = ref.addSnapshotListener { snap, err ->
+            if (err != null || snap == null || !snap.exists()) {
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            val ids = snap.get("savedIds") as? List<*>
+            val stringIds = ids?.mapNotNull { it as? String } ?: emptyList()
+            trySend(stringIds)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun saveEdgePost(postId: String) {
+        val uid = currentUserId ?: return
+        val ref = db.collection("users").document(uid).collection("saved_edge").document("posts")
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(ref)
+            val currentIds = if (snapshot.exists()) {
+                (snapshot.get("savedIds") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+            } else {
+                emptyList()
+            }
+            if (!currentIds.contains(postId)) {
+                val updatedIds = currentIds + postId
+                transaction.set(ref, mapOf("savedIds" to updatedIds), SetOptions.merge())
+            }
+            null
+        }.await()
+    }
+
+    suspend fun unsaveEdgePost(postId: String) {
+        val uid = currentUserId ?: return
+        val ref = db.collection("users").document(uid).collection("saved_edge").document("posts")
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(ref)
+            if (snapshot.exists()) {
+                val currentIds = (snapshot.get("savedIds") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                if (currentIds.contains(postId)) {
+                    val updatedIds = currentIds - postId
+                    transaction.set(ref, mapOf("savedIds" to updatedIds), SetOptions.merge())
+                }
+            }
+            null
+        }.await()
+    }
+
+    fun subscribeToUserPreferences(): Flow<List<String>> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val ref = db.collection("users").document(uid).collection("preferences").document("settings")
+        val listener = ref.addSnapshotListener { snap, err ->
+            if (err != null || snap == null || !snap.exists()) {
+                trySend(listOf("Tech", "Focus", "Students", "Motivation"))
+                return@addSnapshotListener
+            }
+            val interests = snap.get("interests") as? List<*>
+            val stringInterests = interests?.mapNotNull { it as? String } ?: listOf("Tech", "Focus", "Students", "Motivation")
+            trySend(stringInterests)
+        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun updateUserPreferences(interests: List<String>) {
+        val uid = currentUserId ?: return
+        val ref = db.collection("users").document(uid).collection("preferences").document("settings")
+        ref.set(mapOf("interests" to interests), SetOptions.merge()).await()
+    }
+
     suspend fun generateInviteCode(): String {
         val uid = currentUserId ?: throw Exception("Not logged in")
         val code = "NEXIFY-" + UUID.randomUUID().toString().take(8).toUpperCase()

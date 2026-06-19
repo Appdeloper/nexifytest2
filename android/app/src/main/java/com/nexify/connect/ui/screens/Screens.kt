@@ -884,16 +884,14 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
             }
             item {
                 AppLaunchChip(
-                    label = "🏋️ Fit (Soon)",
-                    onClick = { /* Locked */ },
-                    enabled = false
+                    label = "🏋️ Nexify Fit",
+                    onClick = { navController.navigate("fitness") }
                 )
             }
             item {
                 AppLaunchChip(
-                    label = "⚡ Edge (Soon)",
-                    onClick = { /* Locked */ },
-                    enabled = false
+                    label = "⚡ Nexify Edge",
+                    onClick = { navController.navigate("nexify_edge") }
                 )
             }
             item {
@@ -1196,7 +1194,8 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
             ) {
                 IconButton(onClick = { navController.popBackStack() }) {
                     Icon(Icons.Default.ArrowBack, contentDescription = null, color = Color.White)
@@ -1211,6 +1210,37 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                             fontSize = 11.sp
                         )
                     }
+                }
+            }
+            
+            // Calling Actions (Voice Call & Video Call buttons)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    coroutineScope.launch {
+                        try {
+                            val callId = repository.startCall(otherUserId)
+                            navController.navigate("call/$callId/$otherUserId/true")
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Voice call signal failed.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Phone, contentDescription = "Voice Call", tint = CyanNeon)
+                }
+                IconButton(onClick = {
+                    coroutineScope.launch {
+                        try {
+                            val callId = repository.startCall(otherUserId)
+                            navController.navigate("call/$callId/$otherUserId/true")
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Video call signal failed.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Videocam, contentDescription = "Video Call", tint = PurpleNeon)
                 }
             }
         }

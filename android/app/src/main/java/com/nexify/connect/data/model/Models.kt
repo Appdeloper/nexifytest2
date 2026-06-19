@@ -107,4 +107,25 @@ data class CallSession(
     val timestamp: Long = 0L
 )
 
+data class FitnessRecord(
+    val date: String = "",
+    val steps: Int = 0,
+    val calories: Double = 0.0,
+    val streak: Int = 0,
+    val xpRewarded: Long = 0L,
+    val timestamp: Long = 0L
+)
+
+data class EdgePost(
+    @DocumentId val id: String = "",
+    val title: String = "",
+    val category: String = "",
+    val type: String = "", // ai, tip, motivation, tool, news
+    val content: String = "",
+    val summary: String = "",
+    val createdAt: Date? = null
+)
+
+
+
 
