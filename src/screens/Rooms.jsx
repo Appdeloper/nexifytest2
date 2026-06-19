@@ -45,7 +45,15 @@ const Rooms = () => {
 
   const displayedRooms = getDisplayedRooms();
 
-  const typeColors = { Study: '#00dfd8', Gaming: '#8b5cf6', Focus: '#10b981', Professional: '#3b82f6', Public: '#f59e0b' };
+  const typeColors = { 
+    Study: '#00dfd8', 
+    Gaming: '#8b5cf6', 
+    Focus: '#10b981', 
+    Professional: '#3b82f6', 
+    Public: '#f59e0b',
+    Community: '#9b51e0',
+    COMMUNITY: '#9b51e0'
+  };
 
   return (
     <div className="fade-in col" style={{ height: '100%', background: 'var(--bg-main)' }}>
@@ -160,7 +168,7 @@ const Rooms = () => {
           <div className="col gap-4">
             {displayedRooms.map((room, i) => {
               const isMember = room.memberMap?.[currentUser?.uid];
-              const typeColor = typeColors[room.type] || 'var(--primary)';
+              const typeColor = typeColors[room.type] || '#00dfd8';
               return (
                 <motion.div
                   key={room.id}

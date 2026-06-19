@@ -1,7 +1,8 @@
 import { db } from './firebase';
 import { 
   collection, doc, setDoc, updateDoc,
-  onSnapshot, query, where, orderBy, serverTimestamp, getDoc
+  onSnapshot, query, where, orderBy, serverTimestamp, getDoc,
+  arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { uploadToCloudinary } from './cloudinary';
 
@@ -341,4 +342,142 @@ export const deleteMessage = async (chatId, messageId) => {
 export const addReaction = async (chatId, messageId, uid, emoji) => {
   const msgRef = doc(db, `chats/${chatId}/messages`, messageId);
   await updateDoc(msgRef, { [`reactions.${uid}`]: emoji });
+};
+
+// ── GROUP CHAT SYSTEM SERVICES ──────────────────────────────
+export const subscribeUserGroups = (uid, callback) => {
+  const q = query(
+    collection(db, 'groups'),
+    where('members', 'array-contains', uid)
+  );
+  return onSnapshot(q, (snapshot) => {
+    const grps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(grps);
+  }, (err) => {
+    console.warn("Groups subscription failed:", err);
+    callback([]);
+  });
+};
+
+export const subscribeGroupMessages = (groupId, callback) => {
+  const q = query(
+    collection(db, `group_messages/${groupId}/messages`),
+    orderBy('timestamp', 'asc')
+  );
+  return onSnapshot(q, (snapshot) => {
+    const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(msgs);
+  }, (err) => {
+    console.warn("Group messages subscription failed:", err);
+    callback([]);
+  });
+};
+
+export const createGroup = async (name, members, groupImage, adminId) => {
+  const newGroupRef = doc(collection(db, 'groups'));
+  const allMembers = Array.from(new Set([adminId, ...members]));
+  const groupData = {
+    groupId: newGroupRef.id,
+    name: name,
+    adminId: adminId,
+    members: allMembers,
+    groupImage: groupImage || `https://api.dicebear.com/7.x/identicon/svg?seed=${name}`,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastMessage: 'Pod initialized.',
+    lastMessageAt: serverTimestamp()
+  };
+  await setDoc(newGroupRef, groupData);
+  return newGroupRef.id;
+};
+
+export const sendGroupTextMessage = async (groupId, senderId, text) => {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('Cannot send empty message.');
+  const msgRef = doc(collection(db, `group_messages/${groupId}/messages`));
+  const timestamp = new Date();
+  await setDoc(msgRef, {
+    messageId: msgRef.id,
+    senderId,
+    text: trimmed,
+    timestamp: timestamp,
+    createdAt: timestamp,
+    seen: false
+  });
+  
+  await updateDoc(doc(db, 'groups', groupId), {
+    lastMessage: trimmed,
+    lastMessageAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }).catch(() => {});
+};
+
+export const sendGroupMediaMessage = async (groupId, senderId, file, type, url) => {
+  const msgRef = doc(collection(db, `group_messages/${groupId}/messages`));
+  const timestamp = new Date();
+  await setDoc(msgRef, {
+    messageId: msgRef.id,
+    senderId,
+    text: '',
+    imageUrl: type === 'image' ? url : null,
+    mediaURL: url,
+    fileName: file.name,
+    fileSize: file.size,
+    type: type,
+    timestamp: timestamp,
+    createdAt: timestamp,
+    seen: false
+  });
+
+  const body = `[${type === 'image' ? 'Image' : 'File'}]`;
+  await updateDoc(doc(db, 'groups', groupId), {
+    lastMessage: body,
+    lastMessageAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }).catch(() => {});
+};
+
+export const sendGroupGifMessage = async (groupId, senderId, gifUrl) => {
+  const msgRef = doc(collection(db, `group_messages/${groupId}/messages`));
+  const timestamp = new Date();
+  await setDoc(msgRef, {
+    messageId: msgRef.id,
+    senderId,
+    text: '',
+    type: 'gif',
+    mediaURL: gifUrl,
+    timestamp: timestamp,
+    createdAt: timestamp,
+    seen: false
+  });
+
+  await updateDoc(doc(db, 'groups', groupId), {
+    lastMessage: '[GIF]',
+    lastMessageAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }).catch(() => {});
+};
+
+export const deleteGroupMessage = async (groupId, messageId) => {
+  const msgRef = doc(db, `group_messages/${groupId}/messages`, messageId);
+  await updateDoc(msgRef, { deleted: true, text: '', mediaURL: null, imageUrl: null });
+};
+
+export const addGroupReaction = async (groupId, messageId, uid, emoji) => {
+  const msgRef = doc(db, `group_messages/${groupId}/messages`, messageId);
+  await updateDoc(msgRef, { [`reactions.${uid}`]: emoji });
+};
+
+export const addMemberToGroup = async (groupId, targetUserId) => {
+  const groupRef = doc(db, 'groups', groupId);
+  await updateDoc(groupRef, {
+    members: arrayUnion(targetUserId)
+  });
+};
+
+export const removeMemberFromGroup = async (groupId, targetUserId) => {
+  const groupRef = doc(db, 'groups', groupId);
+  await updateDoc(groupRef, {
+    members: arrayRemove(targetUserId)
+  });
 };

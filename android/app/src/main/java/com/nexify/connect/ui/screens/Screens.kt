@@ -2397,23 +2397,6 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
             containerColor = Color(0xFF161128),
             shape = RoundedCornerShape(16.dp)
         )
-    }   repository.createRoom(newRoomName, newRoomDesc, newRoomCategory, false)
-                                newRoomName = ""
-                                newRoomDesc = ""
-                                showCreateDialog = false
-                            }
-                        }
-                    }
-                )
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
-                    Text("CANCEL", color = Color.Red)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
     }
 }
 

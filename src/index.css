@@ -718,3 +718,67 @@ h1, h2, h3, h4, h5, h6 {
   0% { box-shadow: 0 0 10px rgba(0, 223, 216, 0.2); }
   100% { box-shadow: 0 0 25px rgba(0, 223, 216, 0.5); }
 }
+
+/* Premium Glassmorphic Card (Google Stitch Style) */
+.premium-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s;
+}
+
+.premium-card:hover {
+  border-color: rgba(0, 242, 254, 0.25);
+  box-shadow: 0 8px 30px rgba(0, 242, 254, 0.08);
+}
+
+.premium-card:active {
+  transform: scale(0.98);
+}
+
+.neon-btn {
+  background: var(--grad-premium);
+  border: none;
+  border-radius: var(--radius-md);
+  color: black;
+  padding: 10px 20px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 223, 216, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.neon-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(0, 223, 216, 0.2);
+}
+
+.glass-btn {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: white;
+  padding: 10px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.glass-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.1);
+}

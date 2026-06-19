@@ -15,6 +15,7 @@ import Signup from './screens/Signup';
 const Home = React.lazy(() => import('./screens/Home'));
 const Chats = React.lazy(() => import('./screens/Chats'));
 const ChatConversation = React.lazy(() => import('./screens/ChatConversation'));
+const GroupChat = React.lazy(() => import('./screens/GroupChat'));
 const Calls = React.lazy(() => import('./screens/Calls'));
 const Rooms = React.lazy(() => import('./screens/Rooms'));
 const CreateRoom = React.lazy(() => import('./screens/CreateRoom'));
@@ -92,6 +93,7 @@ const AppContent = () => {
           <Route path="/home" element={<React.Suspense fallback={<LoadingFallback />}><Home /></React.Suspense>} />
           <Route path="/chats" element={<React.Suspense fallback={<LoadingFallback />}><Chats /></React.Suspense>} />
           <Route path="/chat-conversation/:chatId" element={<React.Suspense fallback={<LoadingFallback />}><ChatConversation /></React.Suspense>} />
+          <Route path="/group-chat/:groupId" element={<React.Suspense fallback={<LoadingFallback />}><GroupChat /></React.Suspense>} />
           <Route path="/calls" element={<React.Suspense fallback={<LoadingFallback />}><Calls /></React.Suspense>} />
           <Route path="/rooms" element={<React.Suspense fallback={<LoadingFallback />}><Rooms /></React.Suspense>} />
           <Route path="/create-room" element={<React.Suspense fallback={<LoadingFallback />}><CreateRoom /></React.Suspense>} />
