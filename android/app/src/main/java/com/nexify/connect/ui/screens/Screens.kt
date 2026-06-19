@@ -1447,7 +1447,7 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                         .clip(CircleShape)
                         .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                    Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
                 }
             }
         }
@@ -1868,7 +1868,7 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
                     .clip(CircleShape)
                     .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
             ) {
-                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
             }
         }
     }
@@ -2624,7 +2624,7 @@ fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
                     .clip(CircleShape)
                     .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
             ) {
-                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
             }
         }
     }
@@ -3505,13 +3505,13 @@ fun RoomChatScreen(
                             .clip(CircleShape)
                             .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
                     ) {
-                        Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                        Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
                     }
                 }
             }
             
             // 5. Right-Sliding Room Console/Admin Side Panel
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = showAdminPanel,
                 enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
                 exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
@@ -3878,7 +3878,7 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
     var isTimerRunning by remember { mutableStateOf(false) }
     var initialSecondsSelected by remember { mutableStateOf(25 * 60) }
 
-    val userProfile by repository.subscribeToProfile(uid).safeCollect("FocusPod_profile", null).collectAsState(initial = null)
+    val userProfile by repository.subscribeToUser(uid).safeCollect("FocusPod_profile", null).collectAsState(initial = null)
     val focusSessions by repository.subscribeToFocusSessions().safeCollect("FocusPod_sessions", emptyList()).collectAsState(initial = emptyList())
 
     var showCompletionDialog by remember { mutableStateOf(false) }
@@ -4454,7 +4454,7 @@ fun ChatRoomConversationScreen(navController: NavController, repository: Firebas
                     .clip(CircleShape)
                     .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
             ) {
-                Icon(Icons.Default.Send, contentDescription = null, color = Color.White)
+                Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
             }
         }
     }
