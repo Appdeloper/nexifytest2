@@ -21,7 +21,9 @@ data class User(
     val streakFreezes: Int = 0,
     val lastActiveDate: String = "",
     val activeDates: List<String> = emptyList(),
-    val frozenDates: List<String> = emptyList()
+    val frozenDates: List<String> = emptyList(),
+    val rank: String = "rookie",
+    val level: Int = 1
 )
 
 data class Chat(
