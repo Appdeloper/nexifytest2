@@ -13,8 +13,11 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import java.util.UUID
+import java.util.Calendar as JavaCalendar
 
 class FirebaseRepository {
     private val auth = FirebaseAuth.getInstance()
@@ -131,6 +134,139 @@ class FirebaseRepository {
         }
         updatePresence(true)
         return true
+     }
+
+     suspend fun checkAndIncrementStreak() {
+        val uid = currentUserId ?: return
+        try {
+            val userRef = db.collection("users").document(uid)
+            val snap = userRef.get().await()
+            if (!snap.exists()) return
+
+            val data = snap.data ?: return
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val todayStr = sdf.format(Date())
+            val lastActiveDate = data["lastActiveDate"] as? String ?: ""
+
+            if (lastActiveDate == todayStr) {
+                return
+            }
+
+            var streak = (data["streak"] as? Long)?.toInt() ?: 0
+            var streakFreezes = (data["streakFreezes"] as? Long)?.toInt() ?: 1 // default to 1 free freeze
+            var highestStreak = (data["highestStreak"] as? Long)?.toInt() ?: 0
+            val activeDates = (data["activeDates"] as? List<String>)?.toMutableList() ?: mutableListOf()
+            val frozenDates = (data["frozenDates"] as? List<String>)?.toMutableList() ?: mutableListOf()
+            var streakUpdateToast: Map<String, Any>? = null
+
+            if (lastActiveDate.isNotEmpty()) {
+                val today = sdf.parse(todayStr)
+                val lastActive = sdf.parse(lastActiveDate)
+                val diffTime = Math.abs(today.time - lastActive.time)
+                val diffDays = Math.ceil(diffTime.toDouble() / (1000 * 60 * 60 * 24)).toInt()
+
+                if (diffDays == 1) {
+                    // Regular consecutive check-in
+                    streak += 1
+                    var xpReward = 10L
+                    var freezeReward = 0
+                    
+                    // Add dailyLogin XP directly
+                    var currentXp = (data["xp"] as? Long) ?: 0L
+                    currentXp += 10L
+                    
+                    // Check milestones
+                    if (streak == 3) {
+                        xpReward += 50L
+                        currentXp += 50L
+                        streakUpdateToast = mapOf("type" to "milestone", "streak" to 3, "xp" to 50, "freezes" to 0)
+                    } else if (streak == 7) {
+                        xpReward += 150L
+                        currentXp += 150L
+                        streakFreezes += 1
+                        freezeReward += 1
+                        streakUpdateToast = mapOf("type" to "milestone", "streak" to 7, "xp" to 150, "freezes" to 1)
+                    } else if (streak == 14) {
+                        xpReward += 250L
+                        currentXp += 250L
+                        streakFreezes += 1
+                        freezeReward += 1
+                        streakUpdateToast = mapOf("type" to "milestone", "streak" to 14, "xp" to 250, "freezes" to 1)
+                    } else if (streak == 30) {
+                        xpReward += 500L
+                        currentXp += 500L
+                        streakFreezes += 2
+                        freezeReward += 2
+                        streakUpdateToast = mapOf("type" to "milestone", "streak" to 30, "xp" to 500, "freezes" to 2)
+                    } else {
+                        streakUpdateToast = mapOf("type" to "daily", "streak" to streak, "xp" to 10, "freezes" to 0)
+                    }
+
+                    // Level calculation: 100 XP per level
+                    val level = (currentXp / 100).toInt() + 1
+                    userRef.update(mapOf("xp" to currentXp, "level" to level)).await()
+                    
+                } else if (diffDays == 2) {
+                    // Missed exactly 1 day. Check if we have a streak freeze!
+                    if (streakFreezes > 0) {
+                        streakFreezes -= 1
+                        // Keep current streak!
+                        // Yesterday's date
+                        val cal = JavaCalendar.getInstance()
+                        cal.add(JavaCalendar.DAY_OF_YEAR, -1)
+                        val yesterdayStr = sdf.format(cal.time)
+                        frozenDates.add(yesterdayStr)
+                        if (frozenDates.size > 30) frozenDates.removeAt(0)
+
+                        streakUpdateToast = mapOf("type" to "freeze_used", "streak" to streak, "remainingFreezes" to streakFreezes)
+
+                        // Log activity
+                        val activity = mapOf(
+                            "userId" to uid,
+                            "userName" to (data["displayName"] as? String ?: "Citizen"),
+                            "userPhoto" to (data["photoURL"] as? String ?: ""),
+                            "type" to "ACHIEVEMENT_UNLOCKED",
+                            "text" to "used a ❄️ Streak Freeze to keep a $streak-day streak alive!",
+                            "timestamp" to FieldValue.serverTimestamp()
+                        )
+                        db.collection("activityFeed").add(activity).await()
+
+                    } else {
+                        // Reset
+                        streak = 1
+                        streakUpdateToast = mapOf("type" to "reset", "oldStreak" to streak, "newStreak" to 1)
+                    }
+                } else {
+                    // Reset
+                    streak = 1
+                    streakUpdateToast = mapOf("type" to "reset", "oldStreak" to streak, "newStreak" to 1)
+                }
+            } else {
+                streak = 1
+                streakUpdateToast = mapOf("type" to "welcome", "streak" to 1)
+            }
+
+            if (streak > highestStreak) {
+                highestStreak = streak
+            }
+
+            activeDates.add(todayStr)
+            if (activeDates.size > 30) activeDates.removeAt(0)
+
+            userRef.update(mapOf(
+                "streak" to streak,
+                "highestStreak" to highestStreak,
+                "streakFreezes" to streakFreezes,
+                "lastActiveDate" to todayStr,
+                "activeDates" to activeDates,
+                "frozenDates" to frozenDates,
+                "streakUpdateToast" to streakUpdateToast,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )).await()
+
+        } catch (e: Exception) {
+            NexifyLog.e("FirebaseRepository", "Failed to check and increment daily streak: ${e.message}", e)
+        }
     }
 
     fun logout() {

@@ -16,7 +16,12 @@ data class User(
     val requestsReceived: List<String> = emptyList(),
     val blockedUsers: List<String> = emptyList(),
     val xp: Long = 0L,
-    val streak: Int = 0
+    val streak: Int = 0,
+    val highestStreak: Int = 0,
+    val streakFreezes: Int = 0,
+    val lastActiveDate: String = "",
+    val activeDates: List<String> = emptyList(),
+    val frozenDates: List<String> = emptyList()
 )
 
 data class Chat(

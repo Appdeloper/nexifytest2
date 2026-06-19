@@ -162,6 +162,9 @@ class MainActivity : ComponentActivity() {
                                     SignUpScreen(navController = navController, repository = repository)
                                 }
                                 composable("home") {
+                                    LaunchedEffect(Unit) {
+                                        repository.checkAndIncrementStreak()
+                                    }
                                     ChatListScreen(navController = navController, repository = repository)
                                 }
                                 composable("find") {

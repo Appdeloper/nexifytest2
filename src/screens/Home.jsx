@@ -5,11 +5,15 @@ import {
   Search, Bell, Sparkles, ChevronRight, Target, Trophy,
   Plus, Play, LayoutGrid, Brain, Activity, Radio, 
   Flame, Star, TrendingUp, CheckCircle2, Music,
-  Shield, ArrowRight, Headphones, Timer, Heart, Monitor
+  Shield, ArrowRight, Headphones, Timer, Heart, Monitor,
+  Snowflake, X, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
+import { db } from '../services/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { buyStreakFreeze } from '../services/auth';
 import { subscribeUserChats } from '../services/chat';
 import { subscribeFriends } from '../services/friends';
 import { subscribeTasks, completeTask } from '../services/tasks';
@@ -95,6 +99,44 @@ const Home = () => {
     });
     return () => unsub();
   }, [currentUser?.uid]);
+
+  const [showStreakModal, setShowStreakModal] = useState(false);
+  const [buyingFreeze, setBuyingFreeze] = useState(false);
+  const [activeToast, setActiveToast] = useState(null);
+
+  useEffect(() => {
+    if (currentUser?.streakUpdateToast) {
+      setActiveToast(currentUser.streakUpdateToast);
+      const clearToast = async () => {
+        try {
+          const userRef = doc(db, 'users', currentUser.uid);
+          await updateDoc(userRef, { streakUpdateToast: null });
+        } catch (e) {
+          console.warn("Failed to clear streak toast flag:", e);
+        }
+      };
+      clearToast();
+    }
+  }, [currentUser?.streakUpdateToast]);
+
+  const handleBuyFreeze = async () => {
+    if (!currentUser) return;
+    if (buyingFreeze) return;
+    setBuyingFreeze(true);
+    try {
+      const res = await buyStreakFreeze(currentUser.uid);
+      if (res.success) {
+        showToast("❄️ Streak Freeze purchased!", "success");
+        if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+      } else {
+        showToast(res.error, "error");
+      }
+    } catch (e) {
+      showToast("Purchase failed: " + e.message, "error");
+    } finally {
+      setBuyingFreeze(false);
+    }
+  };
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#000', color: 'white', position: 'relative', overflow: 'hidden' }}>
@@ -212,13 +254,38 @@ const Home = () => {
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Level {currentUser?.level || 1}</div>
           </motion.div>
           {/* Card 2: Streak */}
-          <motion.div whileHover={{ scale: 1.02 }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, backdropFilter: 'blur(20px)' }}>
-            <div style={{ background: 'rgba(255,0,128,0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(255,0,128,0.2)' }}>
-              <Flame size={18} color="#ff0080" fill="#ff0080" />
+          <motion.div 
+            whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(255,0,128,0.15)' }} 
+            onClick={() => setShowStreakModal(true)}
+            style={{ 
+              background: 'rgba(255,255,255,0.02)', 
+              border: '1px solid rgba(255,255,255,0.06)', 
+              borderRadius: 24, 
+              padding: 20, 
+              backdropFilter: 'blur(20px)',
+              cursor: 'pointer',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ background: 'rgba(255,0,128,0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(255,0,128,0.2)' }}>
+                <Flame 
+                  size={18} 
+                  color="#ff0080" 
+                  fill={currentUser?.streak > 0 ? "#ff0080" : "transparent"} 
+                  style={{ filter: currentUser?.streak > 0 ? 'drop-shadow(0 0 8px #ff0080)' : 'none' }}
+                />
+              </div>
+              {currentUser?.streakFreezes > 0 && (
+                <div style={{ background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 12, padding: '2px 8px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: '#38bdf8' }}>
+                  <Snowflake size={10} color="#38bdf8" />
+                  <span>x{currentUser.streakFreezes}</span>
+                </div>
+              )}
             </div>
             <div style={{ fontSize: 10, fontWeight: 800, color: '#ff0080', letterSpacing: 1, marginBottom: 4 }}>STREAK</div>
             <div style={{ fontSize: 16, fontWeight: 900 }}>{currentUser?.streak || 0} Days</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Current Streak</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Tap to view details</div>
           </motion.div>
           {/* Card 3: XP */}
           <motion.div whileHover={{ scale: 1.02 }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, backdropFilter: 'blur(20px)' }}>
@@ -607,6 +674,391 @@ const Home = () => {
           </motion.button>
         </div>
       </div>
+
+      {/* ── Streak Modal ── */}
+      <AnimatePresence>
+        {showStreakModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20
+            }}
+            onClick={() => setShowStreakModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              style={{
+                width: '100%',
+                maxWidth: 400,
+                background: 'rgba(10,6,18,0.7)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5), 0 0 40px rgba(121,40,202,0.1)',
+                borderRadius: 32,
+                padding: 24,
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Background glow lines */}
+              <div style={{ position: 'absolute', top: '-20%', left: '-20%', width: '140%', height: '50%', background: 'radial-gradient(circle, rgba(255,0,128,0.08) 0%, transparent 60%)', pointerEvents: 'none' }} />
+
+              {/* Title Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Flame size={20} color="#ff0080" fill="#ff0080" />
+                  <span style={{ fontSize: 13, fontWeight: 900, color: '#ff0080', letterSpacing: 1.5 }}>FLAME STATUS</span>
+                </div>
+                <button 
+                  onClick={() => setShowStreakModal(false)}
+                  style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Main Flame Card */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 24 }}>
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.05, 1],
+                    filter: ['drop-shadow(0 0 15px rgba(255,0,128,0.4))', 'drop-shadow(0 0 25px rgba(255,0,128,0.7))', 'drop-shadow(0 0 15px rgba(255,0,128,0.4))']
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    background: 'radial-gradient(circle, rgba(255,0,128,0.15) 0%, transparent 70%)',
+                    width: 120,
+                    height: 120,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16
+                  }}
+                >
+                  <Flame size={64} color="#ff0080" fill="#ff0080" />
+                </motion.div>
+                <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1 }}>{currentUser?.streak || 0} Day Streak</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                  Personal Best: <span style={{ color: '#fff', fontWeight: 600 }}>{currentUser?.highestStreak || currentUser?.streak || 0} days</span>
+                </div>
+              </div>
+
+              {/* Weekly History */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5, marginBottom: 12, textTransform: 'uppercase' }}>Weekly Activity</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+                  {(() => {
+                    const days = [];
+                    const today = new Date();
+                    for (let i = 6; i >= 0; i--) {
+                      const d = new Date();
+                      d.setDate(today.getDate() - i);
+                      days.push(d);
+                    }
+                    
+                    const activeDates = currentUser?.activeDates || [];
+                    const frozenDates = currentUser?.frozenDates || [];
+                    const todayStr = today.toLocaleDateString('en-CA');
+
+                    return days.map((day, idx) => {
+                      const dayStr = day.toLocaleDateString('en-CA');
+                      const isToday = dayStr === todayStr;
+                      const isActive = activeDates.includes(dayStr);
+                      const isFrozen = frozenDates.includes(dayStr);
+                      
+                      const dayName = day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1);
+
+                      let bgColor = 'rgba(255,255,255,0.02)';
+                      let borderColor = 'rgba(255,255,255,0.05)';
+                      let iconColor = 'rgba(255,255,255,0.2)';
+                      let displayIcon = null;
+
+                      if (isActive) {
+                        bgColor = 'rgba(255,0,128,0.1)';
+                        borderColor = 'rgba(255,0,128,0.3)';
+                        displayIcon = <Flame size={12} color="#ff0080" fill="#ff0080" />;
+                      } else if (isFrozen) {
+                        bgColor = 'rgba(56,189,248,0.1)';
+                        borderColor = 'rgba(56,189,248,0.3)';
+                        displayIcon = <Snowflake size={12} color="#38bdf8" />;
+                      } else if (isToday) {
+                        bgColor = 'rgba(255,255,255,0.05)';
+                        borderColor = '#00dfd8';
+                        displayIcon = <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#00dfd8', animation: 'ping 1s infinite alternate' }} />;
+                      } else {
+                        displayIcon = <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>•</span>;
+                      }
+
+                      return (
+                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                          <div style={{ fontSize: 10, color: isToday ? '#00dfd8' : 'rgba(255,255,255,0.4)', fontWeight: isToday ? 800 : 500 }}>{dayName}</div>
+                          <div style={{ 
+                            width: 36, 
+                            height: 36, 
+                            borderRadius: 12, 
+                            background: bgColor, 
+                            border: `1px solid ${borderColor}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: isActive ? '0 0 10px rgba(255,0,128,0.1)' : (isFrozen ? '0 0 10px rgba(56,189,248,0.1)' : 'none')
+                          }}>
+                            {displayIcon}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Streak Freezes Section */}
+              <div style={{ background: 'rgba(56,189,248,0.03)', border: '1px solid rgba(56,189,248,0.1)', borderRadius: 20, padding: 16, marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ background: 'rgba(56,189,248,0.1)', width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Snowflake size={14} color="#38bdf8" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#38bdf8' }}>Streak Freezes</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{currentUser?.streakFreezes || 0} available</div>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleBuyFreeze}
+                    disabled={buyingFreeze || (currentUser?.xp || 0) < 200}
+                    style={{
+                      background: (currentUser?.xp || 0) >= 200 ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'rgba(255,255,255,0.03)',
+                      border: (currentUser?.xp || 0) >= 200 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 12,
+                      padding: '6px 12px',
+                      fontSize: 11,
+                      color: (currentUser?.xp || 0) >= 200 ? '#fff' : 'rgba(255,255,255,0.3)',
+                      fontWeight: 800,
+                      cursor: (currentUser?.xp || 0) >= 200 && !buyingFreeze ? 'pointer' : 'default',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    Buy <span style={{ opacity: 0.8 }}>200 XP</span>
+                  </motion.button>
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
+                  Streak Freezes are automatically applied to preserve your active login streak if you miss a day.
+                </div>
+              </div>
+
+              {/* Milestones Info */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5, marginBottom: 10, textTransform: 'uppercase' }}>Milestone Rewards</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { days: 3, reward: '50 XP' },
+                    { days: 7, reward: '150 XP + ❄️ 1 Freeze' },
+                    { days: 14, reward: '250 XP + ❄️ 1 Freeze' },
+                    { days: 30, reward: '500 XP + ❄️ 2 Freezes' }
+                  ].map((milestone, mIdx) => {
+                    const isReached = (currentUser?.streak || 0) >= milestone.days;
+                    return (
+                      <div 
+                        key={mIdx} 
+                        style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          background: isReached ? 'rgba(255,0,128,0.02)' : 'transparent',
+                          border: isReached ? '1px solid rgba(255,0,128,0.1)' : '1px solid rgba(255,255,255,0.02)',
+                          borderRadius: 12,
+                          padding: '8px 12px',
+                          opacity: isReached ? 1 : 0.5
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <CheckCircle2 size={14} color={isReached ? '#ff0080' : 'rgba(255,255,255,0.2)'} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: isReached ? '#ff0080' : '#fff' }}>{milestone.days} Day Milestone</span>
+                        </div>
+                        <span style={{ fontSize: 10, color: isReached ? '#fff' : 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{milestone.reward}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Streak Milestone / Action Popups ── */}
+      <AnimatePresence>
+        {activeToast && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.8)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.8, y: 50, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20 }}
+              style={{
+                width: '100%',
+                maxWidth: 360,
+                background: 'rgba(10,6,18,0.9)',
+                border: '2px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 0 30px rgba(255,0,128,0.2)',
+                borderRadius: 28,
+                padding: 32,
+                textAlign: 'center',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Confetti Glow Background */}
+              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle, rgba(255,0,128,0.15) 0%, transparent 60%)', pointerEvents: 'none', zIndex: 0 }} />
+              
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                {activeToast.type === 'milestone' && (
+                  <>
+                    <motion.div 
+                      animate={{ rotate: [0, 10, -10, 10, 0], scale: [1, 1.1, 1] }} 
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      style={{ fontSize: 48, marginBottom: 16 }}
+                    >
+                      🎉
+                    </motion.div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: '#ff0080', letterSpacing: 2, marginBottom: 8 }}>STREAK MILESTONE</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.2, marginBottom: 12 }}>{activeToast.streak} Days Burning!</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>
+                      Outstanding consistency! You've unlocked exclusive milestone rewards:
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Bonus Rewards</span>
+                        <span style={{ fontSize: 14, fontWeight: 900, color: '#ff0080' }}>+{activeToast.xp} XP</span>
+                      </div>
+                      {activeToast.freezes > 0 && (
+                        <div style={{ background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.1)', borderRadius: 16, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Streak Freeze</span>
+                          <span style={{ fontSize: 14, fontWeight: 900, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Snowflake size={14} color="#38bdf8" /> +{activeToast.freezes}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {activeToast.type === 'freeze_used' && (
+                  <>
+                    <motion.div 
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      style={{ fontSize: 48, marginBottom: 16 }}
+                    >
+                      ❄️
+                    </motion.div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: '#38bdf8', letterSpacing: 2, marginBottom: 8 }}>STREAK PROTECTED</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.2, marginBottom: 12 }}>Streak Frozen!</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>
+                      You missed yesterday, but a **Streak Freeze** was consumed to save your **{activeToast.streak}-Day Streak**!
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '12px 16px', fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 28 }}>
+                      Remaining Freezes: <span style={{ color: '#fff', fontWeight: 700 }}>{activeToast.remainingFreezes}</span>
+                    </div>
+                  </>
+                )}
+
+                {activeToast.type === 'reset' && (
+                  <>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>💨</div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: 2, marginBottom: 8 }}>STREAK COOLED DOWN</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.2, marginBottom: 12 }}>Streak Reset</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 28 }}>
+                      Your previous streak of **{activeToast.oldStreak} days** has ended. Keep logging in daily to rebuild your fire!
+                    </div>
+                  </>
+                )}
+
+                {activeToast.type === 'welcome' && (
+                  <>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>🔥</div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: '#ff0080', letterSpacing: 2, marginBottom: 8 }}>STREAK STARTED</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.2, marginBottom: 12 }}>Flame Ignited!</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 28 }}>
+                      Welcome! You've started a **1-Day Streak**. Log in every day to earn rewards and keep your flame alive.
+                    </div>
+                  </>
+                )}
+
+                {activeToast.type === 'daily' && (
+                  <>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>🔥</div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: '#ff0080', letterSpacing: 2, marginBottom: 8 }}>DAILY LOGIN</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.2, marginBottom: 12 }}>Streak: {activeToast.streak} Days!</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>
+                      Your flame is burning bright at {activeToast.streak} days.
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '12px 16px', fontSize: 12, color: '#00dfd8', fontWeight: 800, marginBottom: 28 }}>
+                      Earned +10 XP for checking in!
+                    </div>
+                  </>
+                )}
+
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setActiveToast(null)}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #7928ca 0%, #b800b8 100%)',
+                    border: 'none',
+                    borderRadius: 16,
+                    padding: '14px',
+                    color: '#fff',
+                    fontWeight: 900,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 15px rgba(121,40,202,0.4)'
+                  }}
+                >
+                  Awesome!
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         @keyframes shine {

@@ -172,7 +172,12 @@ export const checkAndIncrementStreak = async (uid, data) => {
   }
 
   let newStreak = data.streak || 0;
-  
+  let newStreakFreezes = data.streakFreezes !== undefined ? data.streakFreezes : 1; // Default to 1 free freeze
+  let newHighestStreak = data.highestStreak || 0;
+  let activeDates = data.activeDates || [];
+  let frozenDates = data.frozenDates || [];
+  let streakUpdateToast = null;
+
   if (lastActiveDate) {
     const today = new Date(todayStr);
     const lastActive = new Date(lastActiveDate);
@@ -180,23 +185,151 @@ export const checkAndIncrementStreak = async (uid, data) => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays === 1) {
+      // Regular consecutive check-in
       newStreak += 1;
-      import('./xp').then(({ addXP }) => addXP(uid, 'dailyLogin')).catch(() => {});
-    } else if (diffDays > 1) {
+      // Add XP for login
+      try {
+        const { addXP } = await import('./xp');
+        await addXP(uid, 'dailyLogin').catch(() => {});
+      } catch (err) {
+        console.warn("Failed to load addXP module:", err);
+      }
+      
+      // Streak Milestones
+      if (newStreak === 3) {
+        try {
+          const { addXP } = await import('./xp');
+          await addXP(uid, 'streakMilestone_3', 50).catch(() => {});
+        } catch (_) {}
+        streakUpdateToast = { type: 'milestone', streak: 3, xp: 50, freezes: 0 };
+      } else if (newStreak === 7) {
+        newStreakFreezes += 1;
+        try {
+          const { addXP } = await import('./xp');
+          await addXP(uid, 'streakMilestone_7', 150).catch(() => {});
+        } catch (_) {}
+        streakUpdateToast = { type: 'milestone', streak: 7, xp: 150, freezes: 1 };
+      } else if (newStreak === 14) {
+        newStreakFreezes += 1;
+        try {
+          const { addXP } = await import('./xp');
+          await addXP(uid, 'streakMilestone_14', 250).catch(() => {});
+        } catch (_) {}
+        streakUpdateToast = { type: 'milestone', streak: 14, xp: 250, freezes: 1 };
+      } else if (newStreak === 30) {
+        newStreakFreezes += 2;
+        try {
+          const { addXP } = await import('./xp');
+          await addXP(uid, 'streakMilestone_30', 500).catch(() => {});
+        } catch (_) {}
+        streakUpdateToast = { type: 'milestone', streak: 30, xp: 500, freezes: 2 };
+      } else {
+        streakUpdateToast = { type: 'daily', streak: newStreak, xp: 10, freezes: 0 };
+      }
+    } else if (diffDays === 2) {
+      // Missed exactly 1 day. Check if we have a streak freeze!
+      if (newStreakFreezes > 0) {
+        newStreakFreezes -= 1;
+        // Keep the current streak!
+        // Record the missed day (yesterday) as frozen
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+        frozenDates = [...frozenDates, yesterdayStr];
+        if (frozenDates.length > 30) frozenDates.shift();
+        
+        streakUpdateToast = { type: 'freeze_used', streak: newStreak, remainingFreezes: newStreakFreezes };
+        
+        // Log activity
+        await logActivity({
+          userId: uid,
+          userName: data.displayName,
+          userPhoto: data.photoURL,
+          type: ACTIVITY_TYPES.ACHIEVEMENT_UNLOCKED,
+          text: `used a ❄️ Streak Freeze to keep a ${newStreak}-day streak alive!`,
+        }).catch(() => {});
+      } else {
+        // No freeze available, reset
+        newStreak = 1;
+        streakUpdateToast = { type: 'reset', oldStreak: data.streak, newStreak: 1 };
+      }
+    } else {
+      // Missed multiple days, reset
       newStreak = 1;
+      streakUpdateToast = { type: 'reset', oldStreak: data.streak, newStreak: 1 };
     }
   } else {
+    // First time initializing streak
     newStreak = 1;
+    streakUpdateToast = { type: 'welcome', streak: 1 };
   }
+
+  // Update highest streak
+  if (newStreak > newHighestStreak) {
+    newHighestStreak = newStreak;
+  }
+
+  // Add today to active dates list
+  activeDates = [...activeDates, todayStr];
+  if (activeDates.length > 30) activeDates.shift();
 
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, {
     streak: newStreak,
+    highestStreak: newHighestStreak,
+    streakFreezes: newStreakFreezes,
     lastActiveDate: todayStr,
+    activeDates: activeDates,
+    frozenDates: frozenDates,
+    streakUpdateToast: streakUpdateToast,
     updatedAt: serverTimestamp()
   }).catch((err) => {
     console.warn("Failed to update daily login streak:", err.message);
   });
+};
+
+export const buyStreakFreeze = async (uid) => {
+  if (!uid) return { success: false, error: 'User ID required' };
+  
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) return { success: false, error: 'User does not exist' };
+  
+  const data = snap.data();
+  const xp = data.xp || 0;
+  const streakFreezes = data.streakFreezes !== undefined ? data.streakFreezes : 1;
+  
+  const cost = 200; // Cost is 200 XP
+  if (xp < cost) {
+    return { success: false, error: `Insufficient XP. You need ${cost} XP, but you have ${xp} XP.` };
+  }
+  
+  const newXP = xp - cost;
+  const { calculateRankFromXP, syncLeaderboard } = await import('./xp');
+  const newRank = calculateRankFromXP(newXP);
+  const newLevel = Math.floor(newXP / 100) + 1;
+  
+  const updates = {
+    xp: newXP,
+    rank: newRank.id,
+    level: newLevel,
+    streakFreezes: streakFreezes + 1,
+    updatedAt: serverTimestamp()
+  };
+  
+  await updateDoc(userRef, updates);
+  await syncLeaderboard(uid, { ...data, ...updates });
+  
+  // Log activity
+  await logActivity({
+    userId: uid,
+    userName: data.displayName,
+    userPhoto: data.photoURL,
+    type: ACTIVITY_TYPES.ACHIEVEMENT_UNLOCKED,
+    text: `purchased a ❄️ Streak Freeze for 200 XP!`,
+  }).catch(() => {});
+  
+  return { success: true, newXP, newStreakFreezes: streakFreezes + 1 };
 };
 
 export const registerUser = async (email, password, username) => {
