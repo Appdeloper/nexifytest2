@@ -296,14 +296,16 @@ const Home = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h3 style={{ fontSize: 18, fontWeight: 900 }}>Quick Access</h3>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
               { icon: MessageSquare, label: 'Chat', color: '#00dfd8', path: '/chats' },
               { icon: Users, label: 'Rooms', color: '#7928ca', path: '/rooms' },
               { icon: Activity, label: 'Fit', color: '#10b981', path: '/nexify-fit' },
+              { icon: Target, label: 'Pods', color: '#a78bfa', path: '/focus-pods' },
               { icon: Music, label: 'Waves', color: '#ff0080', path: '/nexify-waves' },
               { icon: Phone, label: 'Calls', color: '#0070f3', path: '/calls' },
               { icon: Sparkles, label: 'AI', color: '#facc15', path: '/nexify-ai' },
+              { icon: Zap, label: 'Edge', color: '#00dfd8', path: '/nexify-edge' },
             ].map((item, i) => (
               <motion.div 
                 key={i} 
@@ -312,9 +314,9 @@ const Home = () => {
                 onClick={() => navigate(item.path)}
                 style={{ 
                   background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', 
-                  borderRadius: 24, padding: '20px 10px', display: 'flex', flexDirection: 'column', 
-                  alignItems: 'center', gap: 12, cursor: 'pointer', backdropFilter: 'blur(10px)',
-                  boxShadow: '0 10px 20px rgba(0,0,0,0.2)'
+                  borderRadius: 20, padding: '16px 8px', display: 'flex', flexDirection: 'column', 
+                  alignItems: 'center', gap: 10, cursor: 'pointer', backdropFilter: 'blur(10px)',
+                  boxShadow: '0 8px 16px rgba(0,0,0,0.2)'
                 }}
               >
                 <div style={{ 
