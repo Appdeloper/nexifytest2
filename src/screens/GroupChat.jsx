@@ -8,7 +8,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ToastProvider';
 import { 
   Info, Smile, Image as ImageIcon, Send, Paperclip, 
-  Sparkles, Pin, MoreVertical, X, Users, Trash2, Copy, Play
+  Sparkles, Pin, MoreVertical, X, Users, Trash2, Copy, Play,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   subscribeGroupMessages, sendGroupTextMessage, sendGroupMediaMessage, 
@@ -44,15 +45,16 @@ const GroupManagementSheet = ({ members, profiles, groupData, currentUser, onRem
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column' }}
     >
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }} />
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)' }} />
       <div style={{ 
         position: 'relative', marginLeft: '20%', width: '80%', height: '100%', 
-        background: '#0a0a0a', borderLeft: '1px solid rgba(255,255,255,0.1)',
+        background: 'var(--bg-glass-heavy)', backdropFilter: 'blur(30px)',
+        borderLeft: '1px solid var(--border-glass)',
         display: 'flex', flexDirection: 'column'
       }}>
-        <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 18, fontWeight: 900 }}>Group Details</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+        <div style={{ padding: '24px 20px', borderBottom: '1px solid var(--border-glass)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.5 }}>Group Details</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: 0.8 }}><X size={20} /></button>
         </div>
         
         <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
@@ -252,18 +254,18 @@ const GroupChat = () => {
       {/* ── Appbar Header ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(30px)',
+        padding: '16px 20px', borderBottom: '1px solid var(--border-glass)',
+        background: 'var(--bg-glass-heavy)', backdropFilter: 'blur(30px)',
         position: 'sticky', top: 0, zIndex: 100
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button onClick={() => navigate('/chats')} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontSize: 24 }}>←</span>
+          <button onClick={() => navigate('/chats')} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4 }}>
+            <ArrowLeft size={24} />
           </button>
           
           <img 
             src={groupData?.groupImage || `https://api.dicebear.com/7.x/identicon/svg?seed=${groupId}`} 
-            style={{ width: 42, height: 42, borderRadius: 12, border: '2px solid var(--primary-purple)' }} 
+            style={{ width: 42, height: 42, borderRadius: 12, border: '2px solid var(--primary-purple)', boxShadow: '0 0 10px rgba(123, 97, 255, 0.2)' }} 
             alt="Pod Avatar" 
           />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -284,7 +286,7 @@ const GroupChat = () => {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {loadingMsg ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 30, height: 30, border: '3px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <div style={{ width: 30, height: 30, border: '3px solid var(--primary-cyan)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : messages.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.35 }}>
@@ -302,7 +304,7 @@ const GroupChat = () => {
                 style={{ 
                   display: 'flex', gap: 10,
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%',
+                  maxWidth: '82%',
                   flexDirection: isMe ? 'row-reverse' : 'row'
                 }}
               >
@@ -324,13 +326,14 @@ const GroupChat = () => {
                       <div 
                         onContextMenu={(e) => { e.preventDefault(); setActiveMenu({ id: m.id || m.messageId, x: e.clientX, y: e.clientY }); }}
                         style={{
-                          background: isMe ? 'var(--primary-gradient)' : 'rgba(255,255,255,0.04)',
+                          background: isMe ? 'var(--gradient-primary)' : 'var(--bg-card)',
                           color: isMe ? 'black' : 'white',
                           borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                          border: isMe ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                          padding: '10px 14px', fontSize: 13.5, fontWeight: 600,
+                          border: isMe ? 'none' : '1px solid var(--border-glass)',
+                          padding: '12px 16px', fontSize: 13.5, fontWeight: isMe ? 700 : 500,
                           lineHeight: 1.4, wordBreak: 'break-word',
-                          boxShadow: isMe ? '0 4px 15px rgba(0,242,254,0.15)' : 'none'
+                          boxShadow: isMe ? '0 8px 25px rgba(0, 229, 255, 0.15)' : 'none',
+                          backdropFilter: 'blur(20px)'
                         }}
                       >
                         {m.imageUrl || m.mediaURL ? (
@@ -341,7 +344,7 @@ const GroupChat = () => {
                         
                         {/* Reactions render */}
                         {m.reactions && Object.keys(m.reactions).length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, position: 'absolute', bottom: -12, right: isMe ? 'auto' : 8, left: isMe ? 8 : 'auto', background: '#121212', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '2px 6px' }}>
+                          <div style={{ display: 'flex', gap: 4, position: 'absolute', bottom: -12, right: isMe ? 'auto' : 8, left: isMe ? 8 : 'auto', background: 'var(--bg-glass-heavy)', border: '1px solid var(--border-glass)', borderRadius: 10, padding: '2px 6px', color: 'white' }}>
                             {Object.entries(m.reactions).map(([uid, emoji]) => (
                               <span key={uid} style={{ fontSize: 10 }}>{emoji}</span>
                             ))}
@@ -408,7 +411,7 @@ const GroupChat = () => {
       </AnimatePresence>
 
       {/* ── Input bar and Launcher panels ── */}
-      <div style={{ padding: 16, borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(10,10,10,0.8)' }}>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-glass-heavy)', backdropFilter: 'blur(30px)' }}>
         
         {/* Smart reply suggestions */}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' }}>
@@ -416,7 +419,7 @@ const GroupChat = () => {
             <button 
               key={chip} 
               onClick={() => setText(chip)}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '6px 14px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ background: 'rgba(0, 229, 255, 0.08)', border: '1px solid rgba(0, 229, 255, 0.25)', borderRadius: 20, padding: '6px 14px', fontSize: 11, fontWeight: 700, color: 'var(--primary-cyan)', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               {chip}
             </button>
@@ -436,9 +439,9 @@ const GroupChat = () => {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <label style={{ cursor: 'pointer', width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <label style={{ cursor: 'pointer', width: 38, height: 38, borderRadius: '50%', background: 'var(--bg-glass)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-glass)' }}>
             <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
-            <Paperclip size={18} color="var(--primary)" />
+            <Paperclip size={18} color="var(--primary-cyan)" />
           </label>
 
           <input 
@@ -448,24 +451,25 @@ const GroupChat = () => {
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
             style={{ 
-              flex: 1, height: 44, background: 'rgba(255,255,255,0.04)', 
-              border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, 
-              color: 'white', padding: '0 14px', outline: 'none', 
-              fontSize: 13, fontWeight: 600 
+              flex: 1, height: 38, background: 'var(--bg-glass)', 
+              border: '1px solid var(--border-glass)', borderRadius: 20, 
+              color: 'white', padding: '0 16px', outline: 'none', 
+              fontSize: 13, fontWeight: 600,
+              transition: 'border-color 0.2s'
             }} 
           />
 
           <motion.button 
             whileTap={{ scale: 0.9 }} 
             onClick={handleSend}
+            className="neon-btn"
             style={{ 
-              width: 44, height: 44, borderRadius: 12, 
-              background: 'var(--primary-gradient)', border: 'none', 
+              width: 38, height: 38, borderRadius: '50%', 
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              cursor: 'pointer', color: 'black' 
+              cursor: 'pointer', color: 'black', padding: 0, minWidth: 38
             }}
           >
-            <Send size={18} />
+            <Send size={16} color="black" />
           </motion.button>
         </div>
       </div>

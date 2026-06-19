@@ -304,7 +304,7 @@ const ChatConversation = () => {
 
   /* ── render ── */
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--bg-main)', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--bg-dark)', position: 'relative' }}>
       {/* ── Immersive Chat Header ── */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
@@ -420,50 +420,50 @@ const ChatConversation = () => {
                     onDoubleClick={() => !isDeleted && setMenuMsg(msg)}
                     className={msg.senderId === 'nexify_ai' ? 'ai-message' : ''}
                     style={{
-                      maxWidth: '85%', padding: isDeleted ? '10px 16px' : '14px 18px',
-                      borderRadius: '24px',
-                      borderBottomRightRadius: isMe ? (isGrouped ? 8 : 8) : 24,
-                      borderBottomLeftRadius: !isMe ? (isGrouped ? 8 : 8) : 24,
+                      maxWidth: '82%', padding: isDeleted ? '10px 16px' : '12px 16px',
+                      borderRadius: '20px',
+                      borderBottomRightRadius: isMe ? (isGrouped ? 6 : 6) : 20,
+                      borderBottomLeftRadius: !isMe ? (isGrouped ? 6 : 6) : 20,
                       background: isDeleted
-                        ? 'rgba(255,255,255,0.03)'
+                        ? 'rgba(255,255,255,0.02)'
                         : isMe
-                          ? 'var(--grad-premium)'
-                          : 'var(--bg-glass)',
-                      color: 'white', cursor: 'pointer', position: 'relative',
-                      border: isDeleted ? '1px solid var(--border-glass)' : '1px solid rgba(255,255,255,0.05)',
-                      backdropFilter: isMe ? 'none' : 'blur(20px)',
+                          ? 'var(--gradient-primary)'
+                          : 'var(--bg-card)',
+                      color: isMe ? 'black' : 'white', cursor: 'pointer', position: 'relative',
+                      border: isDeleted ? '1px solid var(--border-glass)' : (isMe ? 'none' : '1px solid var(--border-glass)'),
+                      backdropFilter: 'blur(20px)',
                       wordBreak: 'break-word',
-                      boxShadow: isMe ? '0 10px 30px rgba(0,112,243,0.2)' : 'none',
+                      boxShadow: isMe ? '0 8px 25px rgba(0, 229, 255, 0.15)' : 'none',
                     }}
                   >
                     {isDeleted ? (
-                      <p style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>🚫 Message deleted</p>
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>🚫 Message deleted</p>
                     ) : (
                       <>
-                        {msg.type === 'text' && <p style={{ fontSize: 15, lineHeight: 1.6, fontWeight: 500 }}>{msg.text}</p>}
+                        {msg.type === 'text' && <p style={{ fontSize: 14, lineHeight: 1.5, fontWeight: isMe ? 700 : 500 }}>{msg.text}</p>}
                         {(msg.type === 'image' || msg.type === 'gif') && (
                           <motion.img
                             whileHover={{ scale: 1.02 }}
                             src={msg.mediaURL} alt=""
                             onClick={() => setViewerSrc(msg.mediaURL)}
-                            style={{ maxWidth: '100%', borderRadius: 18, cursor: 'zoom-in', display: 'block', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+                            style={{ maxWidth: '100%', borderRadius: 16, cursor: 'zoom-in', display: 'block', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 25px rgba(0,0,0,0.4)' }}
                           />
                         )}
                         {msg.type === 'voice' && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 220, padding: '4px 0' }}>
                             <motion.button 
                               whileTap={{ scale: 0.9 }}
-                              style={{ background: isMe ? 'rgba(255,255,255,0.2)' : 'var(--primary)', color: isMe ? 'white' : 'black', border: 'none', borderRadius: '50%', width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                              style={{ background: isMe ? 'rgba(0,0,0,0.15)' : 'var(--primary-cyan)15', color: isMe ? 'black' : 'var(--primary-cyan)', border: 'none', borderRadius: '50%', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                             >
-                              <Play size={20} fill={isMe ? 'white' : 'black'} style={{ marginLeft: 2 }} />
+                              <Play size={18} fill={isMe ? 'black' : 'var(--primary-cyan)'} style={{ marginLeft: 2 }} />
                             </motion.button>
-                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 3, height: 28 }}>
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 3, height: 24 }}>
                               {[0.4, 0.7, 0.5, 0.9, 0.6, 0.3, 0.8, 0.5, 0.7, 0.4, 0.6, 0.8, 0.5, 0.9, 0.4].map((h, i) => (
                                 <motion.div 
                                   key={i} 
                                   animate={{ height: [`${h * 100}%`, `${(1-h) * 100}%`, `${h * 100}%`] }}
                                   transition={{ duration: 1 + h, repeat: Infinity }}
-                                  style={{ flex: 1, background: isMe ? 'rgba(255,255,255,0.4)' : 'rgba(0,223,216,0.5)', borderRadius: 4 }} 
+                                  style={{ flex: 1, background: isMe ? 'rgba(0,0,0,0.2)' : 'rgba(0,229,255,0.4)', borderRadius: 4 }} 
                                 />
                               ))}
                             </div>
@@ -471,9 +471,9 @@ const ChatConversation = () => {
                           </div>
                         )}
                         {msg.type === 'file' && (
-                          <a href={msg.mediaURL} download style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'white', background: 'rgba(0,0,0,0.2)', borderRadius: 18, padding: '12px 16px' }}>
-                            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <FileText size={24} color="var(--primary)" />
+                          <a href={msg.mediaURL} download style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: isMe ? 'black' : 'white', background: 'rgba(0,0,0,0.15)', borderRadius: 18, padding: '12px 16px' }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <FileText size={20} color={isMe ? 'black' : 'var(--primary-cyan)'} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.fileName}</div>
@@ -482,9 +482,9 @@ const ChatConversation = () => {
                             <Download size={18} style={{ opacity: 0.7 }} />
                           </a>
                         )}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 8, opacity: 0.7 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 6, opacity: 0.7 }}>
                           <span style={{ fontSize: 10, fontWeight: 800 }}>{time}</span>
-                          {isMe && <CheckCheck size={14} color={msg.readBy?.length > 1 ? 'var(--primary)' : 'rgba(255,255,255,0.3)'} />}
+                          {isMe && <CheckCheck size={14} color="black" />}
                         </div>
                       </>
                     )}
@@ -499,7 +499,7 @@ const ChatConversation = () => {
                         <motion.span 
                           key={emoji} 
                           whileHover={{ scale: 1.1 }}
-                          style={{ fontSize: 12, background: 'var(--bg-glass-heavy)', border: '1px solid var(--border-glass)', borderRadius: 20, padding: '4px 10px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)' }}
+                          style={{ fontSize: 12, background: 'var(--bg-glass-heavy)', border: '1px solid var(--border-glass)', borderRadius: 20, padding: '4px 10px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', color: 'white' }}
                         >
                           {emoji} <span style={{ fontWeight: 900, fontSize: 11, marginLeft: 2 }}>{count > 1 ? count : ''}</span>
                         </motion.span>
@@ -513,7 +513,7 @@ const ChatConversation = () => {
 
         {otherTyping && (
           <div className="msg-pop" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 8 }}>
-            <div style={{ padding: '8px 16px', borderRadius: 20, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <div style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--bg-card)', border: '1px solid var(--border-glass)' }}>
               <div className="typing-dots">
                 <span></span><span></span><span></span>
               </div>
@@ -523,12 +523,12 @@ const ChatConversation = () => {
 
         {isUploading && (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ padding: '10px 14px', borderRadius: 18, borderBottomRightRadius: 4, background: 'linear-gradient(135deg,#0070f3,#7928ca)', opacity: 0.75, maxWidth: '70%' }}>
+            <div style={{ padding: '10px 14px', borderRadius: 18, borderBottomRightRadius: 4, background: 'var(--gradient-primary)', opacity: 0.85, maxWidth: '70%', color: 'black' }}>
               {uploadPreview && <img src={uploadPreview} alt="" style={{ maxWidth: 150, borderRadius: 8, marginBottom: 6, display: 'block' }} />}
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 2 }}>
-                <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'white', borderRadius: 2, transition: 'width 0.3s' }} />
+              <div style={{ height: 4, background: 'rgba(0,0,0,0.15)', borderRadius: 2 }}>
+                <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'black', borderRadius: 2, transition: 'width 0.3s' }} />
               </div>
-              <span style={{ fontSize: 9, display: 'block', textAlign: 'right', marginTop: 4 }}>Uploading {Math.round(uploadProgress)}%</span>
+              <span style={{ fontSize: 9, display: 'block', textAlign: 'right', marginTop: 4, fontWeight: 700 }}>Uploading {Math.round(uploadProgress)}%</span>
             </div>
           </div>
         )}
@@ -539,17 +539,18 @@ const ChatConversation = () => {
       {showScrollBtn && (
         <button
           onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          style={{ position: 'absolute', bottom: 90, right: 16, zIndex: 10, background: 'var(--primary-gradient)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 12px rgba(0,223,216,0.4)' }}
+          className="neon-btn"
+          style={{ position: 'absolute', bottom: 90, right: 16, zIndex: 10, borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, minWidth: 36 }}
         >
-          <ChevronDown size={18} color="white" />
+          <ChevronDown size={18} color="black" />
         </button>
       )}
 
       {/* GIF picker */}
       {showGifs && (
-        <div style={{ position: 'absolute', bottom: 75, left: 12, right: 12, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', zIndex: 20, padding: 12 }}>
+        <div style={{ position: 'absolute', bottom: 75, left: 12, right: 12, background: 'var(--bg-glass-heavy)', borderRadius: 16, border: '1px solid var(--border-glass)', zIndex: 20, padding: 12, backdropFilter: 'blur(30px)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>GIFs</span>
+            <span style={{ fontWeight: 800, fontSize: 13 }}>GIFs</span>
             <button onClick={() => setShowGifs(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -563,10 +564,10 @@ const ChatConversation = () => {
       {/* Smart replies */}
       {messages.length > 0 && !chatBlocked && !text.trim() && !isUploading && !showGifs && (
         <div style={{ overflowX: 'auto', display: 'flex', gap: 8, padding: '4px 12px', flexShrink: 0 }}>
-          <Sparkles size={13} color="var(--primary)" style={{ flexShrink: 0, marginTop: 5 }} />
+          <Sparkles size={13} color="var(--primary-cyan)" style={{ flexShrink: 0, marginTop: 5 }} />
           {SMART_REPLIES.map((r, i) => (
             <button key={i} onClick={() => setText(r)}
-              style={{ whiteSpace: 'nowrap', padding: '5px 12px', borderRadius: 20, background: 'rgba(0,223,216,0.08)', border: '1px solid rgba(0,223,216,0.25)', color: 'var(--primary)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+              style={{ whiteSpace: 'nowrap', padding: '6px 14px', borderRadius: 20, background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.25)', color: 'var(--primary-cyan)', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
             >{r}</button>
           ))}
         </div>
@@ -574,8 +575,8 @@ const ChatConversation = () => {
 
       {/* Reply preview bar */}
       {replyTo && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          <Reply size={14} color="var(--primary)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--bg-card)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+          <Reply size={14} color="var(--primary-cyan)" />
           <span style={{ flex: 1, fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             Replying to: {replyTo.text || '[media]'}
           </span>
@@ -584,7 +585,7 @@ const ChatConversation = () => {
       )}
 
       {/* Composer */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 8px))', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 8px))', background: 'var(--bg-glass-heavy)', backdropFilter: 'blur(30px)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
         <button disabled={chatBlocked} onClick={() => setShowGifs(!showGifs)} style={{ background: 'none', border: 'none', cursor: chatBlocked ? 'not-allowed' : 'pointer', padding: 6, color: 'var(--text-muted)', opacity: chatBlocked ? 0.45 : 1 }}><Smile size={20} /></button>
         <label style={{ cursor: chatBlocked ? 'not-allowed' : 'pointer', padding: 6, color: 'var(--text-muted)', display: 'flex', opacity: chatBlocked ? 0.45 : 1 }}>
           <Paperclip size={20} />
@@ -597,13 +598,25 @@ const ChatConversation = () => {
           disabled={chatBlocked}
           onChange={e => handleTyping(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 14px', borderRadius: 22, color: 'white', outline: 'none', fontSize: 14, opacity: chatBlocked ? 0.6 : 1 }}
+          style={{ 
+            flex: 1, 
+            background: 'var(--bg-glass)', 
+            border: '1px solid var(--border-glass)', 
+            padding: '10px 16px', 
+            borderRadius: 22, 
+            color: 'white', 
+            outline: 'none', 
+            fontSize: 14, 
+            opacity: chatBlocked ? 0.6 : 1,
+            transition: 'border-color 0.2s'
+          }}
         />
         {text.trim() ? (
           <button onClick={handleSend} disabled={isSending}
-            style={{ background: 'linear-gradient(135deg,#0070f3,#7928ca)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: isSending ? 0.5 : 1, boxShadow: '0 2px 10px rgba(0,112,243,0.4)', flexShrink: 0 }}
+            className="neon-btn"
+            style={{ width: 38, height: 38, padding: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: isSending ? 0.5 : 1, flexShrink: 0, minWidth: 38, color: 'black' }}
           >
-            <Send size={17} color="white" />
+            <Send size={16} color="black" />
           </button>
         ) : (
           <button onClick={() => showToast('Voice notes disabled in beta')}

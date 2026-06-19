@@ -56,7 +56,7 @@ const Rooms = () => {
   };
 
   return (
-    <div className="fade-in col" style={{ height: '100%', background: 'var(--bg-main)' }}>
+    <div className="fade-in col" style={{ height: '100%', background: 'var(--bg-dark)' }}>
       {/* ── Immersive Rooms Header ── */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
@@ -70,7 +70,7 @@ const Rooms = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
           <div style={{ position: 'relative' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 36, height: 36, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 36, height: 36, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.5))' }} />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, background: '#10b981', borderRadius: '50%', border: '2px solid black' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -87,49 +87,55 @@ const Rooms = () => {
           whileHover={{ scale: 1.1, rotate: 90 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => navigate('/create-room')}
+          className="neon-btn"
           style={{ 
-            background: 'var(--grad-premium)', 
-            border: 'none', 
-            borderRadius: '16px', 
-            width: 44, 
-            height: 44, 
+            width: 38, 
+            height: 38, 
+            borderRadius: '50%',
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
             cursor: 'pointer', 
-            color: 'white', 
-            boxShadow: '0 0 20px rgba(0,223,216,0.3)',
+            color: 'black', 
+            padding: 0,
             flexShrink: 0
           }}
         >
-          <Plus size={24} strokeWidth={2.5} />
+          <Plus size={20} strokeWidth={2.5} />
         </motion.button>
       </motion.div>
 
       {/* ── Futuristic Browser Controls ── */}
       <div style={{ padding: '20px 20px 0', background: 'transparent' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--bg-glass)', border: '1px solid var(--border-glass)', borderRadius: '18px', padding: '12px 18px', marginBottom: 20 }}>
-          <Search size={18} color="var(--text-dim)" />
+        <div style={{ 
+          display: 'flex', alignItems: 'center', gap: 12, 
+          background: 'var(--bg-card)', 
+          border: '1px solid var(--border-glass)', 
+          borderRadius: '18px', 
+          padding: '12px 18px', 
+          marginBottom: 20 
+        }}>
+          <Search size={18} color="var(--primary-cyan)" style={{ opacity: 0.8 }} />
           <input
-            type="text" placeholder="Explore futuristic dimensions..." value={search}
+            type="text" placeholder="Explore room frequencies..." value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', flex: 1, fontSize: 14, fontWeight: 600 }}
           />
         </div>
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 16, scrollbarWidth: 'none' }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 16, scrollbarWidth: 'none' }}>
           {TABS.map(tab => (
             <motion.button
               key={tab} 
               whileTap={{ scale: 0.95 }}
               onClick={() => { setActiveTab(tab); setLoading(true); setTimeout(() => setLoading(false), 300); }}
               style={{
-                background: activeTab === tab ? 'linear-gradient(135deg, #00dfd8, #0070f3)' : 'rgba(255,255,255,0.05)',
-                color: activeTab === tab ? 'black' : 'white',
-                border: activeTab === tab ? 'none' : '1px solid rgba(255,255,255,0.1)', 
-                padding: '10px 22px', borderRadius: 24,
+                background: activeTab === tab ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.04)',
+                color: activeTab === tab ? 'black' : 'rgba(255, 255, 255, 0.65)',
+                border: activeTab === tab ? 'none' : '1px solid var(--border-glass)', 
+                padding: '8px 18px', borderRadius: 24,
                 whiteSpace: 'nowrap', cursor: 'pointer',
                 fontWeight: 900, fontSize: 11, letterSpacing: 1,
-                boxShadow: activeTab === tab ? '0 10px 20px rgba(0,223,216,0.3)' : 'none',
+                boxShadow: activeTab === tab ? '0 4px 15px rgba(0, 229, 255, 0.25)' : 'none',
                 flexShrink: 0, textTransform: 'uppercase'
               }}
             >{tab}</motion.button>
@@ -172,51 +178,73 @@ const Rooms = () => {
               return (
                 <motion.div
                   key={room.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
+                  whileHover={{ y: -4, borderColor: `${typeColor}55`, boxShadow: `0 8px 30px ${typeColor}15` }}
                   className="premium-card"
-                  style={{ padding: '20px', border: `1px solid ${typeColor}33`, position: 'relative', overflow: 'hidden' }}
+                  style={{ 
+                    padding: '20px', 
+                    border: `1px solid ${typeColor}25`, 
+                    position: 'relative', 
+                    overflow: 'hidden',
+                    background: 'var(--bg-card)',
+                    backdropFilter: 'blur(20px)',
+                    borderRadius: 22,
+                    transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+                  }}
                 >
-                  <div style={{ position: 'absolute', top: 0, right: 0, width: 80, height: 80, background: `radial-gradient(circle at top right, ${typeColor}22, transparent 70%)` }} />
+                  <div style={{ position: 'absolute', top: 0, right: 0, width: 80, height: 80, background: `radial-gradient(circle at top right, ${typeColor}18, transparent 70%)` }} />
                   
-                  <div className="row align-center flex-between mb-4">
-                    <div className="row align-center gap-4">
+                  <div className="row align-center flex-between mb-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div className="row align-center gap-4" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <motion.div 
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        style={{ width: 56, height: 56, borderRadius: 16, background: `${typeColor}15`, border: `2px solid ${typeColor}44`, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px ${typeColor}11` }}
+                        whileHover={{ scale: 1.05, rotate: 2 }}
+                        style={{ 
+                          width: 52, 
+                          height: 52, 
+                          borderRadius: 16, 
+                          background: `${typeColor}18`, 
+                          border: `1px solid ${typeColor}35`, 
+                          overflow: 'hidden', 
+                          flexShrink: 0, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          boxShadow: `0 0 15px ${typeColor}10` 
+                        }}
                       >
                         {room.iconURL ? (
                           <img src={room.iconURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <Users size={28} color={typeColor} />
+                          <Users size={24} color={typeColor} />
                         )}
                       </motion.div>
-                      <div className="col">
-                        <span className="header-title" style={{ fontSize: 17 }}>{room.name}</span>
-                        <div className="row gap-3 align-center" style={{ marginTop: 6 }}>
-                          <span style={{ fontSize: 10, fontWeight: 900, padding: '3px 10px', background: `${typeColor}20`, color: typeColor, borderRadius: 12, letterSpacing: 1, textTransform: 'uppercase' }}>{room.type}</span>
-                          <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <Users size={12} strokeWidth={3} /> {room.members?.length || 0}
+                      <div className="col" style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="header-title" style={{ fontSize: 16, color: 'white' }}>{room.name}</span>
+                        <div className="row gap-3 align-center" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <span style={{ fontSize: 9, fontWeight: 900, padding: '2px 8px', background: `${typeColor}18`, color: typeColor, borderRadius: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>{room.type}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Users size={11} strokeWidth={3} color="var(--text-muted)" /> {room.members?.length || 0}
                           </span>
                         </div>
                       </div>
                     </div>
                     {isMember ? (
                       <motion.button
-                        whileTap={{ scale: 0.9 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => navigate(`/room-chat/${room.id}`)}
                         className="glass-btn"
-                        style={{ padding: '10px 20px', fontSize: 13, fontWeight: 800 }}
+                        style={{ padding: '8px 18px', fontSize: 12, fontWeight: 800 }}
                       >
                         ENTER
                       </motion.button>
                     ) : (
                       <motion.button
-                        whileTap={{ scale: 0.9 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => handleJoin(room.id)}
                         className="neon-btn"
-                        style={{ padding: '10px 20px', fontSize: 13, fontWeight: 900 }}
+                        style={{ padding: '8px 18px', fontSize: 12, fontWeight: 900, color: 'black' }}
                       >
                         JOIN
                       </motion.button>
@@ -224,14 +252,14 @@ const Rooms = () => {
                   </div>
                   
                   {room.description && (
-                    <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginTop: 10, fontWeight: 500 }} className="line-clamp-2">{room.description}</p>
+                    <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 10, fontWeight: 500 }} className="line-clamp-2">{room.description}</p>
                   )}
                   
                   {room.lastMessage && (
-                    <div style={{ fontSize: 12, color: 'var(--primary)', marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-glass)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Sparkles size={12} />
-                      <span style={{ opacity: 0.7, color: 'white' }}>Latest:</span>
-                      <span className="line-clamp-1" style={{ flex: 1 }}>{room.lastMessage}</span>
+                    <div style={{ fontSize: 12, color: 'var(--primary-cyan)', marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-glass)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Sparkles size={12} color="var(--primary-cyan)" />
+                      <span style={{ opacity: 0.6, color: 'white' }}>Latest:</span>
+                      <span className="line-clamp-1" style={{ flex: 1, color: 'rgba(255,255,255,0.7)' }}>{room.lastMessage}</span>
                     </div>
                   )}
                 </motion.div>

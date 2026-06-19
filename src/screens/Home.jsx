@@ -220,94 +220,132 @@ const Home = () => {
       >
         {/* GREETING */}
         <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          style={{ marginTop: 10, marginBottom: 32 }}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ marginTop: 16, marginBottom: 28 }}
         >
-          <div style={{ fontSize: 16, color: '#7928ca', fontWeight: 600, letterSpacing: 0.5 }}>
+          <div style={{ fontSize: 13, color: 'var(--primary-cyan)', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>
             {new Date().getHours() < 5 ? 'Working late?' : 
-             new Date().getHours() < 12 ? 'Good Morning,' : 
-             new Date().getHours() < 17 ? 'Good Afternoon,' : 
-             new Date().getHours() < 21 ? 'Good Evening,' : 'Good Night,'}
+             new Date().getHours() < 12 ? 'Good Morning Citizen' : 
+             new Date().getHours() < 17 ? 'Good Afternoon Citizen' : 
+             new Date().getHours() < 21 ? 'Good Evening Citizen' : 'Good Night Citizen'}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
-            <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1 }}>{currentUser?.displayName?.split(' ')[0] || 'Citizen'} 👋</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+            <h1 style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1, background: 'linear-gradient(135deg, #ffffff, #8F9CAE)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {currentUser?.displayName?.split(' ')[0] || 'Citizen'} 👋
+            </h1>
             {currentUser && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <RoleBadge role={currentUser.role} size="sm" />
                 <RankBadge rankId={currentUser.rank} size="sm" />
               </div>
             )}
           </div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: 6, fontWeight: 500 }}>Ready to connect, focus and grow?</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>Let's connect, focus, and ascend.</div>
         </motion.div>
 
         {/* RANK + XP SECTION (4 Stat Cards) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 32 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 28 }}>
           {/* Card 1: Rank */}
-          <motion.div whileHover={{ scale: 1.02 }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, position: 'relative', overflow: 'hidden', backdropFilter: 'blur(20px)' }}>
-            <div style={{ background: 'rgba(0,223,216,0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(0,223,216,0.2)' }}>
-              <Trophy size={18} color="#00dfd8" />
+          <motion.div 
+            whileHover={{ y: -4 }}
+            style={{ 
+              background: 'var(--bg-card)', 
+              border: '1px solid rgba(0, 229, 255, 0.15)', 
+              borderRadius: 20, 
+              padding: '16px 20px', 
+              position: 'relative', 
+              overflow: 'hidden', 
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <div style={{ background: 'rgba(0, 229, 255, 0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(0, 229, 255, 0.25)', boxShadow: '0 0 10px rgba(0, 229, 255, 0.15)' }}>
+              <Trophy size={18} color="var(--primary-cyan)" />
             </div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#00dfd8', letterSpacing: 1, marginBottom: 4 }}>RANK</div>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>{getRankForXP(currentUser?.xp || 0).name}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Level {currentUser?.level || 1}</div>
+            <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary-cyan)', letterSpacing: 1.5, marginBottom: 4 }}>RANK</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{getRankForXP(currentUser?.xp || 0).name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Level {currentUser?.level || 1}</div>
           </motion.div>
+
           {/* Card 2: Streak */}
           <motion.div 
-            whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(255,0,128,0.15)' }} 
+            whileHover={{ y: -4 }} 
             onClick={() => setShowStreakModal(true)}
             style={{ 
-              background: 'rgba(255,255,255,0.02)', 
-              border: '1px solid rgba(255,255,255,0.06)', 
-              borderRadius: 24, 
-              padding: 20, 
+              background: 'var(--bg-card)', 
+              border: '1px solid rgba(255, 0, 127, 0.15)', 
+              borderRadius: 20, 
+              padding: '16px 20px', 
               backdropFilter: 'blur(20px)',
               cursor: 'pointer',
-              position: 'relative'
+              position: 'relative',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ background: 'rgba(255,0,128,0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(255,0,128,0.2)' }}>
+              <div style={{ background: 'rgba(255, 0, 127, 0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(255, 0, 127, 0.25)', boxShadow: '0 0 10px rgba(255, 0, 127, 0.15)' }}>
                 <Flame 
                   size={18} 
-                  color="#ff0080" 
-                  fill={currentUser?.streak > 0 ? "#ff0080" : "transparent"} 
-                  style={{ filter: currentUser?.streak > 0 ? 'drop-shadow(0 0 8px #ff0080)' : 'none' }}
+                  color="#FF007F" 
+                  fill={currentUser?.streak > 0 ? "#FF007F" : "transparent"} 
+                  style={{ filter: currentUser?.streak > 0 ? 'drop-shadow(0 0 8px #FF007F)' : 'none' }}
                 />
               </div>
               {currentUser?.streakFreezes > 0 && (
-                <div style={{ background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 12, padding: '2px 8px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: '#38bdf8' }}>
-                  <Snowflake size={10} color="#38bdf8" />
+                <div style={{ background: 'rgba(0, 229, 255, 0.15)', border: '1px solid rgba(0, 229, 255, 0.3)', borderRadius: 12, padding: '2px 8px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--primary-cyan)', fontWeight: 800 }}>
+                  <Snowflake size={10} color="var(--primary-cyan)" />
                   <span>x{currentUser.streakFreezes}</span>
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#ff0080', letterSpacing: 1, marginBottom: 4 }}>STREAK</div>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>{currentUser?.streak || 0} Days</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Tap to view details</div>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#FF007F', letterSpacing: 1.5, marginBottom: 4 }}>STREAK</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{currentUser?.streak || 0} Days</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Tap to freeze</div>
           </motion.div>
+
           {/* Card 3: XP */}
-          <motion.div whileHover={{ scale: 1.02 }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, backdropFilter: 'blur(20px)' }}>
-            <div style={{ background: 'rgba(121, 40, 202, 0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(121, 40, 202, 0.2)' }}>
-              <Zap size={18} color="#7928ca" fill="#7928ca" />
+          <motion.div 
+            whileHover={{ y: -4 }}
+            style={{ 
+              background: 'var(--bg-card)', 
+              border: '1px solid rgba(123, 97, 255, 0.15)', 
+              borderRadius: 20, 
+              padding: '16px 20px', 
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <div style={{ background: 'rgba(123, 97, 255, 0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(123, 97, 255, 0.25)', boxShadow: '0 0 10px rgba(123, 97, 255, 0.15)' }}>
+              <Zap size={18} color="var(--primary-purple)" fill="var(--primary-purple)" />
             </div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#7928ca', letterSpacing: 1, marginBottom: 4 }}>XP</div>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>{(currentUser?.xp || 0).toLocaleString()} <span style={{ fontWeight: 400, opacity: 0.4, fontSize: 12 }}>XP</span></div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Total Earned</div>
+            <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary-purple)', letterSpacing: 1.5, marginBottom: 4 }}>XP</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{(currentUser?.xp || 0).toLocaleString()} <span style={{ fontWeight: 400, opacity: 0.4, fontSize: 12 }}>XP</span></div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Total XP</div>
           </motion.div>
+
           {/* Card 4: Next Rank */}
-          <motion.div whileHover={{ scale: 1.02 }} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, backdropFilter: 'blur(20px)' }}>
-            <div style={{ background: 'rgba(16, 185, 129, 0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+          <motion.div 
+            whileHover={{ y: -4 }}
+            style={{ 
+              background: 'var(--bg-card)', 
+              border: '1px solid rgba(16, 185, 129, 0.15)', 
+              borderRadius: 20, 
+              padding: '16px 20px', 
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <div style={{ background: 'rgba(16, 185, 129, 0.1)', width: 36, height: 36, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '1px solid rgba(16, 185, 129, 0.25)', boxShadow: '0 0 10px rgba(16, 185, 129, 0.15)' }}>
               <Shield size={18} color="#10b981" />
             </div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#10b981', letterSpacing: 1, marginBottom: 4 }}>NEXT RANK</div>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>{getNextRank(currentUser?.xp || 0)?.name || 'Max Rank'}</div>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#10b981', letterSpacing: 1.5, marginBottom: 4 }}>NEXT RANK</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{getNextRank(currentUser?.xp || 0)?.name || 'Max Rank'}</div>
             <div style={{ marginTop: 10 }}>
               <div style={{ height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
                 <motion.div initial={{ width: 0 }} animate={{ width: `${getRankProgress(currentUser?.xp || 0)}%` }} transition={{ duration: 1.5 }} style={{ height: '100%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
               </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4, textAlign: 'right' }}>{getNextRank(currentUser?.xp || 0) ? `${(getNextRank(currentUser?.xp || 0).xpRequired - (currentUser?.xp || 0)).toLocaleString()} XP left` : 'Fully Ascended'}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{getNextRank(currentUser?.xp || 0) ? `${(getNextRank(currentUser?.xp || 0).xpRequired - (currentUser?.xp || 0)).toLocaleString()} XP left` : 'Fully Ascended'}</div>
             </div>
           </motion.div>
         </div>
@@ -317,59 +355,76 @@ const Home = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           style={{ 
-            background: 'linear-gradient(135deg, rgba(121, 40, 202, 0.15), rgba(0, 0, 0, 0.6))',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 32, padding: 32,
-            position: 'relative', overflow: 'hidden', marginBottom: 40,
-            boxShadow: '0 30px 60px rgba(0,0,0,0.5), inset 0 0 20px rgba(121, 40, 202, 0.1)'
+            background: 'linear-gradient(135deg, rgba(123, 97, 255, 0.15) 0%, rgba(18, 24, 38, 0.75) 100%)',
+            border: '1px solid rgba(123, 97, 255, 0.25)', 
+            borderRadius: 24, 
+            padding: '24px 28px',
+            position: 'relative', 
+            overflow: 'hidden', 
+            marginBottom: 32,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5), inset 0 0 20px rgba(123, 97, 255, 0.05)'
           }}
         >
           {/* Subtle Reflective Shine */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '100%', background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 40%)', pointerEvents: 'none' }} />
           
-          <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <Timer size={20} color="#7928ca" />
-                <span style={{ fontSize: 24, fontWeight: 900, letterSpacing: -0.5 }}>Focus Now</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Timer size={20} color="var(--primary-purple)" />
+                <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>Focus Now</span>
               </div>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', maxWidth: 180, lineHeight: 1.5, marginBottom: 24 }}>Join a focus room and boost your productivity with others.</p>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 20 }}>Join a focus room and level up with other creators.</p>
               <motion.button 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.96 }}
                 onClick={() => navigate('/focus-pods')}
-                style={{ background: 'linear-gradient(135deg, #7928ca, #0070f3)', border: 'none', borderRadius: 24, padding: '14px 28px', color: 'white', fontWeight: 900, fontSize: 14, display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 10px 25px rgba(121, 40, 202, 0.4)' }}
+                style={{ 
+                  background: 'var(--gradient-primary)', 
+                  border: 'none', 
+                  borderRadius: 24, 
+                  padding: '12px 24px', 
+                  color: 'black', 
+                  fontWeight: 900, 
+                  fontSize: 13, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 8, 
+                  cursor: 'pointer',
+                  boxShadow: '0 10px 25px rgba(0, 229, 255, 0.3)' 
+                }}
               >
-                Join Focus Pod <ArrowRight size={18} />
+                Join Focus Pod <ArrowRight size={16} />
               </motion.button>
             </div>
 
-            <div style={{ position: 'relative', width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {/* Outer Glow Ring */}
-              <motion.div animate={{ opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 3, repeat: Infinity }} style={{ position: 'absolute', inset: -10, border: '1px solid rgba(0, 223, 216, 0.2)', borderRadius: '50%' }} />
+              <motion.div animate={{ opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 3, repeat: Infinity }} style={{ position: 'absolute', inset: -6, border: '1px solid rgba(0, 229, 255, 0.15)', borderRadius: '50%' }} />
               
-              <svg width="140" height="140" viewBox="0 0 140 140">
-                <circle cx="70" cy="70" r="62" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="6" />
                 <motion.circle 
-                  cx="70" cy="70" r="62" fill="none" stroke="url(#focusGrad)" strokeWidth="8" strokeLinecap="round"
+                  cx="60" cy="60" r="52" fill="none" stroke="url(#focusGrad)" strokeWidth="6" strokeLinecap="round"
                   initial={{ pathLength: 0 }} animate={{ pathLength: timerProgress }} transition={{ duration: 2.5, ease: "circOut" }}
                 />
                 <defs>
                   <linearGradient id="focusGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#7928ca" />
-                    <stop offset="100%" stopColor="#00dfd8" />
+                    <stop offset="0%" stopColor="var(--primary-purple)" />
+                    <stop offset="100%" stopColor="var(--primary-cyan)" />
                   </linearGradient>
                 </defs>
               </svg>
               <div style={{ position: 'absolute', textAlign: 'center' }}>
-                <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>25:00</div>
-                <div style={{ fontSize: 10, opacity: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 }}>Focus Session</div>
-                <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 8, height: 12, alignItems: 'center' }}>
-                  {[1,2,3,4,5,4,3,2,1].map((h, i) => (
+                <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.5 }}>25:00</div>
+                <div style={{ fontSize: 8, opacity: 0.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>SESSION</div>
+                <div style={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: 4, height: 10, alignItems: 'center' }}>
+                  {[1,2,3,4,3,2,1].map((h, i) => (
                     <motion.div 
                       key={i} 
-                      animate={{ height: [h*2, h*4, h*2] }} 
+                      animate={{ height: [h*2, h*3, h*2] }} 
                       transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
-                      style={{ width: 2, background: '#00dfd8', borderRadius: 1, boxShadow: '0 0 5px #00dfd8' }} 
+                      style={{ width: 1.5, background: 'var(--primary-cyan)', borderRadius: 1, boxShadow: '0 0 4px var(--primary-cyan)' }} 
                     />
                   ))}
                 </div>
@@ -379,42 +434,48 @@ const Home = () => {
         </motion.div>
 
         {/* QUICK ACCESS GRID */}
-        <div style={{ marginBottom: 40 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 900 }}>Quick Access</h3>
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 900, letterSpacing: -0.3 }}>Quick Access</h3>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
-              { icon: MessageSquare, label: 'Chat', color: '#00dfd8', path: '/chats' },
-              { icon: Users, label: 'Rooms', color: '#7928ca', path: '/rooms' },
+              { icon: MessageSquare, label: 'Chat', color: 'var(--primary-cyan)', path: '/chats' },
+              { icon: Users, label: 'Rooms', color: 'var(--primary-purple)', path: '/rooms' },
               { icon: Activity, label: 'Fit', color: '#10b981', path: '/nexify-fit' },
               { icon: Target, label: 'Pods', color: '#a78bfa', path: '/focus-pods' },
-              { icon: Music, label: 'Waves', color: '#ff0080', path: '/nexify-waves' },
-              { icon: Phone, label: 'Calls', color: '#0070f3', path: '/calls' },
+              { icon: Music, label: 'Waves', color: '#FF007F', path: '/nexify-waves' },
+              { icon: Phone, label: 'Calls', color: '#0072ff', path: '/calls' },
               { icon: Sparkles, label: 'AI', color: '#facc15', path: '/nexify-ai' },
-              { icon: Zap, label: 'Edge', color: '#00dfd8', path: '/nexify-edge' },
+              { icon: Zap, label: 'Edge', color: 'var(--primary-cyan)', path: '/nexify-edge' },
             ].map((item, i) => (
               <motion.div 
                 key={i} 
-                whileHover={{ y: -5, scale: 1.02 }}
+                whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate(item.path)}
                 style={{ 
-                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', 
-                  borderRadius: 20, padding: '16px 8px', display: 'flex', flexDirection: 'column', 
-                  alignItems: 'center', gap: 10, cursor: 'pointer', backdropFilter: 'blur(10px)',
-                  boxShadow: '0 8px 16px rgba(0,0,0,0.2)'
+                  background: 'var(--bg-card)', 
+                  border: '1px solid rgba(255,255,255,0.05)', 
+                  borderRadius: 18, 
+                  padding: '14px 6px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  gap: 8, 
+                  cursor: 'pointer', 
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
                 }}
               >
                 <div style={{ 
-                  width: 48, height: 48, borderRadius: 16, background: `${item.color}10`, 
-                  border: `1px solid ${item.color}30`, display: 'flex', alignItems: 'center', 
+                  width: 44, height: 44, borderRadius: 14, background: `${item.color}12`, 
+                  border: `1px solid ${item.color}25`, display: 'flex', alignItems: 'center', 
                   justifyContent: 'center', position: 'relative'
                 }}>
-                  <item.icon size={24} color={item.color} strokeWidth={2} />
-                  <div style={{ position: 'absolute', inset: -4, border: `1px solid ${item.color}10`, borderRadius: 18, pointerEvents: 'none' }} />
+                  <item.icon size={20} color={item.color} strokeWidth={2.5} />
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 800, opacity: 0.7, letterSpacing: 0.5 }}>{item.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'white', opacity: 0.8 }}>{item.label}</span>
               </motion.div>
             ))}
           </div>

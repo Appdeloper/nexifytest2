@@ -159,22 +159,24 @@ const Chats = () => {
           animate={{ opacity: 1, y: 0 }}
           key={chat.id}
           onClick={() => navigate(`/group-chat/${chat.id}`)}
+          whileHover={{ y: -2, borderColor: 'rgba(123, 97, 255, 0.25)', boxShadow: '0 8px 25px rgba(123, 97, 255, 0.1)' }}
+          whileTap={{ scale: 0.98 }}
           style={{
             display: 'flex', alignItems: 'center', gap: 14,
             padding: '12px 14px', borderRadius: 20, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.05)',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            backdropFilter: 'blur(20px)'
           }}
-          whileTap={{ scale: 0.98 }}
           className="ripple"
         >
           <div style={{ position: 'relative' }}>
             <img 
               src={chat.groupImage || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`} 
-              style={{ width: 50, height: 50, borderRadius: 14, border: '2px solid var(--primary-purple)', objectFit: 'cover' }} 
+              style={{ width: 48, height: 48, borderRadius: 14, border: '2px solid var(--primary-purple)', objectFit: 'cover', boxShadow: '0 0 10px rgba(123, 97, 255, 0.2)' }} 
               alt="" 
             />
           </div>
@@ -185,7 +187,7 @@ const Chats = () => {
                 <span style={{ fontWeight: 800, fontSize: 13.5, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {chat.name}
                 </span>
-                <span style={{ fontSize: 9, fontWeight: 900, background: 'rgba(155,81,224,0.15)', color: 'var(--primary-purple)', padding: '2px 6px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <span style={{ fontSize: 9, fontWeight: 900, background: 'rgba(123, 97, 255, 0.15)', color: 'var(--primary-purple)', padding: '2px 6px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   POD
                 </span>
               </div>
@@ -225,25 +227,31 @@ const Chats = () => {
         animate={{ opacity: 1, y: 0 }}
         key={chat.id}
         onClick={() => navigate(`/chat-conversation/${chat.id}`)}
+        whileHover={{ 
+          y: -2, 
+          borderColor: unreadCount > 0 ? 'rgba(0, 229, 255, 0.35)' : 'rgba(255, 255, 255, 0.12)',
+          boxShadow: unreadCount > 0 ? '0 8px 25px rgba(0, 229, 255, 0.15)' : '0 8px 25px rgba(0, 0, 0, 0.3)'
+        }}
+        whileTap={{ scale: 0.98 }}
         style={{
           display: 'flex', alignItems: 'center', gap: 14,
           padding: '12px 14px', borderRadius: 20, cursor: 'pointer',
-          background: unreadCount > 0 ? 'rgba(0,223,216,0.04)' : 'rgba(255,255,255,0.03)',
-          border: unreadCount > 0 ? '1px solid rgba(0,223,216,0.15)' : '1px solid rgba(255,255,255,0.05)',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          background: unreadCount > 0 ? 'rgba(0, 229, 255, 0.04)' : 'var(--bg-card)',
+          border: unreadCount > 0 ? '1px solid rgba(0, 229, 255, 0.2)' : '1px solid var(--border-glass)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          backdropFilter: 'blur(20px)'
         }}
-        whileTap={{ scale: 0.98 }}
         className="ripple"
       >
         <div style={{ position: 'relative' }}>
-          <Avatar user={otherUser} size={50} />
+          <Avatar user={otherUser} size={48} />
           {isOnline && (
             <div style={{
-              position: 'absolute', bottom: 2, right: 2, width: 12, height: 12,
-              background: '#00dfd8', borderRadius: '50%', border: '2px solid #000',
-              boxShadow: '0 0 10px rgba(0,223,216,0.5)'
+              position: 'absolute', bottom: 0, right: 0, width: 12, height: 12,
+              background: 'var(--primary-cyan)', borderRadius: '50%', border: '2px solid #0A0A0F',
+              boxShadow: '0 0 10px rgba(0,229,255,0.6)'
             }} />
           )}
         </div>
@@ -257,11 +265,11 @@ const Chats = () => {
               {otherUser.role && otherUser.role !== 'member' && <RoleBadge role={otherUser.role} size="xs" hideLabel />}
               {chat.isPinned?.[currentUid] && <div style={{ fontSize: 10, opacity: 0.5 }}>📌</div>}
             </div>
-            <span style={{ fontSize: 10, color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700 }}>{timeStr}</span>
+            <span style={{ fontSize: 10, color: unreadCount > 0 ? 'var(--primary-cyan)' : 'var(--text-muted)', fontWeight: 700 }}>{timeStr}</span>
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <span style={{ fontSize: 12, color: unreadCount > 0 ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: unreadCount > 0 ? 600 : 400 }}>
+            <span style={{ fontSize: 12, color: unreadCount > 0 ? 'rgba(255,255,255,0.95)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: unreadCount > 0 ? 600 : 400 }}>
               {chat.lastMessage || 'Start a conversation'}
             </span>
             {unreadCount > 0 && (
@@ -269,7 +277,7 @@ const Chats = () => {
                 background: 'var(--primary-gradient)', color: 'black',
                 fontSize: 10, fontWeight: 900, borderRadius: 10,
                 padding: '2px 6px', minWidth: 18, textAlign: 'center',
-                boxShadow: '0 2px 10px rgba(0,223,216,0.3)'
+                boxShadow: '0 2px 10px rgba(0,229,255,0.3)'
               }}>
                 {unreadCount}
               </div>
@@ -281,17 +289,17 @@ const Chats = () => {
   };
 
   return (
-    <div className="fade-in col" style={{ height: '100%', position: 'relative', background: '#000' }}>
+    <div className="fade-in col" style={{ height: '100%', position: 'relative', background: 'var(--bg-dark)' }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)',
-        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(30px)',
+        padding: '16px 20px', borderBottom: '1px solid var(--border-glass)',
+        background: 'var(--bg-glass-heavy)', backdropFilter: 'blur(30px)',
         position: 'sticky', top: 0, zIndex: 100
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} alt="Logo" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.5))' }} alt="Logo" />
           </div>
           <h1 style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>Conversations</h1>
         </div>
@@ -300,7 +308,8 @@ const Chats = () => {
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => setShowCreateModal(true)}
-              style={{ background: 'var(--primary-gradient)', border: 'none', borderRadius: 12, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'black', boxShadow: '0 4px 15px rgba(0,223,216,0.3)' }}
+              className="neon-btn"
+              style={{ width: 38, height: 38, padding: 0, borderRadius: '50%', color: 'black', minWidth: 38 }}
             >
               <Plus size={20} />
             </motion.button>
@@ -308,7 +317,8 @@ const Chats = () => {
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => navigate('/friends')}
-              style={{ background: 'var(--primary-gradient)', border: 'none', borderRadius: 12, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'black', boxShadow: '0 4px 15px rgba(0,223,216,0.3)' }}
+              className="neon-btn"
+              style={{ width: 38, height: 38, padding: 0, borderRadius: '50%', color: 'black', minWidth: 38 }}
             >
               <Plus size={20} />
             </motion.button>
@@ -317,9 +327,17 @@ const Chats = () => {
       </div>
 
       {/* Search + Tabs */}
-      <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '10px 16px', marginBottom: 16, transition: 'all 0.3s' }}>
-          <Search size={16} color="var(--primary)" style={{ opacity: 0.8 }} />
+      <div style={{ padding: '16px 20px', background: 'rgba(0,0,0,0.1)' }}>
+        <div style={{ 
+          display: 'flex', alignItems: 'center', gap: 10, 
+          background: 'var(--bg-card)', 
+          border: '1px solid var(--border-glass)', 
+          borderRadius: 14, 
+          padding: '10px 16px', 
+          marginBottom: 16, 
+          transition: 'all 0.3s' 
+        }}>
+          <Search size={16} color="var(--primary-cyan)" style={{ opacity: 0.8 }} />
           <input
             type="text"
             placeholder="Search messages or people..."
@@ -336,14 +354,14 @@ const Chats = () => {
               onClick={() => setActiveTab(tab)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 20px', borderRadius: 24,
-                background: activeTab === tab ? 'linear-gradient(135deg, #00dfd8, #0070f3)' : 'rgba(255,255,255,0.05)',
-                border: activeTab === tab ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                color: activeTab === tab ? 'black' : 'white',
+                padding: '8px 18px', borderRadius: 24,
+                background: activeTab === tab ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.04)',
+                border: activeTab === tab ? 'none' : '1px solid var(--border-glass)',
+                color: activeTab === tab ? 'black' : 'rgba(255, 255, 255, 0.65)',
                 cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.3s',
                 fontWeight: 900, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
                 flexShrink: 0,
-                boxShadow: activeTab === tab ? '0 4px 15px rgba(0,223,216,0.3)' : 'none'
+                boxShadow: activeTab === tab ? '0 4px 15px rgba(0, 229, 255, 0.25)' : 'none'
               }}
             >
               {tab}
@@ -392,36 +410,37 @@ const Chats = () => {
       <AnimatePresence>
         {showCreateModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div onClick={() => setShowCreateModal(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)' }} />
+            <div onClick={() => setShowCreateModal(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)' }} />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               style={{
                 position: 'relative', width: '100%', maxWidth: 380,
-                background: 'var(--bg-glass-heavy)', border: '1px solid rgba(255,255,255,0.08)',
+                background: 'var(--bg-glass-heavy)', border: '1px solid var(--border-glass)',
                 borderRadius: 24, padding: 24, display: 'flex', flexDirection: 'column', gap: 18,
-                backdropFilter: 'blur(20px)'
+                backdropFilter: 'blur(30px)',
+                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.5 }}>Initialize Chat Pod</h3>
-                <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+                <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}><X size={20} /></button>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1 }}>POD NAME</label>
+                <label style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5 }}>POD NAME</label>
                 <input 
                   type="text" 
                   placeholder="e.g. ALPHA TEAM" 
                   value={newGroupName} 
                   onChange={e => setNewGroupName(e.target.value)}
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, height: 44, color: 'white', padding: '0 14px', outline: 'none', fontSize: 14, fontWeight: 600 }}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-glass)', borderRadius: 12, height: 44, color: 'white', padding: '0 14px', outline: 'none', fontSize: 14, fontWeight: 600 }}
                 />
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1 }}>SELECT CITIZENS</label>
+                <label style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5 }}>SELECT CITIZENS</label>
                 <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {friendsList.length === 0 ? (
                     <span style={{ fontSize: 12, opacity: 0.4 }}>No friends available.</span>
@@ -434,8 +453,8 @@ const Chats = () => {
                           onClick={() => toggleSelectFriend(friend.uid)}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '8px 12px', borderRadius: 12, background: isSelected ? 'rgba(0,223,216,0.08)' : 'rgba(255,255,255,0.02)',
-                            border: isSelected ? '1px solid rgba(0,223,216,0.2)' : '1px solid rgba(255,255,255,0.05)',
+                            padding: '8px 12px', borderRadius: 12, background: isSelected ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255,255,255,0.02)',
+                            border: isSelected ? '1px solid rgba(0, 229, 255, 0.25)' : '1px solid rgba(255,255,255,0.05)',
                             cursor: 'pointer', transition: 'all 0.2s'
                           }}
                         >
@@ -445,7 +464,7 @@ const Chats = () => {
                           </div>
                           <div style={{
                             width: 18, height: 18, borderRadius: 6,
-                            background: isSelected ? 'var(--primary-gradient)' : 'rgba(255,255,255,0.05)',
+                            background: isSelected ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)',
                             border: '1px solid rgba(255,255,255,0.1)',
                             display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center'
                           }}>
@@ -462,11 +481,17 @@ const Chats = () => {
                 whileTap={{ scale: 0.95 }}
                 onClick={handleCreateGroup}
                 disabled={isCreatingGroup}
+                className="neon-btn"
                 style={{
-                  background: 'var(--primary-gradient)', border: 'none', borderRadius: 14, height: 44,
-                  fontWeight: 900, color: 'black', letterSpacing: 0.5, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 15px rgba(0,223,216,0.3)'
+                  height: 44,
+                  fontWeight: 900,
+                  color: 'black',
+                  letterSpacing: 0.5,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%'
                 }}
               >
                 {isCreatingGroup ? 'INITIALIZING...' : 'INITIALIZE POD'}

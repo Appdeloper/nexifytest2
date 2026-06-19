@@ -24,22 +24,25 @@ const ProfileRow = ({ icon: Icon, color, label, onClick, delay = 0 }) => (
     initial={{ opacity: 0, x: -10 }}
     animate={{ opacity: 1, x: 0 }}
     transition={{ delay }}
+    whileHover={{ x: 4, backgroundColor: 'rgba(255,255,255,0.03)' }}
     onClick={onClick}
     className="ripple"
     style={{
-      display: 'flex', alignItems: 'center', gap: 14, padding: '16px 0',
-      borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer'
+      display: 'flex', alignItems: 'center', gap: 14, padding: '14px 12px',
+      borderRadius: 14, cursor: 'pointer', transition: 'background-color 0.2s ease',
+      borderBottom: 'none'
     }}
   >
     <div style={{
-      width: 40, height: 40, borderRadius: 12, background: `${color}15`,
+      width: 38, height: 38, borderRadius: 12, background: `${color}18`,
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      border: `1px solid ${color}25`
+      border: `1px solid ${color}35`,
+      boxShadow: `0 0 12px ${color}15`
     }}>
-      <Icon size={20} color={color} />
+      <Icon size={18} color={color} />
     </div>
-    <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>{label}</span>
-    <ChevronRight size={16} color="rgba(255,255,255,0.2)" />
+    <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.95)' }}>{label}</span>
+    <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
   </motion.div>
 );
 
@@ -114,7 +117,7 @@ const Profile = () => {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      style={{ height: '100%', overflowY: 'auto', background: '#000', color: 'white' }}
+      style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-dark)', color: 'white' }}
     >
       {/* ── Status Modal ── */}
       <AnimatePresence>
@@ -125,17 +128,25 @@ const Profile = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowStatusModal(false)}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, backdropFilter: 'blur(8px)' }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, backdropFilter: 'blur(12px)' }}
             />
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: '24px 16px 40px', zIndex: 101, boxShadow: '0 -10px 40px rgba(0,0,0,0.5)' }}
+              style={{ 
+                position: 'fixed', bottom: 0, left: 0, right: 0, 
+                background: 'var(--bg-glass-heavy)', 
+                backdropFilter: 'blur(30px)',
+                borderTop: '1px solid var(--border-glass)', 
+                borderTopLeftRadius: 32, borderTopRightRadius: 32, 
+                padding: '24px 16px 40px', zIndex: 101, 
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.6)' 
+              }}
             >
-              <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, margin: '0 auto 20px' }} />
-              <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 20, textAlign: 'center' }}>Set Status</h3>
+              <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 20px' }} />
+              <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 20, textAlign: 'center', letterSpacing: 0.5 }}>Set Status</h3>
               <StatusSelector 
                 currentPresence={currentUser?.presence} 
                 currentStatus={currentUser?.statusText}
@@ -278,14 +289,15 @@ const Profile = () => {
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/profile-customization')}
               className="neon-btn"
-              style={{ flex: 1, maxWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+              style={{ flex: 1, maxWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 20px', fontSize: 14 }}
             >
               <Palette size={18} /> Customize
             </motion.button>
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/settings')}
-              style={{ flex: 1, maxWidth: 160, padding: '14px', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)', color: 'white', fontSize: 14, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+              className="glass-btn"
+              style={{ flex: 1, maxWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 20px', fontSize: 14 }}
             >
               <SettingsIcon size={18} /> Settings
             </motion.button>
@@ -300,18 +312,19 @@ const Profile = () => {
                 exit={{ opacity: 0 }}
                 style={{ 
                   marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  padding: '10px 16px', background: 'rgba(0, 223, 216, 0.05)', borderRadius: 20,
-                  border: '1px solid rgba(0, 223, 216, 0.15)'
+                  padding: '10px 16px', background: 'rgba(0, 229, 255, 0.04)', borderRadius: 20,
+                  border: '1px solid rgba(0, 229, 255, 0.12)',
+                  boxShadow: '0 0 15px rgba(0, 229, 255, 0.05)'
                 }}
               >
                 <motion.div 
                   animate={{ rotate: 360 }}
                   transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
                 >
-                  <Disc size={16} color="#00dfd8" />
+                  <Disc size={16} color="var(--primary-cyan)" />
                 </motion.div>
-                <span style={{ fontSize: 11, fontWeight: 800, color: '#00dfd8' }}>
-                  NOW PLAYING: {musicStatus.title} • {musicStatus.artist}
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary-cyan)' }}>
+                  NOW PLAYING: {musicStatus.title.toUpperCase()} • {musicStatus.artist.toUpperCase()}
                 </span>
               </motion.div>
             )}
@@ -320,26 +333,45 @@ const Profile = () => {
       </div>
 
       {/* ── XP Progress ── */}
-      <div style={{ padding: '0 16px 24px' }}>
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 20 }}>
+      <div style={{ padding: '0 20px 24px' }}>
+        <div style={{ 
+          background: 'var(--bg-card)', 
+          border: '1px solid var(--border-glass)', 
+          borderRadius: 24, 
+          padding: 20,
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+        }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 4 }}>CURRENT RANK</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: rank.color }}>{rank.name.toUpperCase()}</div>
+              <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5, marginBottom: 4 }}>CURRENT RANK</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: rank.color, textShadow: `0 0 10px ${rank.color}44` }}>{rank.name.toUpperCase()}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 4 }}>NEXT RANK</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{nextRank ? nextRank.name : 'MAX'}</div>
+              <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5, marginBottom: 4 }}>NEXT RANK</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>{nextRank ? nextRank.name : 'MAX'}</div>
             </div>
-
           </div>
           
-          <div style={{ height: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 5, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 1.5, ease: "easeOut" }}
-              style={{ height: '100%', background: `linear-gradient(90deg, ${rank.color}, #fff)`, borderRadius: 5, boxShadow: `0 0 10px ${rank.color}` }}
+              style={{ 
+                height: '100%', 
+                background: `linear-gradient(90deg, ${rank.color}, #fff)`, 
+                borderRadius: 4, 
+                boxShadow: `0 0 15px ${rank.color}`
+              }}
+            />
+            <motion.div 
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
+              style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)'
+              }}
             />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
@@ -350,56 +382,93 @@ const Profile = () => {
       </div>
 
       {/* ── Stats Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, padding: '0 16px 32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, padding: '0 20px 32px' }}>
         {stats.map((stat, i) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 * i }}
+            whileHover={{ y: -4, borderColor: `${stat.color}44`, boxShadow: `0 8px 25px ${stat.color}15` }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             style={{ 
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', 
-              borderRadius: 20, padding: 16, display: 'flex', alignItems: 'center', gap: 12
+              background: 'var(--bg-card)', 
+              border: `1px solid rgba(255, 255, 255, 0.05)`, 
+              borderRadius: 20, 
+              padding: 16, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 12,
+              backdropFilter: 'blur(20px)',
+              cursor: 'pointer'
             }}
           >
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: `${stat.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <stat.icon size={20} color={stat.color} />
+            <div style={{ 
+              width: 38, 
+              height: 38, 
+              borderRadius: 12, 
+              background: `${stat.color}15`, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              border: `1px solid ${stat.color}25`,
+              boxShadow: `0 0 10px ${stat.color}10`
+            }}>
+              <stat.icon size={18} color={stat.color} />
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 900 }}>{stat.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{stat.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{stat.value}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>{stat.label}</div>
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* ── Menu Rows ── */}
-      <div style={{ padding: '0 16px 40px' }}>
-        <h3 style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 12, paddingLeft: 4 }}>DASHBOARD</h3>
-        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 24, padding: '4px 16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <ProfileRow icon={Target} color="#00dfd8" label="My Tasks" onClick={() => navigate('/tasks')} delay={0.1} />
-          <ProfileRow icon={Trophy} color="#f59e0b" label="Leaderboards" onClick={() => navigate('/leaderboards')} delay={0.15} />
-          <ProfileRow icon={Zap} color="#0070f3" label="Nexify Edge" onClick={() => navigate('/nexify-edge')} delay={0.25} />
+      <div style={{ padding: '0 20px 40px' }}>
+        <h3 style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5, marginBottom: 12, paddingLeft: 4 }}>DASHBOARD</h3>
+        <div style={{ 
+          background: 'var(--bg-card)', 
+          borderRadius: 24, 
+          padding: '8px', 
+          border: '1px solid var(--border-glass)',
+          backdropFilter: 'blur(20px)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          marginBottom: 24
+        }}>
+          <ProfileRow icon={Target} color="#00dfd8" label="My Tasks" onClick={() => navigate('/tasks')} delay={0.05} />
+          <ProfileRow icon={Trophy} color="#f59e0b" label="Leaderboards" onClick={() => navigate('/leaderboards')} delay={0.1} />
+          <ProfileRow icon={Zap} color="#0070f3" label="Nexify Edge" onClick={() => navigate('/nexify-edge')} delay={0.15} />
         </div>
 
-        <h3 style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1, marginTop: 24, marginBottom: 12, paddingLeft: 4 }}>SYSTEM</h3>
-        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 24, padding: '4px 16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <ProfileRow icon={Bell} color="#ff5555" label="Notifications" onClick={() => navigate('/settings')} delay={0.3} />
-          <ProfileRow icon={Palette} color="#d000ff" label="Appearance" onClick={() => navigate('/appearance')} delay={0.35} />
-          <ProfileRow icon={HelpCircle} color="#a78bfa" label="Help & Support" onClick={() => navigate('/settings')} delay={0.4} />
+        <h3 style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5, marginBottom: 12, paddingLeft: 4 }}>SYSTEM</h3>
+        <div style={{ 
+          background: 'var(--bg-card)', 
+          borderRadius: 24, 
+          padding: '8px', 
+          border: '1px solid var(--border-glass)',
+          backdropFilter: 'blur(20px)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <ProfileRow icon={Bell} color="#ff5555" label="Notifications" onClick={() => navigate('/settings')} delay={0.2} />
+          <ProfileRow icon={Palette} color="#d000ff" label="Appearance" onClick={() => navigate('/appearance')} delay={0.25} />
+          <ProfileRow icon={HelpCircle} color="#a78bfa" label="Help & Support" onClick={() => navigate('/settings')} delay={0.3} />
         </div>
 
         {(currentUser?.role === 'owner' || currentUser?.role === 'admin') && (
           <motion.button
-            whileHover={{ scale: 1.02 }}
+            whileHover={{ y: -2, boxShadow: '0 8px 25px rgba(208, 0, 255, 0.25)', borderColor: 'rgba(208, 0, 255, 0.4)' }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate('/admin')}
             style={{
-              width: '100%', marginTop: 24, background: 'rgba(208,0,255,0.1)',
-              border: '1px solid rgba(208,0,255,0.3)', borderRadius: 16, padding: 16,
-              color: '#d000ff', cursor: 'pointer', fontWeight: 800, fontSize: 15,
+              width: '100%', marginTop: 24, background: 'rgba(208,0,255,0.08)',
+              border: '1px solid rgba(208,0,255,0.2)', borderRadius: 16, padding: 16,
+              color: '#d000ff', cursor: 'pointer', fontWeight: 800, fontSize: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              boxShadow: '0 8px 20px rgba(208,0,255,0.15)'
+              transition: 'all 0.2s ease', letterSpacing: 0.5
             }}
           >
             <SettingsIcon size={18} /> Admin Control Panel
@@ -407,7 +476,8 @@ const Profile = () => {
         )}
 
         <motion.button
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ y: -2, backgroundColor: 'rgba(255, 85, 85, 0.12)', borderColor: 'rgba(255, 85, 85, 0.4)' }}
+          whileTap={{ scale: 0.98 }}
           onClick={async () => {
             try {
               await logoutUser();
@@ -417,15 +487,15 @@ const Profile = () => {
             }
           }}
           style={{
-            width: '100%', marginTop: 12, background: 'rgba(255,85,85,0.08)',
-            border: '1px solid rgba(255,85,85,0.25)', borderRadius: 16, padding: 16,
-            color: '#ff5555', cursor: 'pointer', fontWeight: 800, fontSize: 15,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+            width: '100%', marginTop: 12, background: 'rgba(255,85,85,0.06)',
+            border: '1px solid rgba(255,85,85,0.2)', borderRadius: 16, padding: 16,
+            color: '#ff5555', cursor: 'pointer', fontWeight: 800, fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            transition: 'all 0.2s ease', letterSpacing: 0.5
           }}
         >
           <LogOut size={18} /> Sign Out
         </motion.button>
-
       </div>
     </motion.div>
   );

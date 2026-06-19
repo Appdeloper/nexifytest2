@@ -7,6 +7,7 @@ import {
   X, AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../components/ToastProvider';
 import { logoutUser } from '../services/auth';
 import { updateUserProfile, uploadAvatar, saveUserPrefs } from '../services/profile';
@@ -18,49 +19,64 @@ const Toggle = ({ value, onChange }) => (
   <div
     onClick={() => onChange(!value)}
     style={{
-      width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
-      background: value ? 'var(--primary)' : 'rgba(255,255,255,0.15)',
+      width: 42, height: 22, borderRadius: 11, cursor: 'pointer',
+      background: value ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.15)',
       position: 'relative', transition: 'background 0.3s',
       flexShrink: 0
     }}
   >
     <div style={{
-      position: 'absolute', top: 3, left: value ? 23 : 3,
-      width: 18, height: 18, borderRadius: '50%', background: 'white',
-      transition: 'left 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.4)'
+      position: 'absolute', top: 2, left: value ? 22 : 2,
+      width: 18, height: 18, borderRadius: '50%', background: value ? 'black' : 'white',
+      transition: 'left 0.3s, background-color 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.4)'
     }} />
   </div>
 );
 
 const Row = ({ icon: Icon, color = '#00dfd8', title, sub, right, onClick }) => (
-  <div
+  <motion.div
     onClick={onClick}
+    whileHover={onClick ? { x: 4, backgroundColor: 'rgba(255,255,255,0.03)' } : {}}
+    whileTap={onClick ? { scale: 0.98 } : {}}
     style={{
-      display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0',
-      borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: onClick ? 'pointer' : 'default'
+      display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px',
+      borderRadius: 12, cursor: onClick ? 'pointer' : 'default',
+      transition: 'background-color 0.2s ease',
+      borderBottom: 'none'
     }}
     className={onClick ? 'ripple' : ''}
   >
     <div style={{
       width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-      background: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center'
+      background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      border: `1px solid ${color}35`,
+      boxShadow: `0 0 10px ${color}15`
     }}>
       <Icon size={18} color={color} />
     </div>
     <div style={{ flex: 1 }}>
-      <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
+      <div style={{ fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.95)' }}>{title}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
     </div>
-    {right || (onClick && <ChevronRight size={16} color="var(--text-muted)" />)}
-  </div>
+    {right || (onClick && <ChevronRight size={16} color="rgba(255,255,255,0.3)" />)}
+  </motion.div>
 );
 
 const Section = ({ label, children }) => (
-  <div style={{ marginBottom: 8 }}>
-    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, padding: '16px 0 4px' }}>
+  <div style={{ marginBottom: 12 }}>
+    <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: 1.5, padding: '20px 0 8px 4px' }}>
       {label}
     </div>
-    <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: '0 16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ 
+      background: 'var(--bg-card)', 
+      borderRadius: 24, 
+      padding: '8px', 
+      border: '1px solid var(--border-glass)',
+      backdropFilter: 'blur(20px)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2
+    }}>
       {children}
     </div>
   </div>
@@ -474,42 +490,50 @@ const Settings = () => {
   };
 
   return (
-    <div className="fade-in col" style={{ height: '100%' }}>
+    <div className="fade-in col" style={{ height: '100%', background: 'var(--bg-dark)' }}>
       {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '16px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 10
+        display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px',
+        borderBottom: '1px solid var(--border-glass)',
+        background: 'var(--bg-glass-heavy)', backdropFilter: 'blur(30px)', position: 'sticky', top: 0, zIndex: 10
       }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+        <motion.button 
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate(-1)} 
+          style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
+        >
           <ArrowLeft size={18} />
-        </button>
-        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,223,216,0.6))' }} />
-        <h1 style={{ fontSize: 18, fontWeight: 700, flex: 1 }}>Settings</h1>
+        </motion.button>
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ width: 28, height: 28, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.5))' }} />
+        <h1 style={{ fontSize: 18, fontWeight: 700, flex: 1, color: 'white' }}>Settings</h1>
       </div>
 
-      <div style={{ overflowY: 'auto', padding: '0 16px 40px' }}>
+      <div style={{ overflowY: 'auto', padding: '0 20px 40px' }}>
         {/* Profile peek */}
-        <div
+        <motion.div
           onClick={() => setSheet('account')}
+          whileHover={{ y: -2, borderColor: 'rgba(0, 229, 255, 0.25)', boxShadow: '0 8px 25px rgba(0, 229, 255, 0.1)' }}
+          whileTap={{ scale: 0.98 }}
           style={{
-            display: 'flex', alignItems: 'center', gap: 14, padding: '20px 16px',
-            background: 'var(--bg-card)', borderRadius: 16, margin: '16px 0',
-            border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer'
+            display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px',
+            background: 'var(--bg-card)', borderRadius: 20, margin: '16px 0',
+            border: '1px solid var(--border-glass)', cursor: 'pointer',
+            backdropFilter: 'blur(20px)',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
           }}
           className="ripple"
         >
           <img
             src={currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.uid}`}
-            style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }}
+            style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-cyan)', boxShadow: '0 0 10px rgba(0, 229, 255, 0.2)' }}
             alt=""
           />
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{currentUser?.displayName || 'User'}</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'white' }}>{currentUser?.displayName || 'User'}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{currentUser?.email}</div>
           </div>
-          <ChevronRight size={16} color="var(--text-muted)" />
-        </div>
+          <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
+        </motion.div>
 
         <Section label="ACCOUNT & PRIVACY">
           <Row icon={User} color="#00e5ff" title="Account" sub="Name, email, profile" onClick={() => setSheet('account')} />
@@ -536,17 +560,20 @@ const Settings = () => {
           <Row icon={Info} color="#94a3b8" title="About Nexify Connect" sub="Version 1.0.0" onClick={() => setSheet('about')} />
         </Section>
 
-        <button
+        <motion.button
+          whileHover={{ y: -2, backgroundColor: 'rgba(255, 85, 85, 0.12)', borderColor: 'rgba(255, 85, 85, 0.4)' }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => setShowLogout(true)}
           style={{
-            width: '100%', marginTop: 8, background: 'rgba(255,85,85,0.08)',
-            border: '1px solid rgba(255,85,85,0.25)', borderRadius: 14, padding: '16px',
-            color: '#ff5555', cursor: 'pointer', fontWeight: 700, fontSize: 15,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+            width: '100%', marginTop: 16, background: 'rgba(255,85,85,0.06)',
+            border: '1px solid rgba(255,85,85,0.2)', borderRadius: 16, padding: 16,
+            color: '#ff5555', cursor: 'pointer', fontWeight: 800, fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            transition: 'all 0.2s ease', letterSpacing: 0.5
           }}
         >
           <LogOut size={18} /> Logout
-        </button>
+        </motion.button>
       </div>
 
       {/* Detail Sheets */}
