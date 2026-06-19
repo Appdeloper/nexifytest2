@@ -616,6 +616,7 @@ class FirebaseRepository {
             throw Exception("Transmission blocked by Nexify Edge: Spam or unsafe content detected.")
         }
 
+        val messageId = java.util.UUID.randomUUID().toString()
         val type = when {
             imageUrl != null -> "image"
             stickerId != null || stickerUrl != null -> "sticker"

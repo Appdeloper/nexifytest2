@@ -56,7 +56,7 @@ fun CallScreen(
         initialValue = 0.95f,
         targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, ease = LinearEasing),
+            animation = tween(1500, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         )
     )

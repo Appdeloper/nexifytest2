@@ -181,7 +181,8 @@ fun PremiumTextField(
             focusedBorderColor = CyanNeon,
             unfocusedBorderColor = CardBorder,
             containerColor = Color(0x33161128),
-            textColor = Color.White
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White
         ),
         shape = RoundedCornerShape(16.dp),
         modifier = modifier.fillMaxWidth()
@@ -241,3 +242,19 @@ fun UniversalBackButton(
         }
     }
 }
+
+@Composable
+fun PremiumCard(
+    modifier: Modifier = Modifier,
+    borderStroke: BorderStroke = BorderStroke(1.dp, CardBorder),
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    GlassmorphicCard(
+        modifier = modifier,
+        borderStroke = borderStroke,
+        onClick = onClick,
+        content = content
+    )
+}
+

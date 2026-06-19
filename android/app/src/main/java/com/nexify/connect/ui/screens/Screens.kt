@@ -48,6 +48,7 @@ import com.nexify.connect.services.safeCollect
 import com.nexify.connect.services.LocalErrorReporter
 import com.nexify.connect.services.NexifyLog
 import com.nexify.connect.ui.components.*
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.catch
 import com.nexify.connect.ui.theme.*
 import kotlinx.coroutines.delay
@@ -128,7 +129,7 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                 value = email,
                 onValueChange = { email = it },
                 placeholder = "Email Address",
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, color = CyanNeon) }
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon) }
             )
 
             PremiumTextField(
@@ -136,7 +137,7 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                 onValueChange = { password = it },
                 placeholder = "Password",
                 visualTransformation = PasswordVisualTransformation(),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, color = CyanNeon) }
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = CyanNeon) }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -247,14 +248,14 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                 value = username,
                 onValueChange = { username = it },
                 placeholder = "Citizen Username",
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, color = PurpleNeon) }
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PurpleNeon) }
             )
 
             PremiumTextField(
                 value = email,
                 onValueChange = { email = it },
                 placeholder = "Email Address",
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, color = PurpleNeon) }
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PurpleNeon) }
             )
 
             PremiumTextField(
@@ -262,14 +263,14 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                 onValueChange = { password = it },
                 placeholder = "Secure Password",
                 visualTransformation = PasswordVisualTransformation(),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, color = PurpleNeon) }
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurpleNeon) }
             )
 
             PremiumTextField(
                 value = inviteCode,
                 onValueChange = { inviteCode = it },
                 placeholder = "Access / Invite Code",
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, color = PurpleNeon) }
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurpleNeon) }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -434,7 +435,7 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
                         .padding(8.dp)
                         .border(1.dp, Color.Black, CircleShape)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, color = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -535,6 +536,8 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
                         }
                     }
                 )
+            }
+        )
     }
 }
 
@@ -620,7 +623,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                 value = searchQuery,
                 onValueChange = { searchQuery = it.lowercase() },
                 placeholder = "Search by username...",
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, color = CyanNeon) }
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = CyanNeon) }
             )
 
             if (searchQuery.isBlank()) {
@@ -680,7 +683,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
                                             shape = RoundedCornerShape(20.dp)
                                         ) {
-                                            Icon(Icons.Default.Block, contentDescription = null, color = Color.White, modifier = Modifier.size(14.dp))
+                                            Icon(Icons.Default.Block, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Blocked", color = Color.White, fontSize = 12.sp)
                                         }
@@ -698,7 +701,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                                 colors = ButtonDefaults.buttonColors(containerColor = CyanNeon),
                                                 shape = RoundedCornerShape(20.dp)
                                             ) {
-                                                Icon(Icons.Default.Message, contentDescription = null, color = Color.Black)
+                                                Icon(Icons.Default.Message, contentDescription = null, tint = Color.Black)
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text("Message", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                             }
@@ -710,7 +713,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                                 },
                                                 modifier = Modifier.size(36.dp)
                                             ) {
-                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                                Icon(Icons.Default.Block, contentDescription = "Block", tint = Color.Red)
                                             }
                                         }
                                     }
@@ -738,7 +741,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                                 },
                                                 modifier = Modifier.size(36.dp)
                                             ) {
-                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                                Icon(Icons.Default.Block, contentDescription = "Block", tint = Color.Red)
                                             }
                                         }
                                     }
@@ -779,7 +782,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                                 },
                                                 modifier = Modifier.size(36.dp)
                                             ) {
-                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                                Icon(Icons.Default.Block, contentDescription = "Block", tint = Color.Red)
                                             }
                                         }
                                     }
@@ -799,7 +802,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                                 modifier = Modifier
                                                     .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), RoundedCornerShape(20.dp))
                                             ) {
-                                                Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text("Add", color = Color.White, fontSize = 12.sp)
                                             }
@@ -811,7 +814,7 @@ fun FindFriendsScreen(navController: NavController, repository: FirebaseReposito
                                                 },
                                                 modifier = Modifier.size(36.dp)
                                             ) {
-                                                Icon(Icons.Default.Block, contentDescription = "Block", color = Color.Red)
+                                                Icon(Icons.Default.Block, contentDescription = "Block", tint = Color.Red)
                                             }
                                         }
                                     }
@@ -916,13 +919,13 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                     Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon)
                 }
                 IconButton(onClick = { navController.navigate("settings") }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", color = Color.White)
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                 }
                 IconButton(onClick = { navController.navigate("find") }) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = null, color = Color.White)
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White)
                 }
                 IconButton(onClick = { navController.navigate("rooms") }) {
-                    Icon(Icons.Default.Explore, contentDescription = null, color = Color.White)
+                    Icon(Icons.Default.Explore, contentDescription = null, tint = Color.White)
                 }
                 IconButton(onClick = { navController.navigate("chat_rooms") }) {
                     Icon(Icons.Default.Groups, contentDescription = "Chat Rooms", tint = CyanNeon)
@@ -936,7 +939,7 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                         popUpTo(0)
                     }
                 }) {
-                    Icon(Icons.Default.ExitToApp, contentDescription = null, color = Color.Red)
+                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red)
                 }
             }
         }
@@ -1051,7 +1054,7 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                 ) {
                     Text("Your Active Pods", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     IconButton(onClick = { navController.navigate("create_group") }) {
-                        Icon(Icons.Default.GroupAdd, contentDescription = null, color = CyanNeon)
+                        Icon(Icons.Default.GroupAdd, contentDescription = null, tint = CyanNeon)
                     }
                 }
 
@@ -4137,6 +4140,29 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
     }
 
     if (showCompletionDialog) {
+        AlertDialog(
+            onDismissRequest = { showCompletionDialog = false },
+            title = {
+                Text(
+                    text = "Focus Complete",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "Awesome focus, Citizen! You stayed focused for ${selectedDurationMinutes} minutes and generated +${earnedXpAmount} XP.",
+                    color = TextMuted,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                PremiumButton(
+                    text = "ACKNOWLEDGE",
+                    onClick = { showCompletionDialog = false }
+                )
+            },
             containerColor = Color(0xFF161128),
             shape = RoundedCornerShape(16.dp)
         )

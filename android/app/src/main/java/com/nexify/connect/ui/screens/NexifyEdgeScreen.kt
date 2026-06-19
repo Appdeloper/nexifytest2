@@ -45,7 +45,7 @@ fun NexifyEdgeScreen(navController: NavController, repository: FirebaseRepositor
 
     // Live Subscriptions
     val posts by repository.subscribeToEdgePosts().safeCollect("EdgeScreen_posts", emptyList()).collectAsState(initial = emptyList())
-    val savedIds by repository.subscribeSavedEdgePosts().safeCollect("EdgeScreen_savedIds", emptyList()).collectAsState(initial = emptyList())
+    val savedIds by repository.subscribeToSavedEdgePosts().safeCollect("EdgeScreen_savedIds", emptyList()).collectAsState(initial = emptyList())
     val userPreferences by repository.subscribeToUserPreferences().safeCollect("EdgeScreen_prefs", emptyList()).collectAsState(initial = emptyList())
 
     var activeTab by remember { mutableStateOf("Today's Edge") } // "Today's Edge", "News", "AI Coach"
