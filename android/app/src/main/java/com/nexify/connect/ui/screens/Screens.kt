@@ -6,11 +6,13 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -105,111 +107,240 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
             .background(AmoledBg),
         contentAlignment = Alignment.Center
     ) {
+        // Cyber backdrop glow
+        Box(
+            modifier = Modifier
+                .size(320.dp)
+                .align(Alignment.TopCenter)
+                .offset(y = (-50).dp)
+                .graphicsLayer(alpha = 0.18f)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(CyanNeon, Color.Transparent),
+                        radius = 450f
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .widthIn(max = 400.dp)
+                .fillMaxWidth(0.92f)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "NEXIFY CONNECT",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = CyanNeon
-            )
-            Text(
-                text = "Enter the social gateway of the future",
-                fontSize = 12.sp,
-                color = TextMuted
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            PremiumTextField(
-                value = email,
-                onValueChange = { email = it },
-                placeholder = "Email Address",
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon) }
-            )
-
-            PremiumTextField(
-                value = password,
-                onValueChange = { password = it },
-                placeholder = "Password",
-                visualTransformation = PasswordVisualTransformation(),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = CyanNeon) }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (isLoading) {
-                CircularProgressIndicator(color = CyanNeon)
-            } else {
-                PremiumButton(
-                    text = "AUTHENTICATE",
-                    onClick = {
-                        if (email.isEmpty() || password.isEmpty()) return@PremiumButton
-                        coroutineScope.launch {
-                            isLoading = true
-                            try {
-                                repository.login(email, password)
-                                navController.navigate("home") {
-                                    popUpTo("login") { inclusive = true }
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, e.message ?: "Auth failed.", Toast.LENGTH_SHORT).show()
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+            // App Logo with ambient drop glow
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                // Glow behind logo
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer(alpha = 0.3f)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(CyanNeon, Color.Transparent),
+                                radius = 150f
+                            )
+                        )
                 )
+                Image(
+                    painter = painterResource(id = com.nexify.connect.R.drawable.logo),
+                    contentDescription = "Nexify Connect Logo",
+                    modifier = Modifier.size(110.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            // Glassmorphic Panel
+            GlassmorphicCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderStroke = BorderStroke(1.dp, CardBorder)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Login to continue",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Welcome back! Please login to your account.",
+                        fontSize = 12.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
-                OutlinedButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            isLoading = true
-                            try {
-                                val success = repository.signInWithGoogle("mock_google_id_token")
-                                if (success) {
-                                    navController.navigate("home") {
-                                        popUpTo("login") { inclusive = true }
+                    PremiumTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email",
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    PremiumTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "Password",
+                        visualTransformation = PasswordVisualTransformation(),
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = CyanNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            text = "Forgot password?",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextMuted,
+                            modifier = Modifier
+                                .clickable {
+                                    if (email.isEmpty()) {
+                                        Toast.makeText(context, "Please enter your email address first.", Toast.LENGTH_SHORT).show()
+                                        return@clickable
+                                    }
+                                    coroutineScope.launch {
+                                        isLoading = true
+                                        try {
+                                            repository.forgotPassword(email)
+                                            Toast.makeText(context, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, e.message ?: "Reset failed.", Toast.LENGTH_SHORT).show()
+                                        } finally {
+                                            isLoading = false
+                                        }
                                     }
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
-                            } finally {
-                                isLoading = false
-                            }
+                                .padding(vertical = 4.dp)
+                        )
+                    }
+
+                    if (isLoading) {
+                        Box(modifier = Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(24.dp))
                         }
-                    },
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
+                    } else {
+                        PremiumButton(
+                            text = "CONTINUE",
+                            onClick = {
+                                if (email.isEmpty() || password.isEmpty()) {
+                                    Toast.makeText(context, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                coroutineScope.launch {
+                                    isLoading = true
+                                    try {
+                                        repository.login(email, password)
+                                        navController.navigate("home") {
+                                            popUpTo("login") { inclusive = true }
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, e.message ?: "Auth failed.", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        isLoading = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // OR Separator
                     Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("G  ", fontWeight = FontWeight.Bold, color = CyanNeon, fontSize = 16.sp)
-                        Text("SIGN IN WITH GOOGLE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Divider(modifier = Modifier.weight(1f), color = CardBorder)
+                        Text(text = "OR", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                        Divider(modifier = Modifier.weight(1f), color = CardBorder)
+                    }
+
+                    // Google Login Button
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                isLoading = true
+                                try {
+                                    val success = repository.signInWithGoogle("mock_google_id_token")
+                                    if (success) {
+                                        navController.navigate("home") {
+                                            popUpTo("login") { inclusive = true }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isLoading = false
+                                }
+                            }
+                        },
+                        border = BorderStroke(1.dp, CardBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0x0AFFFFFF),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = CyanNeon,
+                                modifier = Modifier.size(18.dp).padding(end = 6.dp)
+                            )
+                            Text(
+                                text = "Continue with Google",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(text = "Don't have an account?", fontSize = 12.sp, color = TextMuted)
+                        Text(
+                            text = "Sign up",
+                            fontSize = 12.sp,
+                            color = CyanNeon,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                navController.navigate("signup") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            }
+                        )
                     }
                 }
             }
 
-            TextButton(onClick = { 
-                navController.navigate("signup") {
-                    popUpTo("login") { inclusive = true }
-                }
-            }) {
-                Text("Create new avatar profile", color = PurpleNeon)
-            }
+            // Footer Agreement
+            Text(
+                text = "By continuing, you agree to our Terms & Privacy Policy.",
+                fontSize = 11.sp,
+                color = TextMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp).fillMaxWidth(0.85f)
+            )
         }
     }
 }
@@ -231,119 +362,226 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
             .background(AmoledBg),
         contentAlignment = Alignment.Center
     ) {
+        // Cyber backdrop glow
+        Box(
+            modifier = Modifier
+                .size(320.dp)
+                .align(Alignment.BottomStart)
+                .offset(x = (-80).dp, y = 80.dp)
+                .graphicsLayer(alpha = 0.15f)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(PurpleNeon, Color.Transparent),
+                        radius = 450f
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .widthIn(max = 400.dp)
+                .fillMaxWidth(0.92f)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "INITIALIZE PROFILE",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = PurpleNeon
-            )
-
-            PremiumTextField(
-                value = username,
-                onValueChange = { username = it },
-                placeholder = "Citizen Username",
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PurpleNeon) }
-            )
-
-            PremiumTextField(
-                value = email,
-                onValueChange = { email = it },
-                placeholder = "Email Address",
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PurpleNeon) }
-            )
-
-            PremiumTextField(
-                value = password,
-                onValueChange = { password = it },
-                placeholder = "Secure Password",
-                visualTransformation = PasswordVisualTransformation(),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurpleNeon) }
-            )
-
-            PremiumTextField(
-                value = inviteCode,
-                onValueChange = { inviteCode = it },
-                placeholder = "Access / Invite Code",
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurpleNeon) }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (isLoading) {
-                CircularProgressIndicator(color = PurpleNeon)
-            } else {
-                PremiumButton(
-                    text = "REGISTER CITIZEN",
-                    onClick = {
-                        if (email.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) return@PremiumButton
-                        coroutineScope.launch {
-                            isLoading = true
-                            try {
-                                repository.signUp(email, password, username, inviteCode)
-                                navController.navigate("home") {
-                                    popUpTo("signup") { inclusive = true }
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, e.message ?: "Sign up failed.", Toast.LENGTH_SHORT).show()
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = listOf(CyanNeon, PurpleNeon)
+            // App Logo with ambient drop glow
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                // Glow behind logo
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer(alpha = 0.3f)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(CyanNeon, Color.Transparent),
+                                radius = 150f
+                            )
+                        )
                 )
+                Image(
+                    painter = painterResource(id = com.nexify.connect.R.drawable.logo),
+                    contentDescription = "Nexify Connect Logo",
+                    modifier = Modifier.size(110.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            // Glassmorphic Panel
+            GlassmorphicCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderStroke = BorderStroke(1.dp, CardBorder)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Join Nexify",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Create your account.",
+                        fontSize = 12.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
-                OutlinedButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            isLoading = true
-                            try {
-                                val success = repository.signInWithGoogle("mock_google_id_token")
-                                if (success) {
-                                    navController.navigate("home") {
-                                        popUpTo("signup") { inclusive = true }
+                    PremiumTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        placeholder = "Username",
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PurpleNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    PremiumTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email",
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PurpleNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    PremiumTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "Password",
+                        visualTransformation = PasswordVisualTransformation(),
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurpleNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    PremiumTextField(
+                        value = inviteCode,
+                        onValueChange = { inviteCode = it },
+                        placeholder = "Access / Invite Code",
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurpleNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (isLoading) {
+                        Box(modifier = Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = PurpleNeon, modifier = Modifier.size(24.dp))
+                        }
+                    } else {
+                        PremiumButton(
+                            text = "SIGN UP",
+                            onClick = {
+                                if (email.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) {
+                                    Toast.makeText(context, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                coroutineScope.launch {
+                                    isLoading = true
+                                    try {
+                                        repository.signUp(email, password, username, inviteCode)
+                                        navController.navigate("home") {
+                                            popUpTo("signup") { inclusive = true }
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, e.message ?: "Sign up failed.", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        isLoading = false
                                     }
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, e.message ?: "Google Sign Up failed.", Toast.LENGTH_SHORT).show()
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
+                            },
+                            colors = listOf(CyanNeon, PurpleNeon),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // OR Separator
                     Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("G  ", fontWeight = FontWeight.Bold, color = CyanNeon, fontSize = 16.sp)
-                        Text("SIGN IN WITH GOOGLE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Divider(modifier = Modifier.weight(1f), color = CardBorder)
+                        Text(text = "OR", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                        Divider(modifier = Modifier.weight(1f), color = CardBorder)
+                    }
+
+                    // Google Signup Button
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                isLoading = true
+                                try {
+                                    val success = repository.signInWithGoogle("mock_google_id_token")
+                                    if (success) {
+                                        navController.navigate("home") {
+                                            popUpTo("signup") { inclusive = true }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, e.message ?: "Google Sign Up failed.", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isLoading = false
+                                }
+                            }
+                        },
+                        border = BorderStroke(1.dp, CardBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0x0AFFFFFF),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = PurpleNeon,
+                                modifier = Modifier.size(18.dp).padding(end = 6.dp)
+                            )
+                            Text(
+                                text = "Sign Up with Google",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(text = "Already have an account?", fontSize = 12.sp, color = TextMuted)
+                        Text(
+                            text = "Log in",
+                            fontSize = 12.sp,
+                            color = CyanNeon,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                navController.navigate("login") {
+                                    popUpTo("signup") { inclusive = true }
+                                }
+                            }
+                        )
                     }
                 }
             }
 
-            TextButton(onClick = { 
-                navController.navigate("login") {
-                    popUpTo("signup") { inclusive = true }
-                }
-            }) {
-                Text("Already registered? Login", color = CyanNeon)
-            }
+            // Footer Agreement
+            Text(
+                text = "By continuing, you agree to our Terms & Privacy Policy.",
+                fontSize = 11.sp,
+                color = TextMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp).fillMaxWidth(0.85f)
+            )
         }
     }
 }

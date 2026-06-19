@@ -65,6 +65,11 @@ class FirebaseRepository {
         return true
     }
 
+    suspend fun forgotPassword(email: String): Boolean {
+        auth.sendPasswordResetEmail(email).await()
+        return true
+    }
+
     suspend fun signUp(email: String, password: CharSequence, username: String, inviteCode: String): Boolean {
         val trimmedCode = inviteCode.trim()
         if (trimmedCode.isEmpty()) {
