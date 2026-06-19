@@ -87,3 +87,47 @@ export const summarizeChats = async (chats) => {
     return "Failed to summarize chats.";
   }
 };
+
+export const explainEdgeUpdate = async (title, content, type) => {
+  if (!genAI) {
+    // Fallback response with simulated breakdown if no API key is provided
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(`### AI Insights & Action Items: **${title}**
+
+Here is a quick breakdown for this **${type}** update:
+
+1. **Core Concept**: The main idea here is how we can apply modern workflows (like ${content.slice(0, 70)}...) to improve our day-to-day productivity.
+2. **Key Takeaway**: Don't get stuck in planning. Immediate action creates momentum.
+3. **Actionable Step**: Set a timer for 10 minutes right now and work on your highest-priority task without interruption.
+
+*Note: Enable Gemini power by configuring \`VITE_GEMINI_API_KEY\` in your environment to get real-time deep-dive explanations!*`);
+      }, 1200);
+    });
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `
+      You are Nexify AI, a premium productivity assistant inside Nexify Connect.
+      Please explain and break down this curated insight/update for a user.
+      Provide context, key takeaways, and a clear actionable step.
+      Format your response beautifully in Markdown. Keep it concise, engaging, and premium.
+      
+      TITLE: ${title}
+      TYPE: ${type}
+      CONTENT: ${content}
+    `;
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("Gemini Explain Error:", error);
+    return `### **${title}** (Brief Explanation)
+    
+Could not load AI-powered deep explanation right now, but here is a quick note:
+This ${type} highlight focuses on optimizing your workflow. ${content}
+
+*Actionable Step*: Incorporate this insight into your next focus session or daily planner.`;
+  }
+};
+

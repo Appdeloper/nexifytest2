@@ -115,7 +115,7 @@ export const syncLeaderboard = async (uid, cachedData = null) => {
       level: userData.level || 1,
       verified: userData.verified || false,
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
   } catch (e) {
     console.error('Leaderboard sync failed:', e.message);
   }

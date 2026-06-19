@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { logActivity, ACTIVITY_TYPES } from './activity';
+import { syncLeaderboard } from './xp';
 
 const OWNER_EMAIL = "iamwe@nexify.com";
 
@@ -67,6 +68,9 @@ export const ensureUserProfile = async (user) => {
     
     await setDoc(userRef, profileData);
     
+    // Sync to leaderboard
+    await syncLeaderboard(user.uid, profileData).catch(() => {});
+
     // Log signup activity
     await logActivity({
       userId: user.uid,
@@ -128,6 +132,7 @@ export const ensureUserProfile = async (user) => {
 
       // Rewrite clean and complete data (without merge to discard old keys with spaces)
       await setDoc(userRef, repairedData);
+      await syncLeaderboard(user.uid, repairedData).catch(() => {});
       return repairedData;
     }
 
@@ -149,6 +154,10 @@ export const ensureUserProfile = async (user) => {
       lastSeen: serverTimestamp(),
       online: true
     }, { merge: true });
+    
+    // Sync to leaderboard
+    await syncLeaderboard(user.uid, data).catch(() => {});
+    
     return data;
   }
 };

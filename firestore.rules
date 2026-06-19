@@ -233,6 +233,14 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
+    match /users/{userId}/preferences/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+    match /users/{userId}/saved_edge/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
     match /users/{userId}/tasks/{taskId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;

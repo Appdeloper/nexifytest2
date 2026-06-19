@@ -154,11 +154,11 @@ const Leaderboards = () => {
 
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="header-title" style={{ fontSize: 16 }}>{user.displayName}</span>
+                      <span className="header-title" style={{ fontSize: 16 }}>{user.displayName || 'Unknown Seeker'}</span>
                       <RoleBadge role={user.role} size="xs" />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 700 }}>@{user.username}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 700 }}>{user.username ? `@${user.username}` : '@seeker'}</span>
                       <RankBadge xp={user.xp || 0} size="xs" />
                     </div>
                   </div>
