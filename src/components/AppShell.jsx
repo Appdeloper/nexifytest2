@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
 
-const HIDE_NAV_PREFIXES = ['/chat-conversation', '/room-chat', '/create-room', '/focus-pods', '/friends', '/tasks', '/nexify-fit', '/nexify-edge', '/nexify-ai', '/global-search', '/settings', '/appearance', '/admin'];
+const HIDE_NAV_PREFIXES = ['/chat-conversation', '/group-chat', '/room-chat', '/create-room', '/focus-pods', '/friends', '/tasks', '/nexify-fit', '/nexify-edge', '/nexify-ai', '/global-search', '/settings', '/appearance', '/admin'];
 
 import { useAIEngine } from './useAIEngine';
 
