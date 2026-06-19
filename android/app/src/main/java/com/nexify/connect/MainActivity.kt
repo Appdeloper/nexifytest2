@@ -21,6 +21,7 @@ import com.nexify.connect.services.NexifyLog
 import com.nexify.connect.ui.screens.*
 import com.nexify.connect.ui.viewmodel.*
 import com.nexify.connect.ui.theme.NexifyConnectTheme
+import kotlinx.coroutines.flow.*
 
 class MainActivity : ComponentActivity() {
     private val repository = FirebaseRepository()
@@ -144,6 +145,22 @@ class MainActivity : ComponentActivity() {
 
                             val currentUser = FirebaseAuth.getInstance().currentUser
                             val startDestination = if (!onboardingComplete) "onboarding" else if (currentUser != null) "home" else "login"
+
+                            LaunchedEffect(currentUser) {
+                                if (currentUser != null) {
+                                    repository.subscribeToIncomingCalls().collect { calls ->
+                                        val activeCall = calls.firstOrNull { it.status == "ringing" || it.status == "dialing" }
+                                        if (activeCall != null) {
+                                            val currentRoute = navController.currentBackStackEntry?.destination?.route ?: ""
+                                            if (!currentRoute.startsWith("call/")) {
+                                                navController.navigate("call/${activeCall.callId}/${activeCall.callerId}/false") {
+                                                    launchSingleTop = true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
                             NavHost(
                                 navController = navController,

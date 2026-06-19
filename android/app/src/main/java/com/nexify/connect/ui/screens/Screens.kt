@@ -158,6 +158,40 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            isLoading = true
+                            try {
+                                val success = repository.signInWithGoogle("mock_google_id_token")
+                                if (success) {
+                                    navController.navigate("home") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("G  ", fontWeight = FontWeight.Bold, color = CyanNeon, fontSize = 16.sp)
+                        Text("SIGN IN WITH GOOGLE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    }
+                }
             }
 
             TextButton(onClick = { 
@@ -257,6 +291,40 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                     modifier = Modifier.fillMaxWidth(),
                     colors = listOf(CyanNeon, PurpleNeon)
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            isLoading = true
+                            try {
+                                val success = repository.signInWithGoogle("mock_google_id_token")
+                                if (success) {
+                                    navController.navigate("home") {
+                                        popUpTo("signup") { inclusive = true }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, e.message ?: "Google Sign Up failed.", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("G  ", fontWeight = FontWeight.Bold, color = CyanNeon, fontSize = 16.sp)
+                        Text("SIGN IN WITH GOOGLE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    }
+                }
             }
 
             TextButton(onClick = { 
@@ -1023,67 +1091,6 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                 }
             }
         }
-    }
-
-    val incomingCalls by repository.subscribeToIncomingCalls().safeCollect("ChatList_incomingCalls", emptyList()).collectAsState(initial = emptyList())
-    val activeIncomingCall = incomingCalls.firstOrNull()
-    if (activeIncomingCall != null) {
-        val callerProfile = allUsers.find { it.userId == activeIncomingCall.callerId }
-        val callerName = callerProfile?.username ?: "Citizen"
-        val isConnected = activeIncomingCall.status == "connected"
-
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text(if (isConnected) "📞 Active Voice Channel" else "📞 Incoming Voice Signal...", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "@$callerName",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        text = if (isConnected) "CONNECTED" else "RINGING...",
-                        color = if (isConnected) Color.Green else CyanNeon,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            confirmButton = {
-                if (!isConnected) {
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                repository.answerCall(activeIncomingCall.callId)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
-                    ) {
-                        Text("ANSWER", color = Color.White)
-                    }
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = {
-                        coroutineScope.launch {
-                            repository.endCall(activeIncomingCall.callId)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                ) {
-                    Text(if (isConnected) "DISCONNECT" else "DECLINE", color = Color.White)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
     }
 }
 
