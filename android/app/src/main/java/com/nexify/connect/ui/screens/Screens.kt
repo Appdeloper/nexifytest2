@@ -30,8 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
@@ -988,7 +990,7 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
 
         if (currentTab == "DMs") {
             if (chats.isEmpty()) {
-                Box(modifier = Modifier.fillGrid(), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No active DMs. Find friends to connect!", color = TextMuted, fontSize = 14.sp)
                 }
             } else {
@@ -1936,7 +1938,7 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(currentGroup.members) { memberId ->
-                        val memberProfile = friendsList.find { it.userId == memberId } ?: allUsers.find { it.userId == memberId }
+                        val memberProfile = friendsList.find { it.userId == memberId }
                         val isMemberMe = memberId == uid
 
                         Row(
@@ -2121,7 +2123,8 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
                     focusedBorderColor = CyanNeon,
                     unfocusedBorderColor = CardBorder,
                     containerColor = Color(0x33161128),
-                    textColor = Color.White
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
                 ),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -2320,20 +2323,6 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
                                     }
                                 }
 
-                                if (room.lastMessage.isNotEmpty()) {
-                                    Text(
-                                        text = "Last link: ${room.lastMessage}",
-                                        color = TextMuted.copy(alpha = 0.8f),
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color.White.copy(alpha = 0.02f))
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
 
                                 // Live member details
                                 Row(

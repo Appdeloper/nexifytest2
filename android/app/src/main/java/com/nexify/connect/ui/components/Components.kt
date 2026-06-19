@@ -258,3 +258,38 @@ fun PremiumCard(
     )
 }
 
+@Composable
+fun TabButton(
+    text: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) Color(0x2200DFD8) else Color(0x10FFFFFF))
+            .border(
+                1.dp,
+                if (active) CyanNeon else Color.White.copy(alpha = 0.15f),
+                RoundedCornerShape(12.dp)
+            )
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
+            .padding(vertical = 8.dp, horizontal = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (active) CyanNeon else Color.White,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 14.sp
+        )
+    }
+}
+
+

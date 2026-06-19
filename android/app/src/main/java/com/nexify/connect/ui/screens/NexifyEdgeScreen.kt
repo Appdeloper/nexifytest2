@@ -408,6 +408,7 @@ fun EdgeAiCoachTab(repository: FirebaseRepository) {
 }
 
 // Inline tracking parameter helper
+@Composable
 private fun Text(text: String, color: Color, fontWeight: FontWeight, fontSize: androidx.compose.ui.unit.TextUnit, trackingSender: androidx.compose.ui.unit.TextUnit) {
     Text(text = text, color = color, fontWeight = fontWeight, fontSize = fontSize, letterSpacing = trackingSender)
 }
