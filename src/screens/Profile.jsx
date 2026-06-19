@@ -379,7 +379,7 @@ const Profile = () => {
         <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 24, padding: '4px 16px', border: '1px solid rgba(255,255,255,0.05)' }}>
           <ProfileRow icon={Target} color="#00dfd8" label="My Tasks" onClick={() => navigate('/tasks')} delay={0.1} />
           <ProfileRow icon={Trophy} color="#f59e0b" label="Leaderboards" onClick={() => navigate('/leaderboards')} delay={0.15} />
-          <ProfileRow icon={Zap} color="#0070f3" label="My Activity" onClick={() => navigate('/nexify-edge')} delay={0.25} />
+          <ProfileRow icon={Zap} color="#0070f3" label="Nexify Edge" onClick={() => navigate('/nexify-edge')} delay={0.25} />
         </div>
 
         <h3 style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 1, marginTop: 24, marginBottom: 12, paddingLeft: 4 }}>SYSTEM</h3>

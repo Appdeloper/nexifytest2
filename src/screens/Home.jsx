@@ -124,6 +124,26 @@ const Home = () => {
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <motion.button 
             whileTap={{ scale: 0.9 }} 
+            onClick={() => navigate('/nexify-edge')}
+            style={{ 
+              background: 'rgba(0, 223, 216, 0.1)', 
+              border: '1px solid rgba(0, 223, 216, 0.35)', 
+              borderRadius: '50%', 
+              width: 42, 
+              height: 42, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              color: '#00dfd8', 
+              position: 'relative', 
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 0 10px rgba(0, 223, 216, 0.2)' 
+            }}
+          >
+            <Zap size={20} fill="#00dfd8" />
+          </motion.button>
+          <motion.button 
+            whileTap={{ scale: 0.9 }} 
             onClick={() => navigate('/global-search')}
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '50%', width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', backdropFilter: 'blur(10px)' }}
           >
