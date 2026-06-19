@@ -2005,7 +2005,23 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
                                         onClick = {
                                             coroutineScope.launch {
                                                 repository.addMemberToGroup(groupId, friend.userId)
-            // ── DISCORD-STYLE ROOMS SCREEN ──────────────────────────────────────
+                                                Toast.makeText(context, "Added!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = CyanNeon)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── DISCORD-STYLE ROOMS SCREEN ──────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
