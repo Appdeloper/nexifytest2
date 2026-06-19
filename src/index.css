@@ -1,17 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-dark: #000000;
-  --bg-main: #000000;
-  --bg-card: #0A0F1F;
-  --bg-glass: rgba(10, 15, 31, 0.7);
+  --bg-dark: #0D0D0D;
+  --bg-main: #0D0D0D;
+  --bg-card: rgba(22, 17, 40, 0.45);
+  --bg-glass: rgba(22, 17, 40, 0.45);
   
-  --primary-blue: #0070f3;
-  --primary-purple: #7928ca;
-  --primary-cyan: #00dfd8;
+  --primary-blue: #00F2FE;
+  --primary-purple: #9B51E0;
+  --primary-cyan: #00F2FE;
 
   --text-main: #ffffff;
-  --text-muted: #a0a0a0;
+  --text-muted: #A0A0C0;
 
   --font-main: 'Inter', sans-serif;
   
@@ -27,21 +27,21 @@
   --radius-lg: 16px;
   --radius-full: 9999px;
 
-  --gradient-primary: linear-gradient(135deg, var(--primary-blue), var(--primary-purple), var(--primary-cyan));
-  --neon-glow: 0 0 10px rgba(0, 223, 216, 0.5), 0 0 20px rgba(121, 40, 202, 0.3);
-  --border-glass: rgba(255, 255, 255, 0.1);
+  --gradient-primary: linear-gradient(135deg, var(--primary-purple), var(--primary-cyan));
+  --neon-glow: 0 0 15px rgba(0, 242, 254, 0.35), 0 0 25px rgba(155, 81, 224, 0.2);
+  --border-glass: rgba(255, 255, 255, 0.08);
   --primary: var(--primary-cyan);
 
   /* Premium Gradients */
-  --grad-premium: linear-gradient(135deg, #0070f3, #7928ca, #00dfd8);
-  --grad-dark: linear-gradient(180deg, rgba(10, 10, 20, 0) 0%, rgba(0, 0, 0, 1) 100%);
+  --grad-premium: linear-gradient(135deg, var(--primary-purple), var(--primary-cyan));
+  --grad-dark: linear-gradient(180deg, rgba(13, 13, 13, 0) 0%, rgba(13, 13, 13, 1) 100%);
   --grad-glass: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-  --grad-neon: linear-gradient(90deg, #0070f3, #7928ca, #00dfd8);
-  --primary-gradient: linear-gradient(135deg, #00dfd8, #0070f3);
+  --grad-neon: linear-gradient(90deg, var(--primary-purple), var(--primary-cyan));
+  --primary-gradient: linear-gradient(135deg, var(--primary-cyan), var(--primary-purple));
 
   /* Glow Effects */
-  --glow-cyan: 0 0 20px rgba(0, 223, 216, 0.4);
-  --glow-purple: 0 0 25px rgba(121, 40, 202, 0.35);
+  --glow-cyan: 0 0 20px rgba(0, 242, 254, 0.4);
+  --glow-purple: 0 0 25px rgba(155, 81, 224, 0.35);
   --glow-soft: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
 
@@ -131,10 +131,10 @@ body {
 /* Glassmorphism utility */
 .glass {
   background: var(--bg-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .text-gradient {
