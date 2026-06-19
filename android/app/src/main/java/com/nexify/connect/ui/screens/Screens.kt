@@ -8,6 +8,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -4554,6 +4556,149 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                     }
                 }
             }
+        }
+
+        Text("SUPPORT & MISSION DETAILS", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+        var showHelpDialog by remember { mutableStateOf(false) }
+        var showAboutDialog by remember { mutableStateOf(false) }
+
+        GlassmorphicCard(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { showHelpDialog = true }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.Help, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(24.dp))
+                    Column {
+                        Text("Help & Support Center", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Contact email support or bug logs", color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+                Icon(Icons.Default.NavigateNext, contentDescription = null, tint = Color.White)
+            }
+        }
+
+        GlassmorphicCard(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { showAboutDialog = true }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(24.dp))
+                    Column {
+                        Text("About Nexify Connect", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Platform info, mission & version", color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+                Icon(Icons.Default.NavigateNext, contentDescription = null, tint = Color.White)
+            }
+        }
+
+        if (showHelpDialog) {
+            AlertDialog(
+                onDismissRequest = { showHelpDialog = false },
+                title = { Text("Help & Support Desk", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Need help? We're here for you.\n\nIf you are facing issues, have suggestions, or want to report a bug, feel free to reach out to us. Our support team is dedicated to helping you get the best experience from Nexify Connect.",
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+                        Divider(color = Color.White.copy(alpha = 0.1f))
+                        Text(
+                            text = "📧 Email Support: nexifyconnect90@gmail.com\n📱 Phone Support: +91 8828428386",
+                            color = CyanNeon,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Divider(color = Color.White.copy(alpha = 0.1f))
+                        Text(
+                            text = "Common Support Areas:\n• Account & Login Issues\n• Message Delivery Problems\n• Calls & Audio Quality\n• Privacy & Security Concerns\n• App Bugs & Feedback",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "We usually respond within 24–48 hours.\n\nThank you for being part of Nexify Connect 💙",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showHelpDialog = false }) {
+                        Text("DISMISS", color = CyanNeon)
+                    }
+                },
+                containerColor = Color(0xFF161128),
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
+
+        if (showAboutDialog) {
+            AlertDialog(
+                onDismissRequest = { showAboutDialog = false },
+                title = { Text("About Nexify Connect", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Nexify Connect is a next-generation communication platform designed for speed, privacy, and seamless connection. Built for the modern world, Nexify Connect brings messaging, calling, and smart features together in one powerful and beautifully crafted experience.",
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "Our mission is simple: make communication faster, safer, and more enjoyable. Whether you're chatting with friends, collaborating with teams, or connecting across the globe, Nexify Connect ensures reliability, high performance, and top-tier security.",
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "With features like real-time messaging, HD calls, smart notifications, and customizable themes, Nexify Connect adapts to your style while keeping your data protected.",
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "We are constantly evolving — adding new features, improving performance, and listening to our users.",
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+                        Divider(color = Color.White.copy(alpha = 0.1f))
+                        Text(
+                            text = "Version: 1.0.0\nBuilt with passion for the future of communication.",
+                            color = PurpleNeon,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showAboutDialog = false }) {
+                        Text("CLOSE", color = PurpleNeon)
+                    }
+                },
+                containerColor = Color(0xFF161128),
+                shape = RoundedCornerShape(24.dp)
+            )
         }
 
         Spacer(modifier = Modifier.weight(1f))
