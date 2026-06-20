@@ -7064,24 +7064,26 @@ fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
                 alpha = alpha.value
             )
         ) {
-            // App Logo
+            // App Logo wrapped in high-tech glowing glass badge
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(CardBg)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color(0xFF000000))
                     .border(
-                        2.dp,
-                        Brush.horizontalGradient(listOf(CyanNeon, PurpleNeon)),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(28.dp)
+                    )
             ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = "Logo",
-                    tint = CyanNeon,
-                    modifier = Modifier.size(50.dp)
+                Image(
+                    painter = painterResource(id = com.nexify.connect.R.drawable.logo),
+                    contentDescription = "Nexify Connect Logo",
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .fillMaxSize(),
+                    contentScale = ContentScale.Fit
                 )
             }
 
