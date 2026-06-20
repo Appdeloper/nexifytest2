@@ -37,14 +37,19 @@ import com.nexify.connect.ui.theme.*
 @Composable
 fun GlassmorphicCard(
     modifier: Modifier = Modifier,
-    borderStroke: BorderStroke = BorderStroke(1.dp, CardBorder),
+    borderStroke: BorderStroke = BorderStroke(
+        width = 1.dp,
+        brush = Brush.horizontalGradient(
+            colors = listOf(CyanNeon.copy(alpha = 0.35f), PurpleNeon.copy(alpha = 0.35f))
+        )
+    ),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val baseModifier = modifier
-        .clip(RoundedCornerShape(16.dp))
+        .clip(RoundedCornerShape(20.dp))
         .background(CardBg)
-        .border(borderStroke, RoundedCornerShape(16.dp))
+        .border(borderStroke, RoundedCornerShape(20.dp))
         
     val finalModifier = if (onClick != null) {
         baseModifier.clickable { onClick() }
@@ -103,19 +108,20 @@ fun PremiumButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     
     val buttonGlowAlpha by animateFloatAsState(if (isPressed) 0.6f else 0.25f)
-    val scaleFactor by animateFloatAsState(if (isPressed) 0.97f else 1.0f)
+    val scaleFactor by animateFloatAsState(if (isPressed) 0.96f else 1.0f)
     
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .padding(vertical = 4.dp)
+            .graphicsLayer(scaleX = scaleFactor, scaleY = scaleFactor)
     ) {
         // Neon ambient shadow glow behind button
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .blur(8.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .blur(10.dp)
+                .clip(CircleShape)
                 .background(
                     Brush.horizontalGradient(colors),
                     alpha = buttonGlowAlpha
@@ -132,17 +138,17 @@ fun PremiumButton(
             contentPadding = PaddingValues(),
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
+                .clip(CircleShape)
                 .background(Brush.horizontalGradient(colors))
                 .border(
                     BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                    RoundedCornerShape(24.dp)
+                    CircleShape
                 )
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp, horizontal = 24.dp),
+                    .padding(vertical = 14.dp, horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -180,11 +186,11 @@ fun PremiumTextField(
         colors = TextFieldDefaults.outlinedTextFieldColors(
             focusedBorderColor = CyanNeon,
             unfocusedBorderColor = CardBorder,
-            containerColor = Color(0x33161128),
+            containerColor = Color(0x660A0A0F),
             focusedTextColor = Color.White,
             unfocusedTextColor = Color.White
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         modifier = modifier.fillMaxWidth()
     )
 }

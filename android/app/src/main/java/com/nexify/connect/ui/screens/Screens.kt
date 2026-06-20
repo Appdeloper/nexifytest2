@@ -696,72 +696,173 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
-            .padding(16.dp),
+            .background(LuxuryBgGradient)
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Sticky Header with back button + Title
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             UniversalBackButton(navController = navController)
-            Text("Edit Profile", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(start = 8.dp))
+            Text(
+                text = "Citizen Profile",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                modifier = Modifier.padding(start = 12.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
+        // Center avatar with glowing ring & online indicator
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(130.dp)
         ) {
+            // Glowing ring shadow
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(10.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), alpha = 0.35f)
+            )
             AsyncImage(
-                model = userProfile?.profileImage,
+                model = userProfile?.profileImage ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$uid",
                 contentDescription = "Profile Picture",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .size(116.dp)
                     .clip(CircleShape)
-                    .border(3.dp, Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), CircleShape)
+                    .border(2.dp, Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), CircleShape)
                     .clickable { imageLauncher.launch("image/*") }
+            )
+
+            // Online status indicator (green dot)
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .align(Alignment.BottomEnd)
+                    .clip(CircleShape)
+                    .background(Color(0xFF00FF55))
+                    .border(3.dp, Color(0xFF0A0A0F), CircleShape)
             )
 
             if (isUploading) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .size(116.dp)
                         .background(Color.Black.copy(alpha = 0.6f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = CyanNeon)
                 }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .background(PurpleNeon, CircleShape)
-                        .padding(8.dp)
-                        .border(1.dp, Color.Black, CircleShape)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = userProfile?.username?.uppercase() ?: "CITIZEN",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Text(
+                text = userProfile?.email ?: "",
+                fontSize = 13.sp,
+                color = TextMuted
+            )
+        }
+
+        // Badge Chips (Member, Rookie)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = Color(0x1F00E5FF),
+                border = BorderStroke(1.dp, CyanNeon.copy(0.4f)),
+                shape = CircleShape
+            ) {
+                Text("MEMBER", color = CyanNeon, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+            }
+            Surface(
+                color = Color(0x1F7B61FF),
+                border = BorderStroke(1.dp, PurpleNeon.copy(0.4f)),
+                shape = CircleShape
+            ) {
+                Text(userProfile?.rank?.uppercase() ?: "ROOKIE", color = PurpleNeon, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+            }
+        }
+
+        // Stats Grid Cards
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("FRIENDS", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${userProfile?.friends?.size ?: 0}", fontSize = 16.sp, color = CyanNeon, fontWeight = FontWeight.ExtraBold)
+                }
+            }
+            GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("LEVEL", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${userProfile?.level ?: 1}", fontSize = 16.sp, color = PurpleNeon, fontWeight = FontWeight.ExtraBold)
+                }
+            }
+            GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("XP", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${userProfile?.xp ?: 0}", fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
 
-        Text(
-            text = userProfile?.username ?: "Citizen",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = userProfile?.email ?: "",
-            fontSize = 13.sp,
-            color = TextMuted
-        )
+        // Progress Bar
+        val progress = remember(userProfile?.xp) {
+            val xpVal = userProfile?.xp ?: 0L
+            (xpVal % 100).toFloat() / 100f
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Level Progress", fontSize = 12.sp, color = TextMuted)
+                Text("${(progress * 100).toInt()}%", fontSize = 12.sp, color = PurpleNeon, fontWeight = FontWeight.Bold)
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(if (progress > 0) progress else 0.01f)
+                        .clip(CircleShape)
+                        .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Biography section
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -771,7 +872,7 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold)
+                Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 
                 Row(
                     modifier = Modifier
@@ -792,7 +893,7 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
         PremiumButton(
             text = "SAVE CHANGES",
@@ -1206,40 +1307,54 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
     val chats by repository.subscribeToChats().safeCollect("ChatListScreen_chats", emptyList()).collectAsState(initial = emptyList())
     val groups by repository.subscribeToGroups().safeCollect("ChatListScreen_groups", emptyList()).collectAsState(initial = emptyList())
     val allUsers by repository.subscribeToAllUsers().safeCollect("ChatListScreen_users", emptyList()).collectAsState(initial = emptyList())
+    val uid = repository.currentUserId ?: ""
+    val userProfile by repository.subscribeToUser(uid).safeCollect("ChatListScreen", null).collectAsState(initial = null)
     
     var currentTab by remember { mutableStateOf("DMs") }
+
+    val calendar = remember { java.util.Calendar.getInstance() }
+    val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+    val greetingPrefix = when {
+        hour in 5..11 -> "Good morning"
+        hour in 12..16 -> "Good afternoon"
+        hour in 17..21 -> "Good evening"
+        else -> "Working late"
+    }
+    val name = userProfile?.username?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } ?: "Citizen"
+    val greetingText = "$greetingPrefix, $name 👋"
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(LuxuryBgGradient)
     ) {
+        // Top Hub Header Bar
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Nexify Hub", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CyanNeon)
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = { navController.navigate("ai_chat") }) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon)
+                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("settings") }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("find") }) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White)
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("rooms") }) {
-                    Icon(Icons.Default.Explore, contentDescription = null, tint = Color.White)
+                    Icon(Icons.Default.Explore, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("chat_rooms") }) {
-                    Icon(Icons.Default.Groups, contentDescription = "Chat Rooms", tint = CyanNeon)
+                    Icon(Icons.Default.Groups, contentDescription = "Chat Rooms", tint = CyanNeon, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("leaderboard") }) {
-                    Icon(Icons.Default.Star, contentDescription = "Leaderboard", tint = Color.White)
+                    Icon(Icons.Default.Star, contentDescription = "Leaderboard", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = {
                     repository.logout()
@@ -1247,63 +1362,194 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                         popUpTo(0)
                     }
                 }) {
-                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red)
+                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red, modifier = Modifier.size(20.dp))
                 }
             }
         }
 
-        // Nexify Apps Quick Launcher Bar
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            // Dynamic Greeting
             item {
-                AppLaunchChip(
-                    label = "⏱️ Focus Pod",
-                    onClick = { navController.navigate("focus_pod") }
+                Text(
+                    text = greetingText,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            item {
-                AppLaunchChip(
-                    label = "🏋️ Nexify Fit",
-                    onClick = { navController.navigate("fitness") }
-                )
-            }
-            item {
-                AppLaunchChip(
-                    label = "⚡ Nexify Edge",
-                    onClick = { navController.navigate("nexify_edge") }
-                )
-            }
-            item {
-                AppLaunchChip(
-                    label = "🌊 Waves (Soon)",
-                    onClick = { /* Locked */ },
-                    enabled = false
-                )
-            }
-        }
 
-        // Tab Selector
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            TabButton(text = "Direct Messages", active = currentTab == "DMs", onClick = { currentTab = "DMs" })
-            TabButton(text = "Group Chats", active = currentTab == "Groups", onClick = { currentTab = "Groups" })
-        }
-
-        if (currentTab == "DMs") {
-            if (chats.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No active DMs. Find friends to connect!", color = TextMuted, fontSize = 14.sp)
+            // Stats 2x2 Grid Card
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("RANK", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(userProfile?.rank?.uppercase() ?: "ROOKIE", fontSize = 16.sp, color = CyanNeon, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("STREAK", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${userProfile?.streak ?: 0} Days 🔥", fontSize = 16.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("LEVEL", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Level ${userProfile?.level ?: 1}", fontSize = 16.sp, color = PurpleNeon, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("XP PROGRESS", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${userProfile?.xp ?: 0} XP", fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            }
+
+            // Focus Pod Large Card
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF7B61FF).copy(0.12f), Color(0xFF00E5FF).copy(0.12f))
+                            )
+                        )
+                        .border(
+                            1.dp,
+                            Brush.horizontalGradient(listOf(PurpleNeon.copy(0.4f), CyanNeon.copy(0.4f))),
+                            RoundedCornerShape(24.dp)
+                        )
+                        .padding(16.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1.5f)) {
+                            Text("Focus Pod", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Lock into your workspace chamber and gain Level XP.", fontSize = 12.sp, color = TextMuted, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                            
+                            // Glowing CTA button
+                            PremiumButton(
+                                text = "Enter Chamber",
+                                onClick = { navController.navigate("focus_pod") },
+                                modifier = Modifier.width(160.dp)
+                            )
+                        }
+                        
+                        // Mini animated circular timer
+                        Box(
+                            modifier = Modifier.size(80.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                progress = 0.75f,
+                                modifier = Modifier.fillMaxSize(),
+                                color = CyanNeon,
+                                strokeWidth = 6.dp,
+                                trackColor = Color.White.copy(alpha = 0.05f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = CyanNeon,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Quick Launcher chips
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("QUICK LAUNCHER", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        item {
+                            AppLaunchChip(
+                                label = "⏱️ Focus Pod",
+                                onClick = { navController.navigate("focus_pod") }
+                            )
+                        }
+                        item {
+                            AppLaunchChip(
+                                label = "🏋️ Nexify Fit",
+                                onClick = { navController.navigate("fitness") }
+                            )
+                        }
+                        item {
+                            AppLaunchChip(
+                                label = "⚡ Nexify Edge",
+                                onClick = { navController.navigate("nexify_edge") }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Tab Selector
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TabButton(text = "Direct Messages", active = currentTab == "DMs", onClick = { currentTab = "DMs" }, modifier = Modifier.weight(1f))
+                    TabButton(text = "Group Chats", active = currentTab == "Groups", onClick = { currentTab = "Groups" }, modifier = Modifier.weight(1f))
+                }
+            }
+
+            // Tabs Content List
+            if (currentTab == "DMs") {
+                if (chats.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                            Text("No active DMs. Find friends to connect!", color = TextMuted, fontSize = 14.sp)
+                        }
+                    }
+                } else {
                     items(chats) { chat ->
                         val otherUserId = chat.participants.find { it != repository.currentUserId } ?: ""
                         val otherUserProfile = allUsers.find { it.userId == otherUserId }
@@ -1351,53 +1597,49 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                         }
                     }
                 }
-            }
-        } else {
-            // Groups Tab
-            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Your Active Pods", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    IconButton(onClick = { navController.navigate("create_group") }) {
-                        Icon(Icons.Default.GroupAdd, contentDescription = null, tint = CyanNeon)
-                    }
-                }
-
+            } else {
+                // Groups Tab
                 if (groups.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("No active groups. Initialize a group!", color = TextMuted, fontSize = 14.sp)
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                            Text("No active groups. Initialize a group!", color = TextMuted, fontSize = 14.sp)
+                        }
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(groups) { group ->
-                            GlassmorphicCard(
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Your Active Pods", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            IconButton(onClick = { navController.navigate("create_group") }) {
+                                Icon(Icons.Default.GroupAdd, contentDescription = null, tint = CyanNeon)
+                            }
+                        }
+                    }
+                    items(groups) { group ->
+                        GlassmorphicCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { navController.navigate("group/${group.groupId}") }
+                        ) {
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                onClick = { navController.navigate("group/${group.groupId}") }
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    AsyncImage(
-                                        model = group.groupImage,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(50.dp)
-                                            .clip(CircleShape)
-                                            .border(1.5.dp, PurpleNeon, CircleShape)
-                                    )
-                                    Column {
-                                        Text(group.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                        Text("${group.members.size} members connected", color = TextMuted, fontSize = 13.sp)
-                                    }
+                                AsyncImage(
+                                    model = group.groupImage,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(50.dp)
+                                        .clip(CircleShape)
+                                        .border(1.5.dp, PurpleNeon, CircleShape)
+                                )
+                                Column {
+                                    Text(group.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("${group.members.size} members connected", color = TextMuted, fontSize = 13.sp)
                                 }
                             }
                         }
@@ -1600,19 +1842,28 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                                 )
                             }
                             else -> {
+                                val bubbleShape = RoundedCornerShape(
+                                    topStart = 16.dp,
+                                    topEnd = 16.dp,
+                                    bottomStart = if (isMe) 16.dp else 0.dp,
+                                    bottomEnd = if (isMe) 0.dp else 16.dp
+                                )
                                 Box(
                                     modifier = Modifier
-                                        .clip(
-                                            RoundedCornerShape(
-                                                topStart = 16.dp,
-                                                topEnd = 16.dp,
-                                                bottomStart = if (isMe) 16.dp else 0.dp,
-                                                bottomEnd = if (isMe) 0.dp else 16.dp
-                                            )
+                                        .clip(bubbleShape)
+                                        .background(
+                                            if (isMe) {
+                                                Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                            } else {
+                                                Brush.verticalGradient(listOf(CardBg, CardBg))
+                                            }
                                         )
-                                        .background(if (isMe) PurpleNeon else CardBg)
-                                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-                                        .padding(12.dp)
+                                        .border(
+                                            1.dp,
+                                            if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                            bubbleShape
+                                        )
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
                                 ) {
                                     Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
                                 }
@@ -2092,19 +2343,28 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
                                 )
                             }
                             else -> {
+                                val bubbleShape = RoundedCornerShape(
+                                    topStart = 16.dp,
+                                    topEnd = 16.dp,
+                                    bottomStart = if (isMe) 16.dp else 0.dp,
+                                    bottomEnd = if (isMe) 0.dp else 16.dp
+                                )
                                 Box(
                                     modifier = Modifier
-                                        .clip(
-                                            RoundedCornerShape(
-                                                topStart = 16.dp,
-                                                topEnd = 16.dp,
-                                                bottomStart = if (isMe) 16.dp else 0.dp,
-                                                bottomEnd = if (isMe) 0.dp else 16.dp
-                                            )
+                                        .clip(bubbleShape)
+                                        .background(
+                                            if (isMe) {
+                                                Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                            } else {
+                                                Brush.verticalGradient(listOf(CardBg, CardBg))
+                                            }
                                         )
-                                        .background(if (isMe) PurpleNeon else CardBg)
-                                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-                                        .padding(12.dp)
+                                        .border(
+                                            1.dp,
+                                            if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                            bubbleShape
+                                        )
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
                                 ) {
                                     Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
                                 }
@@ -2836,12 +3096,28 @@ fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.weight(1f),
                             horizontalAlignment = if (isAi) Alignment.Start else Alignment.End
                         ) {
+                            val bubbleShape = RoundedCornerShape(
+                                topStart = 16.dp,
+                                topEnd = 16.dp,
+                                bottomStart = if (isAi) 4.dp else 16.dp,
+                                bottomEnd = if (isAi) 16.dp else 4.dp
+                            )
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isAi) CardBg else PurpleNeon)
-                                    .border(1.dp, if (isAi) CyanNeon.copy(0.4f) else CardBorder, RoundedCornerShape(16.dp))
-                                    .padding(12.dp)
+                                    .clip(bubbleShape)
+                                    .background(
+                                        if (isAi) {
+                                            Brush.verticalGradient(listOf(CardBg, CardBg))
+                                        } else {
+                                            Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                        }
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isAi) CyanNeon.copy(0.3f) else Color.White.copy(alpha = 0.15f),
+                                        bubbleShape
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
                             ) {
                                 Text(message.text, color = Color.White, fontSize = 14.sp)
                             }
@@ -3529,26 +3805,26 @@ fun RoomChatScreen(
                                         }
                                         
                                         Box {
+                                            val bubbleShape = RoundedCornerShape(
+                                                topStart = 14.dp,
+                                                topEnd = 14.dp,
+                                                bottomStart = if (isMe) 14.dp else 0.dp,
+                                                bottomEnd = if (isMe) 0.dp else 14.dp
+                                            )
                                             Box(
                                                 modifier = Modifier
-                                                    .clip(
-                                                        RoundedCornerShape(
-                                                            topStart = 14.dp,
-                                                            topEnd = 14.dp,
-                                                            bottomStart = if (isMe) 14.dp else 0.dp,
-                                                            bottomEnd = if (isMe) 0.dp else 14.dp
-                                                        )
+                                                    .clip(bubbleShape)
+                                                    .background(
+                                                        if (isMe) {
+                                                            Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                                        } else {
+                                                            Brush.verticalGradient(listOf(CardBg, CardBg))
+                                                        }
                                                     )
-                                                    .background(if (isMe) PurpleNeon else CardBg)
                                                     .border(
                                                         1.dp,
-                                                        if (message.isPinned) CyanNeon else CardBorder,
-                                                        RoundedCornerShape(
-                                                            topStart = 14.dp,
-                                                            topEnd = 14.dp,
-                                                            bottomStart = if (isMe) 14.dp else 0.dp,
-                                                            bottomEnd = if (isMe) 0.dp else 14.dp
-                                                        )
+                                                        if (message.isPinned) CyanNeon else if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                                        bubbleShape
                                                     )
                                                     .pointerInput(message.messageId) {
                                                         detectTapGestures(
@@ -4230,7 +4506,7 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
+            .background(LuxuryBgGradient)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -4264,12 +4540,23 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                 .padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(16.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(CyanNeon.copy(alpha = 0.15f), Color.Transparent)
+                        ),
+                        shape = CircleShape
+                    )
+            )
             CircularProgressIndicator(
                 progress = progressFraction,
                 modifier = Modifier.fillMaxSize(),
                 color = CyanNeon,
-                strokeWidth = 10.dp,
-                trackColor = Color.White.copy(alpha = 0.05f)
+                strokeWidth = 8.dp,
+                trackColor = Color.White.copy(alpha = 0.08f)
             )
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -4296,32 +4583,14 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
+            PremiumButton(
+                text = if (isTimerRunning) "PAUSE" else "START",
                 onClick = { isTimerRunning = !isTimerRunning },
                 modifier = Modifier
                     .height(50.dp)
-                    .width(140.dp)
-                    .clip(RoundedCornerShape(25.dp)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isTimerRunning) Color.DarkGray else CyanNeon
-                )
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = if (isTimerRunning) Color.White else Color.Black
-                    )
-                    Text(
-                        text = if (isTimerRunning) "PAUSE" else "START",
-                        color = if (isTimerRunning) Color.White else Color.Black,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
+                    .width(140.dp),
+                colors = if (isTimerRunning) listOf(Color.DarkGray, Color.Gray) else listOf(CyanNeon, PurpleNeon)
+            )
 
             IconButton(
                 onClick = {
@@ -4332,7 +4601,8 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                 modifier = Modifier
                     .size(50.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(0.08f))
+                    .background(Color.White.copy(0.05f))
+                    .border(BorderStroke(1.dp, Color.White.copy(0.15f)), CircleShape)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = Color.White)
             }
@@ -4356,14 +4626,14 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selectedDurationMinutes = duration }
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (selected) CyanNeon.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.03f))
                                 .border(
                                     1.dp,
-                                    if (selected) CyanNeon else Color.Gray.copy(alpha = 0.3f),
-                                    RoundedCornerShape(10.dp)
+                                    if (selected) CyanNeon else Color.White.copy(alpha = 0.1f),
+                                    RoundedCornerShape(14.dp)
                                 )
-                                .background(if (selected) CyanNeon.copy(alpha = 0.15f) else Color.Transparent)
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -4391,7 +4661,7 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                     colors = SliderDefaults.colors(
                         thumbColor = CyanNeon,
                         activeTrackColor = CyanNeon,
-                        inactiveTrackColor = Color.Gray.copy(0.2f)
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
                     ),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 )
@@ -4711,12 +4981,28 @@ fun ChatRoomConversationScreen(navController: NavController, repository: Firebas
                                 modifier = Modifier.padding(bottom = 2.dp)
                             )
                         }
+                        val bubbleShape = RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomStart = if (isMe) 16.dp else 4.dp,
+                            bottomEnd = if (isMe) 4.dp else 16.dp
+                        )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (isMe) PurpleNeon else CardBg)
-                                .border(1.dp, if (isMe) CardBorder else CyanNeon.copy(0.4f), RoundedCornerShape(16.dp))
-                                .padding(12.dp)
+                                .clip(bubbleShape)
+                                .background(
+                                    if (isMe) {
+                                        Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                    } else {
+                                        Brush.verticalGradient(listOf(CardBg, CardBg))
+                                    }
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                    bubbleShape
+                                )
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
                         }
@@ -5210,13 +5496,13 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D0D0D)) // Deep dark AMOLED
+            .background(LuxuryBgGradient)
     ) {
         // Sticky Header with back button + Title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0D0D0D))
+                .background(Color.Transparent)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -6333,12 +6619,13 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White.copy(alpha = 0.04f))
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha = 0.03f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
                                 .clickable {
                                     expandedFaqIndex = if (isExpanded) -1 else index
                                 }
-                                .padding(12.dp)
+                                .padding(14.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -6370,7 +6657,7 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
                             onClick = {
@@ -6385,12 +6672,17 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                                     Toast.makeText(context, "No email client found.", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), RoundedCornerShape(22.dp)),
+                            contentPadding = PaddingValues()
                         ) {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = currentAccentColor, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Email Support", color = Color.White, fontSize = 11.sp)
+                            Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Email Support", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         
                         Button(
@@ -6405,22 +6697,32 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                                     Toast.makeText(context, "Dialer unavailable.", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), RoundedCornerShape(22.dp)),
+                            contentPadding = PaddingValues()
                         ) {
-                            Icon(Icons.Default.Phone, contentDescription = null, tint = currentAccentColor, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Call Support", color = Color.White, fontSize = 11.sp)
+                            Icon(Icons.Default.Phone, contentDescription = null, tint = PurpleNeon, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Call Support", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showHelpScreen = false }) {
-                    Text("DISMISS", color = currentAccentColor)
+                    Text("DISMISS", color = currentAccentColor, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF161128),
+            containerColor = Color(0xEC0D0D15),
+            modifier = Modifier.border(
+                1.dp,
+                Brush.horizontalGradient(listOf(CyanNeon.copy(0.35f), PurpleNeon.copy(0.35f))),
+                RoundedCornerShape(24.dp)
+            ),
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -6444,16 +6746,18 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .padding(12.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("Core Sector Highlights", color = currentAccentColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("• Realtime Socket Direct Chats & Group Pods", color = TextMuted, fontSize = 11.sp)
-                        Text("• WebRTC Secure Voice / Video Calls Overlay", color = TextMuted, fontSize = 11.sp)
-                        Text("• Nexify Fit (Sensor step milestones tracker)", color = TextMuted, fontSize = 11.sp)
-                        Text("• Focus chamber pods with level XP", color = TextMuted, fontSize = 11.sp)
-                        Text("• Leaderboard global ranking", color = TextMuted, fontSize = 11.sp)
+                        Text("Core Highlights", color = currentAccentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("• Realtime Socket Direct Chats & Group Pods", color = TextMuted, fontSize = 12.sp)
+                        Text("• WebRTC Secure Voice / Video Calls Overlay", color = TextMuted, fontSize = 12.sp)
+                        Text("• Nexify Fit (Sensor step milestones tracker)", color = TextMuted, fontSize = 12.sp)
+                        Text("• Focus chamber pods with level XP", color = TextMuted, fontSize = 12.sp)
+                        Text("• Leaderboard global ranking", color = TextMuted, fontSize = 12.sp)
                     }
                     
                     Text("Vision: Connect. Focus. Grow.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -6470,10 +6774,15 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
             },
             confirmButton = {
                 TextButton(onClick = { showAboutScreen = false }) {
-                    Text("CLOSE", color = PurpleNeon)
+                    Text("CLOSE", color = PurpleNeon, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF161128),
+            containerColor = Color(0xEC0D0D15),
+            modifier = Modifier.border(
+                1.dp,
+                Brush.horizontalGradient(listOf(CyanNeon.copy(0.35f), PurpleNeon.copy(0.35f))),
+                RoundedCornerShape(24.dp)
+            ),
             shape = RoundedCornerShape(24.dp)
         )
     }
