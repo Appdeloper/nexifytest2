@@ -175,35 +175,39 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // App Logo with ambient drop glow
+            // App Logo wrapped in high-tech glowing glass badge to blend the black background
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF000000)) // Pure black background to blend the logo's black color
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(24.dp)
+                    )
             ) {
-                // Glow behind logo
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer(alpha = 0.3f)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(CyanNeon, Color.Transparent),
-                                radius = 150f
-                            )
-                        )
-                )
                 Image(
                     painter = painterResource(id = com.nexify.connect.R.drawable.logo),
                     contentDescription = "Nexify Connect Logo",
-                    modifier = Modifier.size(110.dp),
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             }
 
-            // Glassmorphic Panel
+            // Glassmorphic Panel with premium gradient border
             GlassmorphicCard(
                 modifier = Modifier.fillMaxWidth(),
-                borderStroke = BorderStroke(1.dp, CardBorder)
+                borderStroke = BorderStroke(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CyanNeon.copy(alpha = 0.5f), PurpleNeon.copy(alpha = 0.5f))
+                    )
+                )
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
@@ -331,9 +335,9 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = CyanNeon,
+                                painter = painterResource(id = com.nexify.connect.R.drawable.ic_google),
+                                contentDescription = "Google Icon",
+                                tint = Color.Unspecified,
                                 modifier = Modifier.size(18.dp).padding(end = 6.dp)
                             )
                             Text(
@@ -458,35 +462,39 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // App Logo with ambient drop glow
+            // App Logo wrapped in high-tech glowing glass badge to blend the black background
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF000000)) // Pure black background to blend the logo's black color
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(24.dp)
+                    )
             ) {
-                // Glow behind logo
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer(alpha = 0.3f)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(CyanNeon, Color.Transparent),
-                                radius = 150f
-                            )
-                        )
-                )
                 Image(
                     painter = painterResource(id = com.nexify.connect.R.drawable.logo),
                     contentDescription = "Nexify Connect Logo",
-                    modifier = Modifier.size(110.dp),
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             }
 
-            // Glassmorphic Panel
+            // Glassmorphic Panel with premium gradient border
             GlassmorphicCard(
                 modifier = Modifier.fillMaxWidth(),
-                borderStroke = BorderStroke(1.dp, CardBorder)
+                borderStroke = BorderStroke(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CyanNeon.copy(alpha = 0.5f), PurpleNeon.copy(alpha = 0.5f))
+                    )
+                )
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
@@ -600,9 +608,9 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = PurpleNeon,
+                                painter = painterResource(id = com.nexify.connect.R.drawable.ic_google),
+                                contentDescription = "Google Icon",
+                                tint = Color.Unspecified,
                                 modifier = Modifier.size(18.dp).padding(end = 6.dp)
                             )
                             Text(
