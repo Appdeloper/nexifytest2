@@ -178,6 +178,9 @@ class MainActivity : ComponentActivity() {
                                 composable("signup") {
                                     SignUpScreen(navController = navController, repository = repository)
                                 }
+                                composable("forgot_password") {
+                                    ForgotPasswordScreen(navController = navController, repository = repository)
+                                }
                                 composable("home") {
                                     LaunchedEffect(Unit) {
                                         repository.checkAndIncrementStreak()

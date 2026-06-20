@@ -22,8 +22,9 @@ data class User(
     val lastActiveDate: String = "",
     val activeDates: List<String> = emptyList(),
     val frozenDates: List<String> = emptyList(),
-    val rank: String = "rookie",
-    val level: Int = 1
+    val rank: String = "Rookie",
+    val level: Int = 1,
+    val createdAt: Date? = null
 )
 
 data class Chat(

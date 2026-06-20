@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -93,6 +94,20 @@ fun getRelativeTimeString(date: Date?, onlineStatus: Boolean): String {
         minutes < 60 -> "Last seen ${minutes}m ago"
         hours < 24 -> "Last seen ${hours}h ago"
         else -> "Last seen ${days}d ago"
+    }
+}
+
+// ── AUTHENTICATION ERROR PARSER ──────────────────────────────────
+fun getReadableAuthError(e: Throwable): String {
+    val message = e.message ?: ""
+    return when {
+        e is com.google.firebase.auth.FirebaseAuthInvalidUserException -> "User account not found. Please check your credentials or register."
+        e is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "Incorrect password or invalid email format. Please try again."
+        e is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account with this email address already exists."
+        e is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "Password is too weak. Must be at least 6 characters."
+        message.contains("network", ignoreCase = true) -> "Network gateway error. Please check your connection."
+        message.contains("Google", ignoreCase = true) -> "Google sign-in failed. Please try again."
+        else -> message
     }
 }
 
@@ -253,21 +268,7 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                             color = TextMuted,
                             modifier = Modifier
                                 .clickable {
-                                    if (email.isEmpty()) {
-                                        Toast.makeText(context, "Please enter your email address first.", Toast.LENGTH_SHORT).show()
-                                        return@clickable
-                                    }
-                                    coroutineScope.launch {
-                                        isLoading = true
-                                        try {
-                                            repository.forgotPassword(email)
-                                            Toast.makeText(context, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show()
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, e.message ?: "Reset failed.", Toast.LENGTH_SHORT).show()
-                                        } finally {
-                                            isLoading = false
-                                        }
-                                    }
+                                    navController.navigate("forgot_password")
                                 }
                                 .padding(vertical = 4.dp)
                         )
@@ -281,19 +282,28 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                         PremiumButton(
                             text = "CONTINUE",
                             onClick = {
-                                if (email.isEmpty() || password.isEmpty()) {
+                                val trimmedEmail = email.trim()
+                                if (trimmedEmail.isEmpty() || password.isEmpty()) {
                                     Toast.makeText(context, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                                    Toast.makeText(context, "Invalid email format.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (password.length < 6) {
+                                    Toast.makeText(context, "Password must be at least 6 characters.", Toast.LENGTH_SHORT).show()
                                     return@PremiumButton
                                 }
                                 coroutineScope.launch {
                                     isLoading = true
                                     try {
-                                        repository.login(email, password)
+                                        repository.login(trimmedEmail, password)
                                         navController.navigate("home") {
                                             popUpTo("login") { inclusive = true }
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, e.message ?: "Auth failed.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_LONG).show()
                                     } finally {
                                         isLoading = false
                                     }
@@ -418,7 +428,7 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                                 }
                             }
                         } catch (e: Exception) {
-                            Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_SHORT).show()
                         } finally {
                             isLoading = false
                         }
@@ -553,19 +563,28 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                         PremiumButton(
                             text = "SIGN UP",
                             onClick = {
-                                if (email.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) {
+                                val trimmedEmail = email.trim()
+                                if (trimmedEmail.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) {
                                     Toast.makeText(context, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                                    Toast.makeText(context, "Invalid email format.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (password.length < 6) {
+                                    Toast.makeText(context, "Password must be at least 6 characters.", Toast.LENGTH_SHORT).show()
                                     return@PremiumButton
                                 }
                                 coroutineScope.launch {
                                     isLoading = true
                                     try {
-                                        repository.signUp(email, password, username, inviteCode)
+                                        repository.signUp(trimmedEmail, password, username, inviteCode)
                                         navController.navigate("home") {
                                             popUpTo("signup") { inclusive = true }
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, e.message ?: "Sign up failed.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_LONG).show()
                                     } finally {
                                         isLoading = false
                                     }
@@ -6858,6 +6877,167 @@ private fun clearCache(context: android.content.Context) {
         context.cacheDir.deleteRecursively()
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+// ── FORGOT PASSWORD SCREEN ─────────────────────────────────────
+@Composable
+fun ForgotPasswordScreen(navController: NavController, repository: FirebaseRepository) {
+    var email by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(LuxuryBgGradient),
+        contentAlignment = Alignment.Center
+    ) {
+        // Cyber backdrop glow
+        Box(
+            modifier = Modifier
+                .size(320.dp)
+                .align(Alignment.TopCenter)
+                .offset(y = (-50).dp)
+                .graphicsLayer(alpha = 0.18f)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(CyanNeon, Color.Transparent),
+                        radius = 450f
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .widthIn(max = 400.dp)
+                .fillMaxWidth(0.92f)
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // App Logo wrapped in high-tech glowing glass badge
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF000000))
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+            ) {
+                Image(
+                    painter = painterResource(id = com.nexify.connect.R.drawable.logo),
+                    contentDescription = "Nexify Connect Logo",
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            // Glassmorphic Panel
+            GlassmorphicCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderStroke = BorderStroke(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CyanNeon.copy(alpha = 0.5f), PurpleNeon.copy(alpha = 0.5f))
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Reset Access Code",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Enter your verified email to request a reset link.",
+                        fontSize = 12.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+
+                    PremiumTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email Address",
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (isLoading) {
+                        Box(modifier = Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(24.dp))
+                        }
+                    } else {
+                        PremiumButton(
+                            text = "SEND RESET LINK",
+                            onClick = {
+                                val trimmedEmail = email.trim()
+                                if (trimmedEmail.isEmpty()) {
+                                    Toast.makeText(context, "Please fill in email field.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                                    Toast.makeText(context, "Please enter a valid email address.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                coroutineScope.launch {
+                                    isLoading = true
+                                    try {
+                                        repository.forgotPassword(trimmedEmail)
+                                        Toast.makeText(context, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show()
+                                        navController.navigate("login") {
+                                            popUpTo("forgot_password") { inclusive = true }
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isLoading = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(text = "Remembered credentials?", fontSize = 12.sp, color = TextMuted)
+                        Text(
+                            text = "Log in",
+                            fontSize = 12.sp,
+                            color = CyanNeon,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                navController.navigate("login") {
+                                    popUpTo("forgot_password") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -95,7 +95,8 @@ class FirebaseRepository {
             profileImage = "https://api.dicebear.com/7.x/avataaars/svg?seed=$userId",
             bio = "Hey! I am using Nexify Connect.",
             onlineStatus = true,
-            lastSeen = Date()
+            lastSeen = Date(),
+            createdAt = Date()
         )
 
         val referrerId = inviteSnap.getString("createdBy") ?: ""
@@ -131,7 +132,8 @@ class FirebaseRepository {
                 profileImage = result.user?.photoUrl?.toString() ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$userId",
                 bio = "Hey! I am using Nexify Connect.",
                 onlineStatus = true,
-                lastSeen = Date()
+                lastSeen = Date(),
+                createdAt = Date()
             )
             userRef.set(user).await()
         } else {
