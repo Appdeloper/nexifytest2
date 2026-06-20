@@ -1541,6 +1541,29 @@ class FirebaseRepository {
         }
     }
 
+    suspend fun submitFeedback(feature: String, feedback: String) {
+        val uid = currentUserId ?: return
+        val data = hashMapOf(
+            "userId" to uid,
+            "feature" to feature,
+            "feedback" to feedback,
+            "timestamp" to System.currentTimeMillis()
+        )
+        db.collection("feedbacks").document().set(data).await()
+    }
+
+    suspend fun joinAiWaitlist(): String {
+        val uid = currentUserId ?: return "User not logged in"
+        val email = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: ""
+        val data = hashMapOf(
+            "userId" to uid,
+            "email" to email,
+            "timestamp" to System.currentTimeMillis()
+        )
+        db.collection("ai_waitlist").document(uid).set(data).await()
+        return email
+    }
+
     fun subscribeToFitnessData(): Flow<List<FitnessRecord>> = callbackFlow {
         val uid = currentUserId
         if (uid == null) {

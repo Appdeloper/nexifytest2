@@ -143,8 +143,7 @@ class MainActivity : ComponentActivity() {
                             val sharedPrefs = remember { this@MainActivity.getSharedPreferences("nexify_connect_prefs", 0) }
                             val onboardingComplete = remember { sharedPrefs.getBoolean("onboarding_complete", false) }
 
-                            val currentUser = FirebaseAuth.getInstance().currentUser
-                            val startDestination = if (!onboardingComplete) "onboarding" else if (currentUser != null) "home" else "login"
+                            val startDestination = "splash"
 
                             LaunchedEffect(currentUser) {
                                 if (currentUser != null) {
@@ -166,6 +165,9 @@ class MainActivity : ComponentActivity() {
                                 navController = navController,
                                 startDestination = startDestination
                             ) {
+                                composable("splash") {
+                                    SplashScreen(navController = navController, repository = repository)
+                                }
                                 composable("onboarding") {
                                     OnboardingScreen(navController = navController)
                                 }

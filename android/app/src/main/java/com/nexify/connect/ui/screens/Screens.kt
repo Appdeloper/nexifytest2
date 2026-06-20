@@ -2996,417 +2996,371 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
 // ── 🤖 INTELLIGENT AI COMPANION PORTAL (Nexify AI Chat Screen) ────────
 @Composable
 fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
-    LaunchedEffect(Unit) {
-        repository.logFeatureUsage("ai_chat")
-    }
-    val uid = repository.currentUserId ?: ""
-    val messages by repository.subscribeToAiMessages(uid).safeCollect("AiChatScreen_messages", emptyList()).collectAsState(initial = emptyList())
-    var typedText by remember { mutableStateOf("") }
-    var isAiGenerating by remember { mutableStateOf(false) }
-
-    val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    var isJoiningWaitlist by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var registeredEmail by remember { mutableStateOf("") }
 
-    // Dialog state variables for tools
-    var showReelDialog by remember { mutableStateOf(false) }
-    var reelTopic by remember { mutableStateOf("") }
+    // Animations
+    val infiniteTransition = rememberInfiniteTransition(label = "ai_animations")
 
-    var showCaptionDialog by remember { mutableStateOf(false) }
-    var captionDesc by remember { mutableStateOf("") }
-    var captionTone by remember { mutableStateOf("Chill") }
+    val orbScale1 by infiniteTransition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orbScale1"
+    )
 
-    var showPromptDialog by remember { mutableStateOf(false) }
-    var promptTask by remember { mutableStateOf("") }
+    val orbScale2 by infiniteTransition.animateFloat(
+        initialValue = 1.08f,
+        targetValue = 0.88f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = EaseInOutCubic),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orbScale2"
+    )
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
+    val orbRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "orbRotation"
+    )
+
+    // Load scale & alpha animations
+    val scaleState = remember { Animatable(0.92f) }
+    val alphaState = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        scaleState.animateTo(1.0f, animationSpec = tween(600, easing = EaseOutBack))
+    }
+    LaunchedEffect(Unit) {
+        alphaState.animateTo(1.0f, animationSpec = tween(500))
     }
 
-    Column(
+    // Gradient background: Black -> Purple -> Blue
+    val aiBgGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF000000), // black
+            Color(0xFF1E1035), // deep purple
+            Color(0xFF0A192F)  // blue/deep navy
+        )
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
+            .background(aiBgGradient)
     ) {
-        // Appbar
+        // App Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CardBg)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             UniversalBackButton(navController = navController)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "NEXIFY AI",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                letterSpacing = 1.5.sp
+            )
+        }
+
+        // Center Content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .graphicsLayer(
+                    scaleX = scaleState.value,
+                    scaleY = scaleState.value,
+                    alpha = alphaState.value
+                ),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Animated AI orb / glowing sphere
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon))),
+                    .size(200.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White)
-            }
-            Column {
-                Text("Nexify AI", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                Text(
-                    text = if (isAiGenerating) "Thinking..." else "Online & ready",
-                    color = if (isAiGenerating) CyanNeon else Color.Green,
-                    fontSize = 11.sp
+                // Ambient Outer Glow 1 (Purple)
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .graphicsLayer {
+                            scaleX = orbScale1
+                            scaleY = orbScale1
+                        }
+                        .blur(35.dp)
+                        .background(
+                            Brush.radialGradient(listOf(PurpleNeon.copy(alpha = 0.45f), Color.Transparent)),
+                            CircleShape
+                        )
                 )
-            }
-        }
 
-        // Messages List
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            if (messages.isEmpty()) {
-                item {
+                // Ambient Outer Glow 2 (Pink/Reddish)
+                Box(
+                    modifier = Modifier
+                        .size(130.dp)
+                        .graphicsLayer {
+                            scaleX = orbScale2
+                            scaleY = orbScale2
+                        }
+                        .blur(25.dp)
+                        .background(
+                            Brush.radialGradient(listOf(Color(0xFFFF007F).copy(alpha = 0.35f), Color.Transparent)),
+                            CircleShape
+                        )
+                )
+
+                // Swirling Neon Gradient Ring
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .graphicsLayer { rotationZ = orbRotation }
+                        .clip(CircleShape)
+                        .background(CardBg)
+                        .border(
+                            2.5.dp,
+                            Brush.sweepGradient(listOf(Color(0xFFFF007F), PurpleNeon, CyanNeon, Color(0xFFFF007F))),
+                            CircleShape
+                        )
+                )
+
+                // Glowing Sphere core
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .graphicsLayer {
+                            scaleX = orbScale1 * 0.96f
+                            scaleY = orbScale1 * 0.96f
+                        }
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White,
+                                    CyanNeon.copy(alpha = 0.85f),
+                                    PurpleNeon.copy(alpha = 0.6f),
+                                    Color.Transparent
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "AI Core",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Status Badge: Pink/purple gradient glow pill
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(Color(0xFFFF007F).copy(alpha = 0.15f), PurpleNeon.copy(alpha = 0.15f))))
+                    .border(
+                        1.dp,
+                        Brush.horizontalGradient(listOf(Color(0xFFFF007F).copy(alpha = 0.6f), PurpleNeon.copy(alpha = 0.6f))),
+                        CircleShape
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(48.dp))
-                            Text("Yo citizen! I'm your futuristic companion.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text("Ask me about workouts, study tips, or just vibe!", color = TextMuted, fontSize = 12.sp)
-                        }
-                    }
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF007F))
+                    )
+                    Text(
+                        text = "Coming Soon",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
 
-            items(messages) { message ->
-                val isAi = message.sender == "ai"
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = if (isAi) Alignment.CenterStart else Alignment.CenterEnd
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.fillMaxWidth(0.85f)
-                    ) {
-                        if (isAi) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(CyanNeon),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            }
-                        }
+            Spacer(modifier = Modifier.height(20.dp))
 
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            horizontalAlignment = if (isAi) Alignment.Start else Alignment.End
-                        ) {
-                            val bubbleShape = RoundedCornerShape(
-                                topStart = 16.dp,
-                                topEnd = 16.dp,
-                                bottomStart = if (isAi) 4.dp else 16.dp,
-                                bottomEnd = if (isAi) 16.dp else 4.dp
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .clip(bubbleShape)
-                                    .background(
-                                        if (isAi) {
-                                            Brush.verticalGradient(listOf(CardBg, CardBg))
-                                        } else {
-                                            Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
-                                        }
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isAi) CyanNeon.copy(0.3f) else Color.White.copy(alpha = 0.15f),
-                                        bubbleShape
-                                    )
-                                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                            ) {
-                                Text(message.text, color = Color.White, fontSize = 14.sp)
-                            }
-                            Text(
-                                text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp)),
-                                color = TextMuted,
-                                fontSize = 9.sp,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Typing Loader
-        if (isAiGenerating) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(14.dp))
-                Text("Nexify AI is generating response...", color = CyanNeon, fontSize = 11.sp)
-            }
-        }
-
-        // AI Quick Tools Row
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp)
-        ) {
-            item {
-                ToolChip(
-                    text = "🎬 Reel Idea",
-                    onClick = { showReelDialog = true }
-                )
-            }
-            item {
-                ToolChip(
-                    text = "✍️ Caption Gen",
-                    onClick = { showCaptionDialog = true }
-                )
-            }
-            item {
-                ToolChip(
-                    text = "🤖 Optimize Prompt",
-                    onClick = { showPromptDialog = true }
-                )
-            }
-        }
-
-        // Input Form
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            PremiumTextField(
-                value = typedText,
-                onValueChange = { typedText = it },
-                placeholder = "Vibe check with AI...",
-                modifier = Modifier.weight(1f),
-                leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon) }
+            // Title
+            Text(
+                text = "Nexify AI",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 32.sp,
+                textAlign = TextAlign.Center,
+                letterSpacing = 0.5.sp
             )
 
-            IconButton(
-                onClick = {
-                    if (typedText.isEmpty()) return@IconButton
-                    val prompt = typedText
-                    typedText = ""
-                    coroutineScope.launch {
-                        try {
-                            repository.sendAiMessage(uid, prompt) { generating ->
-                                isAiGenerating = generating
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                },
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Description Glassmorphism Card
+            Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardBg)
+                    .border(
+                        1.dp,
+                        Brush.horizontalGradient(listOf(CardBorder, Color(0xFFFF007F).copy(alpha = 0.25f))),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(20.dp)
             ) {
-                Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Your personal AI assistant for smarter chats, productivity, and insights.",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Text(
+                        text = "Smarter features are on the way.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Normal
+                    )
+
+                    // Interactive Action: Join Waitlist
+                    PremiumButton(
+                        text = if (isJoiningWaitlist) "JOINING..." else "Join the Waitlist 🚀",
+                        onClick = {
+                            if (isJoiningWaitlist) return@PremiumButton
+                            isJoiningWaitlist = true
+                            coroutineScope.launch {
+                                try {
+                                    val email = repository.joinAiWaitlist()
+                                    registeredEmail = email
+                                    showSuccessDialog = true
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Waitlist failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isJoiningWaitlist = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Disabled Button: Coming Soon
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Coming Soon",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp
+                )
             }
         }
-    }
 
-    // --- Tool Dialogs ---
-
-    if (showReelDialog) {
-        AlertDialog(
-            onDismissRequest = { showReelDialog = false },
-            title = { Text("🎬 Reel Idea Generator", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Enter a topic or niche to brainstorm a structured viral Reel idea.", color = TextMuted, fontSize = 12.sp)
-                    PremiumTextField(
-                        value = reelTopic,
-                        onValueChange = { reelTopic = it },
-                        placeholder = "e.g., coding routine, gym hacks"
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (reelTopic.isNotBlank()) {
-                            val topic = reelTopic
-                            reelTopic = ""
-                            showReelDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    repository.generateReelIdea(uid, topic) { generating ->
-                                        isAiGenerating = generating
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
+        // Waitlist success dialog
+        if (showSuccessDialog) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .clickable { showSuccessDialog = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(CardBg)
+                        .border(
+                            1.dp,
+                            Brush.horizontalGradient(listOf(CardBorder, Color(0xFFFF007F).copy(alpha = 0.3f))),
+                            RoundedCornerShape(24.dp)
+                        )
+                        .clickable(enabled = false) {}
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Generate", color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReelDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
-
-    if (showCaptionDialog) {
-        AlertDialog(
-            onDismissRequest = { showCaptionDialog = false },
-            title = { Text("✍️ AI Caption Generator", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Describe your post and select the tone.", color = TextMuted, fontSize = 12.sp)
-                    PremiumTextField(
-                        value = captionDesc,
-                        onValueChange = { captionDesc = it },
-                        placeholder = "e.g., A developer debugging at 2 AM"
-                    )
-                    Text("Tone Selection", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        val tones = listOf("Chill", "Professional", "Hustle")
-                        tones.forEach { t ->
-                            val selected = captionTone == t
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { captionTone = t }
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        1.dp,
-                                        if (selected) CyanNeon else Color.Gray.copy(alpha = 0.4f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .background(if (selected) CyanNeon.copy(alpha = 0.2f) else Color.Transparent)
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = t,
-                                    color = if (selected) CyanNeon else Color.White,
-                                    fontSize = 11.sp
-                                )
-                            }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x1F00E5FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(32.dp))
                         }
+
+                        Text(
+                            text = "You're on the list!",
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "We have registered $registeredEmail for early access. We will email you once your access key is activated! 🚀",
+                            color = TextMuted,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        PremiumButton(
+                            text = "Awesome",
+                            onClick = { showSuccessDialog = false },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (captionDesc.isNotBlank()) {
-                            val desc = captionDesc
-                            val tone = captionTone
-                            captionDesc = ""
-                            showCaptionDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    repository.generateCaption(uid, desc, tone) { generating ->
-                                        isAiGenerating = generating
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
-                ) {
-                    Text("Generate", color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCaptionDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
-
-    if (showPromptDialog) {
-        AlertDialog(
-            onDismissRequest = { showPromptDialog = false },
-            title = { Text("🤖 AI Prompt Optimizer", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Turn a simple task description into a high-quality system prompt.", color = TextMuted, fontSize = 12.sp)
-                    PremiumTextField(
-                        value = promptTask,
-                        onValueChange = { promptTask = it },
-                        placeholder = "e.g., Translate text to SQL"
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (promptTask.isNotBlank()) {
-                            val task = promptTask
-                            promptTask = ""
-                            showPromptDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    repository.generatePrompt(uid, task) { generating ->
-                                        isAiGenerating = generating
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
-                ) {
-                    Text("Optimize", color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPromptDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 }
 
