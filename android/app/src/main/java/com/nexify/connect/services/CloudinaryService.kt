@@ -18,9 +18,9 @@ import java.io.InputStream
 object CloudinaryService {
     private val client = OkHttpClient()
     
-    // Nexify Connect global demo cloud credentials for seamless integration
-    private const val CLOUD_NAME = "nexify-connect" 
-    private const val UPLOAD_PRESET = "unsigned_preset"
+    // Nexify Connect global credentials matching web configuration
+    private const val CLOUD_NAME = "dwcy3l9gz" 
+    private const val UPLOAD_PRESET = "nexify_uploads"
 
     /**
      * Compresses the selected image Uri and uploads it to Cloudinary.

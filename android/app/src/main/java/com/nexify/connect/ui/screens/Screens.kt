@@ -58,6 +58,10 @@ import com.nexify.connect.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.nexify.connect.R
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.animation.AnimatedVisibility
@@ -100,6 +104,46 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val idToken = account.idToken
+                if (idToken != null) {
+                    coroutineScope.launch {
+                        isLoading = true
+                        try {
+                            val success = repository.signInWithGoogle(idToken)
+                            if (success) {
+                                navController.navigate("home") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                } else {
+                    Toast.makeText(context, "Google sign in failed: missing ID Token.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: ApiException) {
+                Toast.makeText(context, "Google sign in failed: ${e.message} (status: ${e.statusCode})", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
 
     Box(
         modifier = Modifier
@@ -269,20 +313,8 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                     // Google Login Button
                     OutlinedButton(
                         onClick = {
-                            coroutineScope.launch {
-                                isLoading = true
-                                try {
-                                    val success = repository.signInWithGoogle("mock_google_id_token")
-                                    if (success) {
-                                        navController.navigate("home") {
-                                            popUpTo("login") { inclusive = true }
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isLoading = false
-                                }
+                            googleSignInClient.signOut().addOnCompleteListener {
+                                googleSignInLauncher.launch(googleSignInClient.signInIntent)
                             }
                         },
                         border = BorderStroke(1.dp, CardBorder),
@@ -355,6 +387,46 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val idToken = account.idToken
+                if (idToken != null) {
+                    coroutineScope.launch {
+                        isLoading = true
+                        try {
+                            val success = repository.signInWithGoogle(idToken)
+                            if (success) {
+                                navController.navigate("home") {
+                                    popUpTo("signup") { inclusive = true }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                } else {
+                    Toast.makeText(context, "Google sign in failed: missing ID Token.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: ApiException) {
+                Toast.makeText(context, "Google sign in failed: ${e.message} (status: ${e.statusCode})", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
 
     Box(
         modifier = Modifier
@@ -510,20 +582,8 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                     // Google Signup Button
                     OutlinedButton(
                         onClick = {
-                            coroutineScope.launch {
-                                isLoading = true
-                                try {
-                                    val success = repository.signInWithGoogle("mock_google_id_token")
-                                    if (success) {
-                                        navController.navigate("home") {
-                                            popUpTo("signup") { inclusive = true }
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Google Sign Up failed.", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isLoading = false
-                                }
+                            googleSignInClient.signOut().addOnCompleteListener {
+                                googleSignInLauncher.launch(googleSignInClient.signInIntent)
                             }
                         },
                         border = BorderStroke(1.dp, CardBorder),
