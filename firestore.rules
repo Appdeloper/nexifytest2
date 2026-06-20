@@ -269,6 +269,12 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
 
+    // === Invites collection ===
+    match /invites/{inviteCode} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
     // === Catch-all ===
     match /{path=**} {
       allow read: if isSignedIn();
