@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "1055135318628",
+    "firebase_url": "https://nexify-connect-prod-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "nexify-connect-prod",
+    "storage_bucket": "nexify-connect-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055135318628:android:c85b1139cdf4c5d3769571",
+        "android_client_info": {
+          "package_name": "com.nexify.connect"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1055135318628-kgr2peebkvmkr4t60bksb7fumeg5vl2b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA90WVioDC0yGiIMB8pa07VDgrPv4C5r0Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1055135318628-kgr2peebkvmkr4t60bksb7fumeg5vl2b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
