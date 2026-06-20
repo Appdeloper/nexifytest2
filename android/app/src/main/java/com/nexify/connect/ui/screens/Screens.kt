@@ -7013,7 +7013,7 @@ fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
         delay(1500)
         
         // Autologin routing checks
-        val sharedPrefs = context.getSharedPreferences("nexify_connect_prefs", Context.MODE_PRIVATE)
+        val sharedPrefs = context.getSharedPreferences("nexify_connect_prefs", 0)
         val onboardingComplete = sharedPrefs.getBoolean("onboarding_complete", false)
         val currentUser = FirebaseAuth.getInstance().currentUser
 
