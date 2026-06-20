@@ -6999,21 +6999,16 @@ fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
     val scale = remember { Animatable(0f) }
     val alpha = remember { Animatable(0f) }
 
-    LaunchedEffect(key1 = true) {
-        // Fade in and overshoot scale bounce
-        launch {
-            alpha.animateTo(1f, animationSpec = tween(1000))
-        }
-        scale.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(1200, easing = EaseOutBack)
-        )
-        
-        // Wait a bit for the premium animation feel
-        delay(1500)
-        
-        // Autologin routing checks
-        val sharedPrefs = context.getSharedPreferences("nexify_connect_prefs", 0)
+    // FEATURE CONFIGURATION: Change REQUIRE_EARLY_ACCESS to false to remove this gate
+    val REQUIRE_EARLY_ACCESS = true
+    val EARLY_ACCESS_PASSWORD = "NEXIFY2026"
+
+    val sharedPrefs = remember { context.getSharedPreferences("nexify_connect_prefs", 0) }
+    var showGate by remember { mutableStateOf(false) }
+    var passwordInput by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+
+    val routeNext = {
         val onboardingComplete = sharedPrefs.getBoolean("onboarding_complete", false)
         val currentUser = FirebaseAuth.getInstance().currentUser
 
@@ -7029,6 +7024,28 @@ fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
             navController.navigate("login") {
                 popUpTo("splash") { inclusive = true }
             }
+        }
+    }
+
+    LaunchedEffect(key1 = true) {
+        // Fade in and overshoot scale bounce
+        launch {
+            alpha.animateTo(1f, animationSpec = tween(1000))
+        }
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(1200, easing = EaseOutBack)
+        )
+        
+        // Wait a bit for the premium animation feel
+        delay(1500)
+        
+        // Check early access authorization
+        val accessGranted = sharedPrefs.getBoolean("early_access_granted", false)
+        if (REQUIRE_EARLY_ACCESS && !accessGranted) {
+            showGate = true
+        } else {
+            routeNext()
         }
     }
 
@@ -7102,6 +7119,115 @@ fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
                 fontSize = 12.sp,
                 letterSpacing = 2.sp
             )
+        }
+
+        // --- Early Access Passcode Lock Overlay ---
+        if (showGate) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xE605050A)), // solid near-black overlay
+                contentAlignment = Alignment.Center
+            ) {
+                // Glow behind the login box
+                Box(
+                    modifier = Modifier
+                        .size(280.dp)
+                        .blur(50.dp)
+                        .background(PurpleNeon.copy(alpha = 0.20f), CircleShape)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 340.dp)
+                        .fillMaxWidth(0.86f)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(CardBg)
+                        .border(
+                            BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(CyanNeon, PurpleNeon))),
+                            RoundedCornerShape(28.dp)
+                        )
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x1100DFD8))
+                            .border(1.dp, CyanNeon, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Access Gate",
+                            tint = CyanNeon,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "EARLY ACCESS ACCESS",
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "This build is restricted. Enter the passcode to authenticate your device and unlock Nexify Connect.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 16.sp
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            isError = false
+                        },
+                        placeholder = { Text("Enter passcode", color = TextMuted) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = if (isError) Color.Red else CyanNeon,
+                            unfocusedBorderColor = if (isError) Color.Red else CardBorder,
+                            focusedContainerColor = Color(0x660A0A0F),
+                            unfocusedContainerColor = Color(0x660A0A0F),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (isError) {
+                        Text(
+                            text = "Invalid passcode. Access denied.",
+                            color = Color.Red,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    PremiumButton(
+                        text = "AUTHENTICATE BUILD",
+                        onClick = {
+                            if (passwordInput.trim() == EARLY_ACCESS_PASSWORD) {
+                                sharedPrefs.edit().putBoolean("early_access_granted", true).apply()
+                                showGate = false
+                                routeNext()
+                            } else {
+                                isError = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 }
