@@ -70,11 +70,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.*
+import androidx.compose.ui.text.style.TextAlign
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -6991,6 +6989,117 @@ fun ForgotPasswordScreen(navController: NavController, repository: FirebaseRepos
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
+    val context = LocalContext.current
+    val scale = remember { Animatable(0f) }
+    val alpha = remember { Animatable(0f) }
+
+    LaunchedEffect(key1 = true) {
+        // Fade in and overshoot scale bounce
+        launch {
+            alpha.animateTo(1f, animationSpec = tween(1000))
+        }
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(1200, easing = EaseOutBack)
+        )
+        
+        // Wait a bit for the premium animation feel
+        delay(1500)
+        
+        // Autologin routing checks
+        val sharedPrefs = context.getSharedPreferences("nexify_connect_prefs", Context.MODE_PRIVATE)
+        val onboardingComplete = sharedPrefs.getBoolean("onboarding_complete", false)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+
+        if (!onboardingComplete) {
+            navController.navigate("onboarding") {
+                popUpTo("splash") { inclusive = true }
+            }
+        } else if (currentUser != null) {
+            navController.navigate("home") {
+                popUpTo("splash") { inclusive = true }
+            }
+        } else {
+            navController.navigate("login") {
+                popUpTo("splash") { inclusive = true }
+            }
+        }
+    }
+
+    // Gradient background: Black -> Deep Purple -> Blue
+    val splashBgGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF000000), // black
+            Color(0xFF1E1035), // deep purple
+            Color(0xFF0A192F)  // blue/deep navy
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(splashBgGradient),
+        contentAlignment = Alignment.Center
+    ) {
+        // Glowing halo circle backdrop
+        Box(
+            modifier = Modifier
+                .size(240.dp)
+                .blur(40.dp)
+                .background(PurpleNeon.copy(alpha = 0.3f), CircleShape)
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.graphicsLayer(
+                scaleX = scale.value,
+                scaleY = scale.value,
+                alpha = alpha.value
+            )
+        ) {
+            // App Logo
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .background(CardBg)
+                    .border(
+                        2.dp,
+                        Brush.horizontalGradient(listOf(CyanNeon, PurpleNeon)),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "Logo",
+                    tint = CyanNeon,
+                    modifier = Modifier.size(50.dp)
+                )
+            }
+
+            Text(
+                text = "Nexify Connect",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 28.sp,
+                letterSpacing = 1.sp
+            )
+
+            Text(
+                text = "Connect. Focus. Grow.",
+                color = CyanNeon,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                letterSpacing = 2.sp
+            )
         }
     }
 }

@@ -143,6 +143,7 @@ class MainActivity : ComponentActivity() {
                             val sharedPrefs = remember { this@MainActivity.getSharedPreferences("nexify_connect_prefs", 0) }
                             val onboardingComplete = remember { sharedPrefs.getBoolean("onboarding_complete", false) }
 
+                            val currentUser = remember { FirebaseAuth.getInstance().currentUser }
                             val startDestination = "splash"
 
                             LaunchedEffect(currentUser) {
