@@ -231,7 +231,6 @@ const Login = () => {
         )}
       </AnimatePresence>
     </div>
-    </div>
   );
 };
 
