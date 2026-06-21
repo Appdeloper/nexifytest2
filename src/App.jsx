@@ -122,6 +122,14 @@ const AppContent = () => {
 };
 
 const App = () => {
+  useEffect(() => {
+    const splash = document.getElementById('splash');
+    if (splash) {
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 500);
+    }
+  }, []);
+
   const [earlyAccessGranted, setEarlyAccessGranted] = useState(
     localStorage.getItem('early_access_granted') === 'true'
   );
