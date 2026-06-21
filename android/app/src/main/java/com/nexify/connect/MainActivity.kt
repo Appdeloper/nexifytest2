@@ -41,6 +41,14 @@ class MainActivity : ComponentActivity() {
                                     loadWithOverviewMode = true
                                     setSupportZoom(false)
                                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                    
+                                    // Bypass Google OAuth disallowed_useragent block inside WebViews
+                                    val defaultUserAgent = userAgentString
+                                    if (defaultUserAgent != null) {
+                                        userAgentString = defaultUserAgent
+                                            .replace("; wv", "")
+                                            .replace(Regex("Version/\\d+\\.\\d+\\s?"), "")
+                                    }
                                 }
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(
