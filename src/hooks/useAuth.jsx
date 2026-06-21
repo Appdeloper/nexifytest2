@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ensureUserProfile, checkAndIncrementStreak } from '../services/auth';
@@ -14,6 +14,19 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let profileUnsub = null;
+
+    // Check redirect result on mount (crucial for WebView Google Auth!)
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          console.log("[NexifyAuth] LOGIN SUCCESS via redirect for user:", result.user.uid);
+          await ensureUserProfile(result.user);
+          console.log("[NexifyAuth] Profile verified for redirect user.");
+        }
+      })
+      .catch((err) => {
+        console.error("[NexifyAuth] getRedirectResult error:", err);
+      });
 
     const authUnsub = onAuthStateChanged(auth, async (user) => {
       if (profileUnsub) { profileUnsub(); profileUnsub = null; }

@@ -38,11 +38,18 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
-      await loginWithGoogle();
-      navigate('/home');
+      console.log("[NexifyAuth] Initiating Google login...");
+      const user = await loginWithGoogle();
+      if (user) {
+        console.log("[NexifyAuth] LOGIN SUCCESS");
+        console.log("[NexifyAuth] NAVIGATING TO HOME");
+        navigate('/home');
+      } else {
+        console.log("[NexifyAuth] Redirect flow active, waiting for page redirect...");
+      }
     } catch (error) {
-      showToast(error.message);
-    } finally {
+      console.error("[NexifyAuth] Google login failed:", error);
+      showToast(error.message || "Google login failed.");
       setLoading(false);
     }
   };

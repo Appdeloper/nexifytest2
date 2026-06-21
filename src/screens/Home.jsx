@@ -210,6 +210,85 @@ const Home = () => {
     }
   };
 
+  useEffect(() => {
+    console.log("[NexifyHome] HOME SCREEN LOADED");
+  }, []);
+
+  // Safe data extraction with fallbacks to prevent crashes
+  let userRankName = 'Citizen';
+  let nextRankName = 'Max Rank';
+  let rankProgressPercent = 0;
+  let nextRankXpRequired = 0;
+  let isMaxRank = false;
+
+  try {
+    if (currentUser) {
+      const xpVal = currentUser.xp || 0;
+      const rankObj = getRankForXP(xpVal);
+      if (rankObj) userRankName = rankObj.name;
+      
+      const nextRankObj = getNextRank(xpVal);
+      if (nextRankObj) {
+        nextRankName = nextRankObj.name;
+        nextRankXpRequired = nextRankObj.xpRequired;
+        rankProgressPercent = getRankProgress(xpVal);
+      } else {
+        isMaxRank = true;
+        rankProgressPercent = 100;
+      }
+    }
+  } catch (err) {
+    console.error("[NexifyHome] Error processing rank/xp values:", err);
+  }
+
+  // If currentUser is null (still loading), show the Welcome fallback UI to prevent blank screens
+  if (!currentUser) {
+    return (
+      <div style={{ 
+        height: '100dvh', 
+        width: '100%', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        background: '#0A0A0F', 
+        color: 'white', 
+        gap: 20,
+        fontFamily: 'Inter, sans-serif',
+        position: 'relative'
+      }}>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '250px', height: '250px', borderRadius: '50%', background: 'rgba(0, 229, 255, 0.1)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+        
+        <img 
+          src="logo.png" 
+          className="logo-squircle" 
+          alt="Logo" 
+          style={{ width: 80, height: 80, objectFit: 'contain', filter: 'drop-shadow(0 0 12px rgba(0, 229, 255, 0.5))' }} 
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, zIndex: 1 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', margin: 0 }}>Welcome</h2>
+          <p style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.4)', margin: 0 }}>Loading your workspace profile...</p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: 6, zIndex: 1 }}>
+          {[0, 1, 2].map(i => (
+            <div 
+              key={i} 
+              style={{ 
+                width: 6, 
+                height: 6, 
+                borderRadius: '50%', 
+                background: '#00dfd8', 
+                animation: `dotBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+                boxShadow: '0 0 6px #00dfd8'
+              }} 
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#000', color: 'white', position: 'relative', overflow: 'hidden' }}>
       <ParticleSystem />
@@ -339,7 +418,7 @@ const Home = () => {
               <Trophy size={18} color="var(--primary-cyan)" />
             </div>
             <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--primary-cyan)', letterSpacing: 1.5, marginBottom: 4 }}>RANK</div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{getRankForXP(currentUser?.xp || 0).name}</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{userRankName}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Level {currentUser?.level || 1}</div>
           </motion.div>
 
@@ -415,12 +494,12 @@ const Home = () => {
               <Shield size={18} color="#10b981" />
             </div>
             <div style={{ fontSize: 10, fontWeight: 900, color: '#10b981', letterSpacing: 1.5, marginBottom: 4 }}>NEXT RANK</div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{getNextRank(currentUser?.xp || 0)?.name || 'Max Rank'}</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: 'white' }}>{nextRankName}</div>
             <div style={{ marginTop: 10 }}>
               <div style={{ height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
-                <motion.div initial={{ width: 0 }} animate={{ width: `${getRankProgress(currentUser?.xp || 0)}%` }} transition={{ duration: 1.5 }} style={{ height: '100%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
+                <motion.div initial={{ width: 0 }} animate={{ width: `${rankProgressPercent}%` }} transition={{ duration: 1.5 }} style={{ height: '100%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{getNextRank(currentUser?.xp || 0) ? `${(getNextRank(currentUser?.xp || 0).xpRequired - (currentUser?.xp || 0)).toLocaleString()} XP left` : 'Fully Ascended'}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>{isMaxRank ? 'Fully Ascended' : `${(nextRankXpRequired - (currentUser?.xp || 0)).toLocaleString()} XP left`}</div>
             </div>
           </motion.div>
         </div>

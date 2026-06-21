@@ -3,6 +3,8 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut 
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -359,10 +361,30 @@ export const loginUser = async (email, password) => {
 
 export const loginWithGoogle = async () => {
   try {
-    const userCredential = await signInWithPopup(auth, googleProvider);
-    await ensureUserProfile(userCredential.user);
-    return userCredential.user;
+    const isMobileApp = navigator.userAgent.includes("NexifyApp") || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobileApp) {
+      console.log("[NexifyAuth] Mobile WebView/Browser detected. Initiating Google Sign-In with redirect...");
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    } else {
+      console.log("[NexifyAuth] Desktop/Standard browser detected. Initiating Google Sign-In with popup...");
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      await ensureUserProfile(userCredential.user);
+      console.log("[NexifyAuth] LOGIN SUCCESS");
+      return userCredential.user;
+    }
   } catch (error) {
+    console.error("[NexifyAuth] Google Sign-In error:", error);
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/operation-not-supported-in-this-environment') {
+      console.warn("[NexifyAuth] Popup blocked or not supported. Falling back to redirect...");
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirectErr) {
+        console.error("[NexifyAuth] Redirect fallback error:", redirectErr);
+        throw parseAuthError(redirectErr);
+      }
+      return null;
+    }
     throw parseAuthError(error);
   }
 };
