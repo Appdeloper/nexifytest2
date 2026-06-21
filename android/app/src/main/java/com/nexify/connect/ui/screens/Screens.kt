@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -69,11 +70,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.*
+import androidx.compose.ui.text.style.TextAlign
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -93,6 +92,20 @@ fun getRelativeTimeString(date: Date?, onlineStatus: Boolean): String {
         minutes < 60 -> "Last seen ${minutes}m ago"
         hours < 24 -> "Last seen ${hours}h ago"
         else -> "Last seen ${days}d ago"
+    }
+}
+
+// ── AUTHENTICATION ERROR PARSER ──────────────────────────────────
+fun getReadableAuthError(e: Throwable): String {
+    val message = e.message ?: ""
+    return when {
+        e is com.google.firebase.auth.FirebaseAuthInvalidUserException -> "User account not found. Please check your credentials or register."
+        e is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "Incorrect password or invalid email format. Please try again."
+        e is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account with this email address already exists."
+        e is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "Password is too weak. Must be at least 6 characters."
+        message.contains("network", ignoreCase = true) -> "Network gateway error. Please check your connection."
+        message.contains("Google", ignoreCase = true) -> "Google sign-in failed. Please try again."
+        else -> message
     }
 }
 
@@ -175,35 +188,39 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // App Logo with ambient drop glow
+            // App Logo wrapped in high-tech glowing glass badge to blend the black background
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF000000)) // Pure black background to blend the logo's black color
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(24.dp)
+                    )
             ) {
-                // Glow behind logo
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer(alpha = 0.3f)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(CyanNeon, Color.Transparent),
-                                radius = 150f
-                            )
-                        )
-                )
                 Image(
                     painter = painterResource(id = com.nexify.connect.R.drawable.logo),
                     contentDescription = "Nexify Connect Logo",
-                    modifier = Modifier.size(110.dp),
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             }
 
-            // Glassmorphic Panel
+            // Glassmorphic Panel with premium gradient border
             GlassmorphicCard(
                 modifier = Modifier.fillMaxWidth(),
-                borderStroke = BorderStroke(1.dp, CardBorder)
+                borderStroke = BorderStroke(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CyanNeon.copy(alpha = 0.5f), PurpleNeon.copy(alpha = 0.5f))
+                    )
+                )
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
@@ -249,21 +266,7 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                             color = TextMuted,
                             modifier = Modifier
                                 .clickable {
-                                    if (email.isEmpty()) {
-                                        Toast.makeText(context, "Please enter your email address first.", Toast.LENGTH_SHORT).show()
-                                        return@clickable
-                                    }
-                                    coroutineScope.launch {
-                                        isLoading = true
-                                        try {
-                                            repository.forgotPassword(email)
-                                            Toast.makeText(context, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show()
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, e.message ?: "Reset failed.", Toast.LENGTH_SHORT).show()
-                                        } finally {
-                                            isLoading = false
-                                        }
-                                    }
+                                    navController.navigate("forgot_password")
                                 }
                                 .padding(vertical = 4.dp)
                         )
@@ -277,19 +280,28 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                         PremiumButton(
                             text = "CONTINUE",
                             onClick = {
-                                if (email.isEmpty() || password.isEmpty()) {
+                                val trimmedEmail = email.trim()
+                                if (trimmedEmail.isEmpty() || password.isEmpty()) {
                                     Toast.makeText(context, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                                    Toast.makeText(context, "Invalid email format.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (password.length < 6) {
+                                    Toast.makeText(context, "Password must be at least 6 characters.", Toast.LENGTH_SHORT).show()
                                     return@PremiumButton
                                 }
                                 coroutineScope.launch {
                                     isLoading = true
                                     try {
-                                        repository.login(email, password)
+                                        repository.login(trimmedEmail, password)
                                         navController.navigate("home") {
                                             popUpTo("login") { inclusive = true }
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, e.message ?: "Auth failed.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_LONG).show()
                                     } finally {
                                         isLoading = false
                                     }
@@ -331,9 +343,9 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = CyanNeon,
+                                painter = painterResource(id = com.nexify.connect.R.drawable.ic_google),
+                                contentDescription = "Google Icon",
+                                tint = Color.Unspecified,
                                 modifier = Modifier.size(18.dp).padding(end = 6.dp)
                             )
                             Text(
@@ -414,7 +426,7 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                                 }
                             }
                         } catch (e: Exception) {
-                            Toast.makeText(context, e.message ?: "Google Auth failed.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_SHORT).show()
                         } finally {
                             isLoading = false
                         }
@@ -458,35 +470,39 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // App Logo with ambient drop glow
+            // App Logo wrapped in high-tech glowing glass badge to blend the black background
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF000000)) // Pure black background to blend the logo's black color
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(24.dp)
+                    )
             ) {
-                // Glow behind logo
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer(alpha = 0.3f)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(CyanNeon, Color.Transparent),
-                                radius = 150f
-                            )
-                        )
-                )
                 Image(
                     painter = painterResource(id = com.nexify.connect.R.drawable.logo),
                     contentDescription = "Nexify Connect Logo",
-                    modifier = Modifier.size(110.dp),
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             }
 
-            // Glassmorphic Panel
+            // Glassmorphic Panel with premium gradient border
             GlassmorphicCard(
                 modifier = Modifier.fillMaxWidth(),
-                borderStroke = BorderStroke(1.dp, CardBorder)
+                borderStroke = BorderStroke(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CyanNeon.copy(alpha = 0.5f), PurpleNeon.copy(alpha = 0.5f))
+                    )
+                )
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
@@ -545,19 +561,28 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                         PremiumButton(
                             text = "SIGN UP",
                             onClick = {
-                                if (email.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) {
+                                val trimmedEmail = email.trim()
+                                if (trimmedEmail.isEmpty() || password.isEmpty() || username.isEmpty() || inviteCode.isEmpty()) {
                                     Toast.makeText(context, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                                    Toast.makeText(context, "Invalid email format.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (password.length < 6) {
+                                    Toast.makeText(context, "Password must be at least 6 characters.", Toast.LENGTH_SHORT).show()
                                     return@PremiumButton
                                 }
                                 coroutineScope.launch {
                                     isLoading = true
                                     try {
-                                        repository.signUp(email, password, username, inviteCode)
+                                        repository.signUp(trimmedEmail, password, username, inviteCode)
                                         navController.navigate("home") {
                                             popUpTo("signup") { inclusive = true }
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, e.message ?: "Sign up failed.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_LONG).show()
                                     } finally {
                                         isLoading = false
                                     }
@@ -600,9 +625,9 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = PurpleNeon,
+                                painter = painterResource(id = com.nexify.connect.R.drawable.ic_google),
+                                contentDescription = "Google Icon",
+                                tint = Color.Unspecified,
                                 modifier = Modifier.size(18.dp).padding(end = 6.dp)
                             )
                             Text(
@@ -688,72 +713,173 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
-            .padding(16.dp),
+            .background(LuxuryBgGradient)
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Sticky Header with back button + Title
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             UniversalBackButton(navController = navController)
-            Text("Edit Profile", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(start = 8.dp))
+            Text(
+                text = "Citizen Profile",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                modifier = Modifier.padding(start = 12.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
+        // Center avatar with glowing ring & online indicator
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(130.dp)
         ) {
+            // Glowing ring shadow
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(10.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), alpha = 0.35f)
+            )
             AsyncImage(
-                model = userProfile?.profileImage,
+                model = userProfile?.profileImage ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$uid",
                 contentDescription = "Profile Picture",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .size(116.dp)
                     .clip(CircleShape)
-                    .border(3.dp, Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), CircleShape)
+                    .border(2.dp, Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)), CircleShape)
                     .clickable { imageLauncher.launch("image/*") }
+            )
+
+            // Online status indicator (green dot)
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .align(Alignment.BottomEnd)
+                    .clip(CircleShape)
+                    .background(Color(0xFF00FF55))
+                    .border(3.dp, Color(0xFF0A0A0F), CircleShape)
             )
 
             if (isUploading) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .size(116.dp)
                         .background(Color.Black.copy(alpha = 0.6f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = CyanNeon)
                 }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .background(PurpleNeon, CircleShape)
-                        .padding(8.dp)
-                        .border(1.dp, Color.Black, CircleShape)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = userProfile?.username?.uppercase() ?: "CITIZEN",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Text(
+                text = userProfile?.email ?: "",
+                fontSize = 13.sp,
+                color = TextMuted
+            )
+        }
+
+        // Badge Chips (Member, Rookie)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = Color(0x1F00E5FF),
+                border = BorderStroke(1.dp, CyanNeon.copy(0.4f)),
+                shape = CircleShape
+            ) {
+                Text("MEMBER", color = CyanNeon, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+            }
+            Surface(
+                color = Color(0x1F7B61FF),
+                border = BorderStroke(1.dp, PurpleNeon.copy(0.4f)),
+                shape = CircleShape
+            ) {
+                Text(userProfile?.rank?.uppercase() ?: "ROOKIE", color = PurpleNeon, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+            }
+        }
+
+        // Stats Grid Cards
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("FRIENDS", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${userProfile?.friends?.size ?: 0}", fontSize = 16.sp, color = CyanNeon, fontWeight = FontWeight.ExtraBold)
+                }
+            }
+            GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("LEVEL", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${userProfile?.level ?: 1}", fontSize = 16.sp, color = PurpleNeon, fontWeight = FontWeight.ExtraBold)
+                }
+            }
+            GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("XP", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${userProfile?.xp ?: 0}", fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
 
-        Text(
-            text = userProfile?.username ?: "Citizen",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = userProfile?.email ?: "",
-            fontSize = 13.sp,
-            color = TextMuted
-        )
+        // Progress Bar
+        val progress = remember(userProfile?.xp) {
+            val xpVal = userProfile?.xp ?: 0L
+            (xpVal % 100).toFloat() / 100f
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Level Progress", fontSize = 12.sp, color = TextMuted)
+                Text("${(progress * 100).toInt()}%", fontSize = 12.sp, color = PurpleNeon, fontWeight = FontWeight.Bold)
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(if (progress > 0) progress else 0.01f)
+                        .clip(CircleShape)
+                        .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Biography section
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -763,7 +889,7 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold)
+                Text("BIOGRAPHY", fontSize = 11.sp, color = CyanNeon, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 
                 Row(
                     modifier = Modifier
@@ -784,7 +910,7 @@ fun ProfileCustomizationScreen(navController: NavController, repository: Firebas
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
         PremiumButton(
             text = "SAVE CHANGES",
@@ -1198,40 +1324,54 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
     val chats by repository.subscribeToChats().safeCollect("ChatListScreen_chats", emptyList()).collectAsState(initial = emptyList())
     val groups by repository.subscribeToGroups().safeCollect("ChatListScreen_groups", emptyList()).collectAsState(initial = emptyList())
     val allUsers by repository.subscribeToAllUsers().safeCollect("ChatListScreen_users", emptyList()).collectAsState(initial = emptyList())
+    val uid = repository.currentUserId ?: ""
+    val userProfile by repository.subscribeToUser(uid).safeCollect("ChatListScreen", null).collectAsState(initial = null)
     
     var currentTab by remember { mutableStateOf("DMs") }
+
+    val calendar = remember { java.util.Calendar.getInstance() }
+    val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+    val greetingPrefix = when {
+        hour in 5..11 -> "Good morning"
+        hour in 12..16 -> "Good afternoon"
+        hour in 17..21 -> "Good evening"
+        else -> "Working late"
+    }
+    val name = userProfile?.username?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } ?: "Citizen"
+    val greetingText = "$greetingPrefix, $name 👋"
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(LuxuryBgGradient)
     ) {
+        // Top Hub Header Bar
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Nexify Hub", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = CyanNeon)
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = { navController.navigate("ai_chat") }) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon)
+                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = CyanNeon, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("settings") }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("find") }) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White)
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("rooms") }) {
-                    Icon(Icons.Default.Explore, contentDescription = null, tint = Color.White)
+                    Icon(Icons.Default.Explore, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("chat_rooms") }) {
-                    Icon(Icons.Default.Groups, contentDescription = "Chat Rooms", tint = CyanNeon)
+                    Icon(Icons.Default.Groups, contentDescription = "Chat Rooms", tint = CyanNeon, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = { navController.navigate("leaderboard") }) {
-                    Icon(Icons.Default.Star, contentDescription = "Leaderboard", tint = Color.White)
+                    Icon(Icons.Default.Star, contentDescription = "Leaderboard", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = {
                     repository.logout()
@@ -1239,63 +1379,194 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                         popUpTo(0)
                     }
                 }) {
-                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red)
+                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red, modifier = Modifier.size(20.dp))
                 }
             }
         }
 
-        // Nexify Apps Quick Launcher Bar
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            // Dynamic Greeting
             item {
-                AppLaunchChip(
-                    label = "⏱️ Focus Pod",
-                    onClick = { navController.navigate("focus_pod") }
+                Text(
+                    text = greetingText,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            item {
-                AppLaunchChip(
-                    label = "🏋️ Nexify Fit",
-                    onClick = { navController.navigate("fitness") }
-                )
-            }
-            item {
-                AppLaunchChip(
-                    label = "⚡ Nexify Edge",
-                    onClick = { navController.navigate("nexify_edge") }
-                )
-            }
-            item {
-                AppLaunchChip(
-                    label = "🌊 Waves (Soon)",
-                    onClick = { /* Locked */ },
-                    enabled = false
-                )
-            }
-        }
 
-        // Tab Selector
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            TabButton(text = "Direct Messages", active = currentTab == "DMs", onClick = { currentTab = "DMs" })
-            TabButton(text = "Group Chats", active = currentTab == "Groups", onClick = { currentTab = "Groups" })
-        }
-
-        if (currentTab == "DMs") {
-            if (chats.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No active DMs. Find friends to connect!", color = TextMuted, fontSize = 14.sp)
+            // Stats 2x2 Grid Card
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("RANK", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(userProfile?.rank?.uppercase() ?: "ROOKIE", fontSize = 16.sp, color = CyanNeon, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("STREAK", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${userProfile?.streak ?: 0} Days 🔥", fontSize = 16.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("LEVEL", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Level ${userProfile?.level ?: 1}", fontSize = 16.sp, color = PurpleNeon, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        GlassmorphicCard(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("XP PROGRESS", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${userProfile?.xp ?: 0} XP", fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            }
+
+            // Focus Pod Large Card
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF7B61FF).copy(0.12f), Color(0xFF00E5FF).copy(0.12f))
+                            )
+                        )
+                        .border(
+                            1.dp,
+                            Brush.horizontalGradient(listOf(PurpleNeon.copy(0.4f), CyanNeon.copy(0.4f))),
+                            RoundedCornerShape(24.dp)
+                        )
+                        .padding(16.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1.5f)) {
+                            Text("Focus Pod", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Lock into your workspace chamber and gain Level XP.", fontSize = 12.sp, color = TextMuted, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                            
+                            // Glowing CTA button
+                            PremiumButton(
+                                text = "Enter Chamber",
+                                onClick = { navController.navigate("focus_pod") },
+                                modifier = Modifier.width(160.dp)
+                            )
+                        }
+                        
+                        // Mini animated circular timer
+                        Box(
+                            modifier = Modifier.size(80.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                progress = 0.75f,
+                                modifier = Modifier.fillMaxSize(),
+                                color = CyanNeon,
+                                strokeWidth = 6.dp,
+                                trackColor = Color.White.copy(alpha = 0.05f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = CyanNeon,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Quick Launcher chips
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("QUICK LAUNCHER", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        item {
+                            AppLaunchChip(
+                                label = "⏱️ Focus Pod",
+                                onClick = { navController.navigate("focus_pod") }
+                            )
+                        }
+                        item {
+                            AppLaunchChip(
+                                label = "🏋️ Nexify Fit",
+                                onClick = { navController.navigate("fitness") }
+                            )
+                        }
+                        item {
+                            AppLaunchChip(
+                                label = "⚡ Nexify Edge",
+                                onClick = { navController.navigate("nexify_edge") }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Tab Selector
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TabButton(text = "Direct Messages", active = currentTab == "DMs", onClick = { currentTab = "DMs" }, modifier = Modifier.weight(1f))
+                    TabButton(text = "Group Chats", active = currentTab == "Groups", onClick = { currentTab = "Groups" }, modifier = Modifier.weight(1f))
+                }
+            }
+
+            // Tabs Content List
+            if (currentTab == "DMs") {
+                if (chats.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                            Text("No active DMs. Find friends to connect!", color = TextMuted, fontSize = 14.sp)
+                        }
+                    }
+                } else {
                     items(chats) { chat ->
                         val otherUserId = chat.participants.find { it != repository.currentUserId } ?: ""
                         val otherUserProfile = allUsers.find { it.userId == otherUserId }
@@ -1343,53 +1614,49 @@ fun ChatListScreen(navController: NavController, repository: FirebaseRepository)
                         }
                     }
                 }
-            }
-        } else {
-            // Groups Tab
-            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Your Active Pods", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    IconButton(onClick = { navController.navigate("create_group") }) {
-                        Icon(Icons.Default.GroupAdd, contentDescription = null, tint = CyanNeon)
-                    }
-                }
-
+            } else {
+                // Groups Tab
                 if (groups.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("No active groups. Initialize a group!", color = TextMuted, fontSize = 14.sp)
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                            Text("No active groups. Initialize a group!", color = TextMuted, fontSize = 14.sp)
+                        }
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(groups) { group ->
-                            GlassmorphicCard(
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Your Active Pods", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            IconButton(onClick = { navController.navigate("create_group") }) {
+                                Icon(Icons.Default.GroupAdd, contentDescription = null, tint = CyanNeon)
+                            }
+                        }
+                    }
+                    items(groups) { group ->
+                        GlassmorphicCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { navController.navigate("group/${group.groupId}") }
+                        ) {
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                onClick = { navController.navigate("group/${group.groupId}") }
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    AsyncImage(
-                                        model = group.groupImage,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(50.dp)
-                                            .clip(CircleShape)
-                                            .border(1.5.dp, PurpleNeon, CircleShape)
-                                    )
-                                    Column {
-                                        Text(group.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                        Text("${group.members.size} members connected", color = TextMuted, fontSize = 13.sp)
-                                    }
+                                AsyncImage(
+                                    model = group.groupImage,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(50.dp)
+                                        .clip(CircleShape)
+                                        .border(1.5.dp, PurpleNeon, CircleShape)
+                                )
+                                Column {
+                                    Text(group.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("${group.members.size} members connected", color = TextMuted, fontSize = 13.sp)
                                 }
                             }
                         }
@@ -1592,19 +1859,28 @@ fun ChatConversationScreen(navController: NavController, repository: FirebaseRep
                                 )
                             }
                             else -> {
+                                val bubbleShape = RoundedCornerShape(
+                                    topStart = 16.dp,
+                                    topEnd = 16.dp,
+                                    bottomStart = if (isMe) 16.dp else 0.dp,
+                                    bottomEnd = if (isMe) 0.dp else 16.dp
+                                )
                                 Box(
                                     modifier = Modifier
-                                        .clip(
-                                            RoundedCornerShape(
-                                                topStart = 16.dp,
-                                                topEnd = 16.dp,
-                                                bottomStart = if (isMe) 16.dp else 0.dp,
-                                                bottomEnd = if (isMe) 0.dp else 16.dp
-                                            )
+                                        .clip(bubbleShape)
+                                        .background(
+                                            if (isMe) {
+                                                Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                            } else {
+                                                Brush.verticalGradient(listOf(CardBg, CardBg))
+                                            }
                                         )
-                                        .background(if (isMe) PurpleNeon else CardBg)
-                                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-                                        .padding(12.dp)
+                                        .border(
+                                            1.dp,
+                                            if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                            bubbleShape
+                                        )
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
                                 ) {
                                     Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
                                 }
@@ -2084,19 +2360,28 @@ fun GroupChatScreen(navController: NavController, repository: FirebaseRepository
                                 )
                             }
                             else -> {
+                                val bubbleShape = RoundedCornerShape(
+                                    topStart = 16.dp,
+                                    topEnd = 16.dp,
+                                    bottomStart = if (isMe) 16.dp else 0.dp,
+                                    bottomEnd = if (isMe) 0.dp else 16.dp
+                                )
                                 Box(
                                     modifier = Modifier
-                                        .clip(
-                                            RoundedCornerShape(
-                                                topStart = 16.dp,
-                                                topEnd = 16.dp,
-                                                bottomStart = if (isMe) 16.dp else 0.dp,
-                                                bottomEnd = if (isMe) 0.dp else 16.dp
-                                            )
+                                        .clip(bubbleShape)
+                                        .background(
+                                            if (isMe) {
+                                                Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                            } else {
+                                                Brush.verticalGradient(listOf(CardBg, CardBg))
+                                            }
                                         )
-                                        .background(if (isMe) PurpleNeon else CardBg)
-                                        .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-                                        .padding(12.dp)
+                                        .border(
+                                            1.dp,
+                                            if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                            bubbleShape
+                                        )
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
                                 ) {
                                     Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
                                 }
@@ -2709,401 +2994,371 @@ fun RoomsScreen(navController: NavController, repository: FirebaseRepository) {
 // ── 🤖 INTELLIGENT AI COMPANION PORTAL (Nexify AI Chat Screen) ────────
 @Composable
 fun AiChatScreen(navController: NavController, repository: FirebaseRepository) {
-    LaunchedEffect(Unit) {
-        repository.logFeatureUsage("ai_chat")
-    }
-    val uid = repository.currentUserId ?: ""
-    val messages by repository.subscribeToAiMessages(uid).safeCollect("AiChatScreen_messages", emptyList()).collectAsState(initial = emptyList())
-    var typedText by remember { mutableStateOf("") }
-    var isAiGenerating by remember { mutableStateOf(false) }
-
-    val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    var isJoiningWaitlist by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var registeredEmail by remember { mutableStateOf("") }
 
-    // Dialog state variables for tools
-    var showReelDialog by remember { mutableStateOf(false) }
-    var reelTopic by remember { mutableStateOf("") }
+    // Animations
+    val infiniteTransition = rememberInfiniteTransition(label = "ai_animations")
 
-    var showCaptionDialog by remember { mutableStateOf(false) }
-    var captionDesc by remember { mutableStateOf("") }
-    var captionTone by remember { mutableStateOf("Chill") }
+    val orbScale1 by infiniteTransition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orbScale1"
+    )
 
-    var showPromptDialog by remember { mutableStateOf(false) }
-    var promptTask by remember { mutableStateOf("") }
+    val orbScale2 by infiniteTransition.animateFloat(
+        initialValue = 1.08f,
+        targetValue = 0.88f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = EaseInOutCubic),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orbScale2"
+    )
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
+    val orbRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "orbRotation"
+    )
+
+    // Load scale & alpha animations
+    val scaleState = remember { Animatable(0.92f) }
+    val alphaState = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        scaleState.animateTo(1.0f, animationSpec = tween(600, easing = EaseOutBack))
+    }
+    LaunchedEffect(Unit) {
+        alphaState.animateTo(1.0f, animationSpec = tween(500))
     }
 
-    Column(
+    // Gradient background: Black -> Purple -> Blue
+    val aiBgGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF000000), // black
+            Color(0xFF1E1035), // deep purple
+            Color(0xFF0A192F)  // blue/deep navy
+        )
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
+            .background(aiBgGradient)
     ) {
-        // Appbar
+        // App Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CardBg)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             UniversalBackButton(navController = navController)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "NEXIFY AI",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                letterSpacing = 1.5.sp
+            )
+        }
+
+        // Center Content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .graphicsLayer(
+                    scaleX = scaleState.value,
+                    scaleY = scaleState.value,
+                    alpha = alphaState.value
+                ),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Animated AI orb / glowing sphere
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon))),
+                    .size(200.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White)
-            }
-            Column {
-                Text("Nexify AI", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                Text(
-                    text = if (isAiGenerating) "Thinking..." else "Online & ready",
-                    color = if (isAiGenerating) CyanNeon else Color.Green,
-                    fontSize = 11.sp
+                // Ambient Outer Glow 1 (Purple)
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .graphicsLayer {
+                            scaleX = orbScale1
+                            scaleY = orbScale1
+                        }
+                        .blur(35.dp)
+                        .background(
+                            Brush.radialGradient(listOf(PurpleNeon.copy(alpha = 0.45f), Color.Transparent)),
+                            CircleShape
+                        )
                 )
-            }
-        }
 
-        // Messages List
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            if (messages.isEmpty()) {
-                item {
+                // Ambient Outer Glow 2 (Pink/Reddish)
+                Box(
+                    modifier = Modifier
+                        .size(130.dp)
+                        .graphicsLayer {
+                            scaleX = orbScale2
+                            scaleY = orbScale2
+                        }
+                        .blur(25.dp)
+                        .background(
+                            Brush.radialGradient(listOf(Color(0xFFFF007F).copy(alpha = 0.35f), Color.Transparent)),
+                            CircleShape
+                        )
+                )
+
+                // Swirling Neon Gradient Ring
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .graphicsLayer { rotationZ = orbRotation }
+                        .clip(CircleShape)
+                        .background(CardBg)
+                        .border(
+                            2.5.dp,
+                            Brush.sweepGradient(listOf(Color(0xFFFF007F), PurpleNeon, CyanNeon, Color(0xFFFF007F))),
+                            CircleShape
+                        )
+                )
+
+                // Glowing Sphere core
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .graphicsLayer {
+                            scaleX = orbScale1 * 0.96f
+                            scaleY = orbScale1 * 0.96f
+                        }
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White,
+                                    CyanNeon.copy(alpha = 0.85f),
+                                    PurpleNeon.copy(alpha = 0.6f),
+                                    Color.Transparent
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "AI Core",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Status Badge: Pink/purple gradient glow pill
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(Color(0xFFFF007F).copy(alpha = 0.15f), PurpleNeon.copy(alpha = 0.15f))))
+                    .border(
+                        1.dp,
+                        Brush.horizontalGradient(listOf(Color(0xFFFF007F).copy(alpha = 0.6f), PurpleNeon.copy(alpha = 0.6f))),
+                        CircleShape
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(48.dp))
-                            Text("Yo citizen! I'm your futuristic companion.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text("Ask me about workouts, study tips, or just vibe!", color = TextMuted, fontSize = 12.sp)
-                        }
-                    }
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF007F))
+                    )
+                    Text(
+                        text = "Coming Soon",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
 
-            items(messages) { message ->
-                val isAi = message.sender == "ai"
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = if (isAi) Alignment.CenterStart else Alignment.CenterEnd
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.fillMaxWidth(0.85f)
-                    ) {
-                        if (isAi) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(CyanNeon),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            }
-                        }
+            Spacer(modifier = Modifier.height(20.dp))
 
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            horizontalAlignment = if (isAi) Alignment.Start else Alignment.End
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isAi) CardBg else PurpleNeon)
-                                    .border(1.dp, if (isAi) CyanNeon.copy(0.4f) else CardBorder, RoundedCornerShape(16.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Text(message.text, color = Color.White, fontSize = 14.sp)
-                            }
-                            Text(
-                                text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp)),
-                                color = TextMuted,
-                                fontSize = 9.sp,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Typing Loader
-        if (isAiGenerating) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(14.dp))
-                Text("Nexify AI is generating response...", color = CyanNeon, fontSize = 11.sp)
-            }
-        }
-
-        // AI Quick Tools Row
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp)
-        ) {
-            item {
-                ToolChip(
-                    text = "🎬 Reel Idea",
-                    onClick = { showReelDialog = true }
-                )
-            }
-            item {
-                ToolChip(
-                    text = "✍️ Caption Gen",
-                    onClick = { showCaptionDialog = true }
-                )
-            }
-            item {
-                ToolChip(
-                    text = "🤖 Optimize Prompt",
-                    onClick = { showPromptDialog = true }
-                )
-            }
-        }
-
-        // Input Form
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            PremiumTextField(
-                value = typedText,
-                onValueChange = { typedText = it },
-                placeholder = "Vibe check with AI...",
-                modifier = Modifier.weight(1f),
-                leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CyanNeon) }
+            // Title
+            Text(
+                text = "Nexify AI",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 32.sp,
+                textAlign = TextAlign.Center,
+                letterSpacing = 0.5.sp
             )
 
-            IconButton(
-                onClick = {
-                    if (typedText.isEmpty()) return@IconButton
-                    val prompt = typedText
-                    typedText = ""
-                    coroutineScope.launch {
-                        try {
-                            repository.sendAiMessage(uid, prompt) { generating ->
-                                isAiGenerating = generating
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(context, e.message ?: "Blocked.", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                },
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Description Glassmorphism Card
+            Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(PurpleNeon, CyanNeon)))
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardBg)
+                    .border(
+                        1.dp,
+                        Brush.horizontalGradient(listOf(CardBorder, Color(0xFFFF007F).copy(alpha = 0.25f))),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(20.dp)
             ) {
-                Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Your personal AI assistant for smarter chats, productivity, and insights.",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Text(
+                        text = "Smarter features are on the way.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Normal
+                    )
+
+                    // Interactive Action: Join Waitlist
+                    PremiumButton(
+                        text = if (isJoiningWaitlist) "JOINING..." else "Join the Waitlist 🚀",
+                        onClick = {
+                            if (isJoiningWaitlist) return@PremiumButton
+                            isJoiningWaitlist = true
+                            coroutineScope.launch {
+                                try {
+                                    val email = repository.joinAiWaitlist()
+                                    registeredEmail = email
+                                    showSuccessDialog = true
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Waitlist failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isJoiningWaitlist = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Disabled Button: Coming Soon
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Coming Soon",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp
+                )
             }
         }
-    }
 
-    // --- Tool Dialogs ---
-
-    if (showReelDialog) {
-        AlertDialog(
-            onDismissRequest = { showReelDialog = false },
-            title = { Text("🎬 Reel Idea Generator", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Enter a topic or niche to brainstorm a structured viral Reel idea.", color = TextMuted, fontSize = 12.sp)
-                    PremiumTextField(
-                        value = reelTopic,
-                        onValueChange = { reelTopic = it },
-                        placeholder = "e.g., coding routine, gym hacks"
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (reelTopic.isNotBlank()) {
-                            val topic = reelTopic
-                            reelTopic = ""
-                            showReelDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    repository.generateReelIdea(uid, topic) { generating ->
-                                        isAiGenerating = generating
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
+        // Waitlist success dialog
+        if (showSuccessDialog) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .clickable { showSuccessDialog = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(CardBg)
+                        .border(
+                            1.dp,
+                            Brush.horizontalGradient(listOf(CardBorder, Color(0xFFFF007F).copy(alpha = 0.3f))),
+                            RoundedCornerShape(24.dp)
+                        )
+                        .clickable(enabled = false) {}
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Generate", color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReelDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
-
-    if (showCaptionDialog) {
-        AlertDialog(
-            onDismissRequest = { showCaptionDialog = false },
-            title = { Text("✍️ AI Caption Generator", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Describe your post and select the tone.", color = TextMuted, fontSize = 12.sp)
-                    PremiumTextField(
-                        value = captionDesc,
-                        onValueChange = { captionDesc = it },
-                        placeholder = "e.g., A developer debugging at 2 AM"
-                    )
-                    Text("Tone Selection", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        val tones = listOf("Chill", "Professional", "Hustle")
-                        tones.forEach { t ->
-                            val selected = captionTone == t
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { captionTone = t }
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        1.dp,
-                                        if (selected) CyanNeon else Color.Gray.copy(alpha = 0.4f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .background(if (selected) CyanNeon.copy(alpha = 0.2f) else Color.Transparent)
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = t,
-                                    color = if (selected) CyanNeon else Color.White,
-                                    fontSize = 11.sp
-                                )
-                            }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x1F00E5FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(32.dp))
                         }
+
+                        Text(
+                            text = "You're on the list!",
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "We have registered $registeredEmail for early access. We will email you once your access key is activated! 🚀",
+                            color = TextMuted,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        PremiumButton(
+                            text = "Awesome",
+                            onClick = { showSuccessDialog = false },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (captionDesc.isNotBlank()) {
-                            val desc = captionDesc
-                            val tone = captionTone
-                            captionDesc = ""
-                            showCaptionDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    repository.generateCaption(uid, desc, tone) { generating ->
-                                        isAiGenerating = generating
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
-                ) {
-                    Text("Generate", color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCaptionDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
-
-    if (showPromptDialog) {
-        AlertDialog(
-            onDismissRequest = { showPromptDialog = false },
-            title = { Text("🤖 AI Prompt Optimizer", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Turn a simple task description into a high-quality system prompt.", color = TextMuted, fontSize = 12.sp)
-                    PremiumTextField(
-                        value = promptTask,
-                        onValueChange = { promptTask = it },
-                        placeholder = "e.g., Translate text to SQL"
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (promptTask.isNotBlank()) {
-                            val task = promptTask
-                            promptTask = ""
-                            showPromptDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    repository.generatePrompt(uid, task) { generating ->
-                                        isAiGenerating = generating
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, e.message ?: "Failed", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanNeon)
-                ) {
-                    Text("Optimize", color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPromptDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = Color(0xFF161128),
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 }
 
@@ -3521,26 +3776,26 @@ fun RoomChatScreen(
                                         }
                                         
                                         Box {
+                                            val bubbleShape = RoundedCornerShape(
+                                                topStart = 14.dp,
+                                                topEnd = 14.dp,
+                                                bottomStart = if (isMe) 14.dp else 0.dp,
+                                                bottomEnd = if (isMe) 0.dp else 14.dp
+                                            )
                                             Box(
                                                 modifier = Modifier
-                                                    .clip(
-                                                        RoundedCornerShape(
-                                                            topStart = 14.dp,
-                                                            topEnd = 14.dp,
-                                                            bottomStart = if (isMe) 14.dp else 0.dp,
-                                                            bottomEnd = if (isMe) 0.dp else 14.dp
-                                                        )
+                                                    .clip(bubbleShape)
+                                                    .background(
+                                                        if (isMe) {
+                                                            Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                                        } else {
+                                                            Brush.verticalGradient(listOf(CardBg, CardBg))
+                                                        }
                                                     )
-                                                    .background(if (isMe) PurpleNeon else CardBg)
                                                     .border(
                                                         1.dp,
-                                                        if (message.isPinned) CyanNeon else CardBorder,
-                                                        RoundedCornerShape(
-                                                            topStart = 14.dp,
-                                                            topEnd = 14.dp,
-                                                            bottomStart = if (isMe) 14.dp else 0.dp,
-                                                            bottomEnd = if (isMe) 0.dp else 14.dp
-                                                        )
+                                                        if (message.isPinned) CyanNeon else if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                                        bubbleShape
                                                     )
                                                     .pointerInput(message.messageId) {
                                                         detectTapGestures(
@@ -4222,7 +4477,7 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBg)
+            .background(LuxuryBgGradient)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -4256,12 +4511,23 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                 .padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(16.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(CyanNeon.copy(alpha = 0.15f), Color.Transparent)
+                        ),
+                        shape = CircleShape
+                    )
+            )
             CircularProgressIndicator(
                 progress = progressFraction,
                 modifier = Modifier.fillMaxSize(),
                 color = CyanNeon,
-                strokeWidth = 10.dp,
-                trackColor = Color.White.copy(alpha = 0.05f)
+                strokeWidth = 8.dp,
+                trackColor = Color.White.copy(alpha = 0.08f)
             )
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -4288,32 +4554,14 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
+            PremiumButton(
+                text = if (isTimerRunning) "PAUSE" else "START",
                 onClick = { isTimerRunning = !isTimerRunning },
                 modifier = Modifier
                     .height(50.dp)
-                    .width(140.dp)
-                    .clip(RoundedCornerShape(25.dp)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isTimerRunning) Color.DarkGray else CyanNeon
-                )
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = if (isTimerRunning) Color.White else Color.Black
-                    )
-                    Text(
-                        text = if (isTimerRunning) "PAUSE" else "START",
-                        color = if (isTimerRunning) Color.White else Color.Black,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
+                    .width(140.dp),
+                colors = if (isTimerRunning) listOf(Color.DarkGray, Color.Gray) else listOf(CyanNeon, PurpleNeon)
+            )
 
             IconButton(
                 onClick = {
@@ -4324,7 +4572,8 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                 modifier = Modifier
                     .size(50.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(0.08f))
+                    .background(Color.White.copy(0.05f))
+                    .border(BorderStroke(1.dp, Color.White.copy(0.15f)), CircleShape)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = Color.White)
             }
@@ -4348,14 +4597,14 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selectedDurationMinutes = duration }
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (selected) CyanNeon.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.03f))
                                 .border(
                                     1.dp,
-                                    if (selected) CyanNeon else Color.Gray.copy(alpha = 0.3f),
-                                    RoundedCornerShape(10.dp)
+                                    if (selected) CyanNeon else Color.White.copy(alpha = 0.1f),
+                                    RoundedCornerShape(14.dp)
                                 )
-                                .background(if (selected) CyanNeon.copy(alpha = 0.15f) else Color.Transparent)
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -4383,7 +4632,7 @@ fun FocusPodScreen(navController: NavController, repository: FirebaseRepository)
                     colors = SliderDefaults.colors(
                         thumbColor = CyanNeon,
                         activeTrackColor = CyanNeon,
-                        inactiveTrackColor = Color.Gray.copy(0.2f)
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
                     ),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 )
@@ -4703,12 +4952,28 @@ fun ChatRoomConversationScreen(navController: NavController, repository: Firebas
                                 modifier = Modifier.padding(bottom = 2.dp)
                             )
                         }
+                        val bubbleShape = RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomStart = if (isMe) 16.dp else 4.dp,
+                            bottomEnd = if (isMe) 4.dp else 16.dp
+                        )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (isMe) PurpleNeon else CardBg)
-                                .border(1.dp, if (isMe) CardBorder else CyanNeon.copy(0.4f), RoundedCornerShape(16.dp))
-                                .padding(12.dp)
+                                .clip(bubbleShape)
+                                .background(
+                                    if (isMe) {
+                                        Brush.horizontalGradient(listOf(PurpleNeon, Color(0xFF5B39FF)))
+                                    } else {
+                                        Brush.verticalGradient(listOf(CardBg, CardBg))
+                                    }
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isMe) Color.White.copy(alpha = 0.15f) else CardBorder,
+                                    bubbleShape
+                                )
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(message.text ?: "", color = Color.White, fontSize = 14.sp)
                         }
@@ -5202,13 +5467,13 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D0D0D)) // Deep dark AMOLED
+            .background(LuxuryBgGradient)
     ) {
         // Sticky Header with back button + Title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0D0D0D))
+                .background(Color.Transparent)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -6325,12 +6590,13 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White.copy(alpha = 0.04f))
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha = 0.03f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
                                 .clickable {
                                     expandedFaqIndex = if (isExpanded) -1 else index
                                 }
-                                .padding(12.dp)
+                                .padding(14.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -6362,7 +6628,7 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
                             onClick = {
@@ -6377,12 +6643,17 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                                     Toast.makeText(context, "No email client found.", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), RoundedCornerShape(22.dp)),
+                            contentPadding = PaddingValues()
                         ) {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = currentAccentColor, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Email Support", color = Color.White, fontSize = 11.sp)
+                            Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Email Support", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         
                         Button(
@@ -6397,22 +6668,32 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                                     Toast.makeText(context, "Dialer unavailable.", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), RoundedCornerShape(22.dp)),
+                            contentPadding = PaddingValues()
                         ) {
-                            Icon(Icons.Default.Phone, contentDescription = null, tint = currentAccentColor, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Call Support", color = Color.White, fontSize = 11.sp)
+                            Icon(Icons.Default.Phone, contentDescription = null, tint = PurpleNeon, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Call Support", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showHelpScreen = false }) {
-                    Text("DISMISS", color = currentAccentColor)
+                    Text("DISMISS", color = currentAccentColor, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF161128),
+            containerColor = Color(0xEC0D0D15),
+            modifier = Modifier.border(
+                1.dp,
+                Brush.horizontalGradient(listOf(CyanNeon.copy(0.35f), PurpleNeon.copy(0.35f))),
+                RoundedCornerShape(24.dp)
+            ),
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -6436,16 +6717,18 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .padding(12.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("Core Sector Highlights", color = currentAccentColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("• Realtime Socket Direct Chats & Group Pods", color = TextMuted, fontSize = 11.sp)
-                        Text("• WebRTC Secure Voice / Video Calls Overlay", color = TextMuted, fontSize = 11.sp)
-                        Text("• Nexify Fit (Sensor step milestones tracker)", color = TextMuted, fontSize = 11.sp)
-                        Text("• Focus chamber pods with level XP", color = TextMuted, fontSize = 11.sp)
-                        Text("• Leaderboard global ranking", color = TextMuted, fontSize = 11.sp)
+                        Text("Core Highlights", color = currentAccentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("• Realtime Socket Direct Chats & Group Pods", color = TextMuted, fontSize = 12.sp)
+                        Text("• WebRTC Secure Voice / Video Calls Overlay", color = TextMuted, fontSize = 12.sp)
+                        Text("• Nexify Fit (Sensor step milestones tracker)", color = TextMuted, fontSize = 12.sp)
+                        Text("• Focus chamber pods with level XP", color = TextMuted, fontSize = 12.sp)
+                        Text("• Leaderboard global ranking", color = TextMuted, fontSize = 12.sp)
                     }
                     
                     Text("Vision: Connect. Focus. Grow.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -6462,10 +6745,15 @@ fun SettingsScreen(navController: NavController, repository: FirebaseRepository)
             },
             confirmButton = {
                 TextButton(onClick = { showAboutScreen = false }) {
-                    Text("CLOSE", color = PurpleNeon)
+                    Text("CLOSE", color = PurpleNeon, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF161128),
+            containerColor = Color(0xEC0D0D15),
+            modifier = Modifier.border(
+                1.dp,
+                Brush.horizontalGradient(listOf(CyanNeon.copy(0.35f), PurpleNeon.copy(0.35f))),
+                RoundedCornerShape(24.dp)
+            ),
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -6541,6 +6829,404 @@ private fun clearCache(context: android.content.Context) {
         context.cacheDir.deleteRecursively()
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+// ── FORGOT PASSWORD SCREEN ─────────────────────────────────────
+@Composable
+fun ForgotPasswordScreen(navController: NavController, repository: FirebaseRepository) {
+    var email by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(LuxuryBgGradient),
+        contentAlignment = Alignment.Center
+    ) {
+        // Cyber backdrop glow
+        Box(
+            modifier = Modifier
+                .size(320.dp)
+                .align(Alignment.TopCenter)
+                .offset(y = (-50).dp)
+                .graphicsLayer(alpha = 0.18f)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(CyanNeon, Color.Transparent),
+                        radius = 450f
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .widthIn(max = 400.dp)
+                .fillMaxWidth(0.92f)
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // App Logo wrapped in high-tech glowing glass badge
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF000000))
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(listOf(CyanNeon, PurpleNeon)),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+            ) {
+                Image(
+                    painter = painterResource(id = com.nexify.connect.R.drawable.logo),
+                    contentDescription = "Nexify Connect Logo",
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            // Glassmorphic Panel
+            GlassmorphicCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderStroke = BorderStroke(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CyanNeon.copy(alpha = 0.5f), PurpleNeon.copy(alpha = 0.5f))
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Reset Access Code",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Enter your verified email to request a reset link.",
+                        fontSize = 12.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+
+                    PremiumTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email Address",
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = CyanNeon.copy(alpha = 0.8f)) }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (isLoading) {
+                        Box(modifier = Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = CyanNeon, modifier = Modifier.size(24.dp))
+                        }
+                    } else {
+                        PremiumButton(
+                            text = "SEND RESET LINK",
+                            onClick = {
+                                val trimmedEmail = email.trim()
+                                if (trimmedEmail.isEmpty()) {
+                                    Toast.makeText(context, "Please fill in email field.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                                    Toast.makeText(context, "Please enter a valid email address.", Toast.LENGTH_SHORT).show()
+                                    return@PremiumButton
+                                }
+                                coroutineScope.launch {
+                                    isLoading = true
+                                    try {
+                                        repository.forgotPassword(trimmedEmail)
+                                        Toast.makeText(context, "Password reset email sent! Check your inbox.", Toast.LENGTH_LONG).show()
+                                        navController.navigate("login") {
+                                            popUpTo("forgot_password") { inclusive = true }
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, getReadableAuthError(e), Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isLoading = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(text = "Remembered credentials?", fontSize = 12.sp, color = TextMuted)
+                        Text(
+                            text = "Log in",
+                            fontSize = 12.sp,
+                            color = CyanNeon,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                navController.navigate("login") {
+                                    popUpTo("forgot_password") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SplashScreen(navController: NavController, repository: FirebaseRepository) {
+    val context = LocalContext.current
+    val scale = remember { Animatable(0f) }
+    val alpha = remember { Animatable(0f) }
+
+    // FEATURE CONFIGURATION: Change REQUIRE_EARLY_ACCESS to false to remove this gate
+    val REQUIRE_EARLY_ACCESS = true
+    val EARLY_ACCESS_PASSWORD = "NEXIFY2026"
+
+    val sharedPrefs = remember { context.getSharedPreferences("nexify_connect_prefs", 0) }
+    var showGate by remember { mutableStateOf(false) }
+    var passwordInput by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+
+    val routeNext = {
+        val onboardingComplete = sharedPrefs.getBoolean("onboarding_complete", false)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+
+        if (!onboardingComplete) {
+            navController.navigate("onboarding") {
+                popUpTo("splash") { inclusive = true }
+            }
+        } else if (currentUser != null) {
+            navController.navigate("home") {
+                popUpTo("splash") { inclusive = true }
+            }
+        } else {
+            navController.navigate("login") {
+                popUpTo("splash") { inclusive = true }
+            }
+        }
+    }
+
+    LaunchedEffect(key1 = true) {
+        // Fade in and overshoot scale bounce
+        launch {
+            alpha.animateTo(1f, animationSpec = tween(1000))
+        }
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(1200, easing = EaseOutBack)
+        )
+        
+        // Wait a bit for the premium animation feel
+        delay(1500)
+        
+        // Check early access authorization
+        val accessGranted = sharedPrefs.getBoolean("early_access_granted", false)
+        if (REQUIRE_EARLY_ACCESS && !accessGranted) {
+            showGate = true
+        } else {
+            routeNext()
+        }
+    }
+
+    // Gradient background: Black -> Deep Purple -> Blue
+    val splashBgGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF000000), // black
+            Color(0xFF1E1035), // deep purple
+            Color(0xFF0A192F)  // blue/deep navy
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(splashBgGradient),
+        contentAlignment = Alignment.Center
+    ) {
+        // Glowing halo circle backdrop
+        Box(
+            modifier = Modifier
+                .size(240.dp)
+                .blur(40.dp)
+                .background(PurpleNeon.copy(alpha = 0.3f), CircleShape)
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.graphicsLayer(
+                scaleX = scale.value,
+                scaleY = scale.value,
+                alpha = alpha.value
+            )
+        ) {
+            // App Logo
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .background(CardBg)
+                    .border(
+                        2.dp,
+                        Brush.horizontalGradient(listOf(CyanNeon, PurpleNeon)),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "Logo",
+                    tint = CyanNeon,
+                    modifier = Modifier.size(50.dp)
+                )
+            }
+
+            Text(
+                text = "Nexify Connect",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 28.sp,
+                letterSpacing = 1.sp
+            )
+
+            Text(
+                text = "Connect. Focus. Grow.",
+                color = CyanNeon,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                letterSpacing = 2.sp
+            )
+        }
+
+        // --- Early Access Passcode Lock Overlay ---
+        if (showGate) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xE605050A)), // solid near-black overlay
+                contentAlignment = Alignment.Center
+            ) {
+                // Glow behind the login box
+                Box(
+                    modifier = Modifier
+                        .size(280.dp)
+                        .blur(50.dp)
+                        .background(PurpleNeon.copy(alpha = 0.20f), CircleShape)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 340.dp)
+                        .fillMaxWidth(0.86f)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(CardBg)
+                        .border(
+                            BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(CyanNeon, PurpleNeon))),
+                            RoundedCornerShape(28.dp)
+                        )
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x1100DFD8))
+                            .border(1.dp, CyanNeon, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Access Gate",
+                            tint = CyanNeon,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "EARLY ACCESS ACCESS",
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "This build is restricted. Enter the passcode to authenticate your device and unlock Nexify Connect.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 16.sp
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            isError = false
+                        },
+                        placeholder = { Text("Enter passcode", color = TextMuted) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = if (isError) Color.Red else CyanNeon,
+                            unfocusedBorderColor = if (isError) Color.Red else CardBorder,
+                            focusedContainerColor = Color(0x660A0A0F),
+                            unfocusedContainerColor = Color(0x660A0A0F),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (isError) {
+                        Text(
+                            text = "Invalid passcode. Access denied.",
+                            color = Color.Red,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    PremiumButton(
+                        text = "AUTHENTICATE BUILD",
+                        onClick = {
+                            if (passwordInput.trim() == EARLY_ACCESS_PASSWORD) {
+                                sharedPrefs.edit().putBoolean("early_access_granted", true).apply()
+                                showGate = false
+                                routeNext()
+                            } else {
+                                isError = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
     }
 }
 

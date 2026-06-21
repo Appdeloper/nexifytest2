@@ -95,7 +95,8 @@ class FirebaseRepository {
             profileImage = "https://api.dicebear.com/7.x/avataaars/svg?seed=$userId",
             bio = "Hey! I am using Nexify Connect.",
             onlineStatus = true,
-            lastSeen = Date()
+            lastSeen = Date(),
+            createdAt = Date()
         )
 
         val referrerId = inviteSnap.getString("createdBy") ?: ""
@@ -131,7 +132,8 @@ class FirebaseRepository {
                 profileImage = result.user?.photoUrl?.toString() ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=$userId",
                 bio = "Hey! I am using Nexify Connect.",
                 onlineStatus = true,
-                lastSeen = Date()
+                lastSeen = Date(),
+                createdAt = Date()
             )
             userRef.set(user).await()
         } else {
@@ -1537,6 +1539,29 @@ class FirebaseRepository {
         if (xpRewarded > 0L) {
             rewardUserXp(xpRewarded)
         }
+    }
+
+    suspend fun submitFeedback(feature: String, feedback: String) {
+        val uid = currentUserId ?: return
+        val data = hashMapOf(
+            "userId" to uid,
+            "feature" to feature,
+            "feedback" to feedback,
+            "timestamp" to System.currentTimeMillis()
+        )
+        db.collection("feedbacks").document().set(data).await()
+    }
+
+    suspend fun joinAiWaitlist(): String {
+        val uid = currentUserId ?: return "User not logged in"
+        val email = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: ""
+        val data = hashMapOf(
+            "userId" to uid,
+            "email" to email,
+            "timestamp" to System.currentTimeMillis()
+        )
+        db.collection("ai_waitlist").document(uid).set(data).await()
+        return email
     }
 
     fun subscribeToFitnessData(): Flow<List<FitnessRecord>> = callbackFlow {
