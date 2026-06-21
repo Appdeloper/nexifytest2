@@ -22,6 +22,26 @@ import com.nexify.connect.ui.screens.*
 import com.nexify.connect.ui.viewmodel.*
 import com.nexify.connect.ui.theme.NexifyConnectTheme
 import kotlinx.coroutines.flow.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+
 
 class MainActivity : ComponentActivity() {
     private val repository = FirebaseRepository()
@@ -140,35 +160,153 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         } else {
+                            val REQUIRE_EARLY_ACCESS = true
+                            val EARLY_ACCESS_PASSWORD = "NEXIFY2026"
                             val sharedPrefs = remember { this@MainActivity.getSharedPreferences("nexify_connect_prefs", 0) }
-                            val onboardingComplete = remember { sharedPrefs.getBoolean("onboarding_complete", false) }
+                            var showEarlyAccessGate by remember { mutableStateOf(REQUIRE_EARLY_ACCESS && !sharedPrefs.getBoolean("early_access_granted", false)) }
+                            var passwordInput by remember { mutableStateOf("") }
+                            var isPasscodeError by remember { mutableStateOf(false) }
 
-                            val currentUser = remember { FirebaseAuth.getInstance().currentUser }
-                            val startDestination = "splash"
+                            if (showEarlyAccessGate) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color(0xFF0A0F1F)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(280.dp)
+                                            .blur(50.dp)
+                                            .background(Color(0xFF8B5CF6).copy(alpha = 0.20f), CircleShape)
+                                    )
 
-                            LaunchedEffect(currentUser) {
-                                if (currentUser != null) {
-                                    repository.subscribeToIncomingCalls().collect { calls ->
-                                        val activeCall = calls.firstOrNull { it.status == "ringing" || it.status == "dialing" }
-                                        if (activeCall != null) {
-                                            val currentRoute = navController.currentBackStackEntry?.destination?.route ?: ""
-                                            if (!currentRoute.startsWith("call/")) {
-                                                navController.navigate("call/${activeCall.callId}/${activeCall.callerId}/false") {
-                                                    launchSingleTop = true
+                                    Column(
+                                        modifier = Modifier
+                                            .widthIn(max = 340.dp)
+                                            .fillMaxWidth(0.86f)
+                                            .clip(RoundedCornerShape(28.dp))
+                                            .background(Color(0xFF161128))
+                                            .border(
+                                                BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(Color(0xFF00DFD8), Color(0xFF8B5CF6)))),
+                                                RoundedCornerShape(28.dp)
+                                            )
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(54.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0x1100DFD8))
+                                                .border(1.dp, Color(0xFF00DFD8), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Access Gate",
+                                                tint = Color(0xFF00DFD8),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+
+                                        Text(
+                                            text = "EARLY ACCESS LOCK",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 16.sp,
+                                            letterSpacing = 1.sp
+                                        )
+
+                                        Text(
+                                            text = "This build is restricted. Enter the passcode to authenticate your device and unlock Nexify Connect.",
+                                            color = Color.LightGray,
+                                            fontSize = 12.sp,
+                                            textAlign = TextAlign.Center,
+                                            lineHeight = 16.sp
+                                        )
+
+                                        OutlinedTextField(
+                                            value = passwordInput,
+                                            onValueChange = {
+                                                passwordInput = it
+                                                isPasscodeError = false
+                                            },
+                                            placeholder = { Text("Enter passcode", color = Color.Gray) },
+                                            visualTransformation = PasswordVisualTransformation(),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = if (isPasscodeError) Color.Red else Color(0xFF00DFD8),
+                                                unfocusedBorderColor = if (isPasscodeError) Color.Red else Color.DarkGray,
+                                                focusedContainerColor = Color(0x660A0A0F),
+                                                unfocusedContainerColor = Color(0x660A0A0F),
+                                                focusedTextColor = Color.White,
+                                                unfocusedTextColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(16.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        if (isPasscodeError) {
+                                            Text(
+                                                text = "Invalid passcode. Access denied.",
+                                                color = Color.Red,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                if (passwordInput.trim() == EARLY_ACCESS_PASSWORD) {
+                                                    sharedPrefs.edit().putBoolean("early_access_granted", true).apply()
+                                                    showEarlyAccessGate = false
+                                                } else {
+                                                    isPasscodeError = true
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                            contentPadding = PaddingValues(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(CircleShape)
+                                                .background(Brush.horizontalGradient(listOf(Color(0xFF8B5CF6), Color(0xFF00DFD8))))
+                                        ) {
+                                            Text(
+                                                text = "UNLOCK ACCESS",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(vertical = 12.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                val onboardingComplete = remember { sharedPrefs.getBoolean("onboarding_complete", false) }
+                                val currentUser = FirebaseAuth.getInstance().currentUser
+                                val startDestination = if (!onboardingComplete) "onboarding" else if (currentUser != null) "home" else "login"
+
+                                LaunchedEffect(currentUser) {
+                                    if (currentUser != null) {
+                                        repository.subscribeToIncomingCalls().collect { calls ->
+                                            val activeCall = calls.firstOrNull { it.status == "ringing" || it.status == "dialing" }
+                                            if (activeCall != null) {
+                                                val currentRoute = navController.currentBackStackEntry?.destination?.route ?: ""
+                                                if (!currentRoute.startsWith("call/")) {
+                                                    navController.navigate("call/${activeCall.callId}/${activeCall.callerId}/false") {
+                                                        launchSingleTop = true
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            NavHost(
-                                navController = navController,
-                                startDestination = startDestination
-                            ) {
-                                composable("splash") {
-                                    SplashScreen(navController = navController, repository = repository)
-                                }
+                                NavHost(
+                                    navController = navController,
+                                    startDestination = startDestination
+                                ) {
                                 composable("onboarding") {
                                     OnboardingScreen(navController = navController)
                                 }
@@ -180,9 +318,6 @@ class MainActivity : ComponentActivity() {
                                 }
                                 composable("signup") {
                                     SignUpScreen(navController = navController, repository = repository)
-                                }
-                                composable("forgot_password") {
-                                    ForgotPasswordScreen(navController = navController, repository = repository)
                                 }
                                 composable("home") {
                                     LaunchedEffect(Unit) {
