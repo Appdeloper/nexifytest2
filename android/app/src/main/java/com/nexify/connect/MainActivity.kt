@@ -24,10 +24,8 @@ class MainActivity : ComponentActivity() {
         // Enable WebView debugging via Chrome DevTools (chrome://inspect)
         WebView.setWebContentsDebuggingEnabled(true)
         
-        // Enable third-party cookies for Firebase OAuth cross-origin redirects
-        val cookieManager = CookieManager.getInstance()
-        cookieManager.setAcceptCookie(true)
-        cookieManager.setAcceptThirdPartyCookies(this@MainActivity, true)
+        // Enable global cookie support
+        CookieManager.getInstance().setAcceptCookie(true)
         
         setContent {
             NexifyConnectTheme {
@@ -39,6 +37,7 @@ class MainActivity : ComponentActivity() {
                         factory = { context ->
                             WebView(context).apply {
                                 this@MainActivity.webView = this
+                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 layoutParams = ViewGroup.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
