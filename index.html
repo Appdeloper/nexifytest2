@@ -28,32 +28,28 @@
     }
     .splash-container {
       position: relative;
-      width: 140px;
-      height: 140px;
+      width: 150px;
+      height: 150px;
       display: flex;
       align-items: center;
       justify-content: center;
+      filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.35)) drop-shadow(0 0 15px rgba(123, 97, 255, 0.2));
     }
     .splash-logo {
-      width: 100px;
-      height: 100px;
+      width: 106px;
+      height: 106px;
       object-fit: contain;
-      border-radius: 22px;
+      clip-path: url(#squircleClip);
       z-index: 2;
-      filter: drop-shadow(0 0 15px rgba(0, 229, 255, 0.4));
       animation: logoPulse 2.5s infinite ease-in-out;
     }
-    .loader-ring {
+    .loader-ring-svg {
       position: absolute;
-      width: 124px;
-      height: 124px;
-      border-radius: 26px;
-      border: 2.5px solid transparent;
-      border-top-color: #00E5FF;
-      border-bottom-color: #7B61FF;
-      animation: spinRing 2s linear infinite;
+      width: 136px;
+      height: 136px;
+      animation: rotateRing 3s linear infinite;
       z-index: 1;
-      filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.5));
+      filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.4));
     }
     .splash-title {
       margin-top: 24px;
@@ -74,13 +70,13 @@
       text-transform: uppercase;
       animation: pulseText 1.5s infinite ease-in-out;
     }
-    @keyframes spinRing {
+    @keyframes rotateRing {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
     @keyframes logoPulse {
-      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(0, 229, 255, 0.4)); }
-      50% { transform: scale(1.04); filter: drop-shadow(0 0 25px rgba(123, 97, 255, 0.7)); }
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.05); opacity: 1; }
     }
     @keyframes pulseText {
       0%, 100% { opacity: 0.4; }
@@ -88,9 +84,31 @@
     }
   </style>
   <body>
+    <!-- Global SVG for clip-paths and gradients -->
+    <svg width="0" height="0" style="position: absolute; width: 0; height: 0; pointer-events: none;">
+      <defs>
+        <clipPath id="squircleClip" clipPathUnits="objectBoundingBox">
+          <path d="M 0,0.5 C 0,0.08 0.08,0 0.5,0 C 0.92,0 1,0.08 1,0.5 C 1,0.92 0.92,1 0.5,1 C 0.08,1 0,0.92 0,0.5" />
+        </clipPath>
+      </defs>
+    </svg>
+
     <div id="splash">
       <div class="splash-container">
-        <div class="loader-ring"></div>
+        <svg class="loader-ring-svg" viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#00E5FF" />
+              <stop offset="50%" stop-color="#7B61FF" />
+              <stop offset="100%" stop-color="#00E5FF" />
+            </linearGradient>
+          </defs>
+          <path d="M 6,50 C 6,6 6,6 50,6 S 94,6 94,50 94,94 50,94 6,94 6,50" 
+                fill="none" 
+                stroke="url(#ring-grad)" 
+                stroke-width="3.5" 
+                stroke-linecap="round" />
+        </svg>
         <img src="logo_v2.png" class="splash-logo" alt="Nexify Connect" />
       </div>
       <div class="splash-title">NEXIFY</div>

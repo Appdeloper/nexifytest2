@@ -473,6 +473,13 @@ h1, h2, h3, h4, h5, h6 {
   to   { transform: scale(1);    opacity: 1; }
 }
 
+/* Premium Logo Shape (Squircle/Superellipse) */
+img[src*="logo"], img[src*="Logo"] {
+  clip-path: url(#squircleClip);
+  border-radius: 26% 26% 26% 26% / 26% 26% 26% 26%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* Splash / Loading animations (global) */
 @keyframes logoPulse {
   from { filter: drop-shadow(0 0 15px rgba(0,223,216,0.4)) drop-shadow(0 0 30px rgba(121,40,202,0.25)); transform: scale(1); }

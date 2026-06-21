@@ -32,19 +32,54 @@ const Splash = () => {
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}
       >
-        <motion.img
-          src={`${import.meta.env.BASE_URL}logo.png`}
-          alt="Nexify Connect"
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          style={{
-            width: 130, height: 130, objectFit: 'contain',
-            filter: 'drop-shadow(0 0 20px rgba(0,223,216,0.5)) drop-shadow(0 0 40px rgba(121,40,202,0.3))'
-          }}
-        />
+        <div style={{
+          position: 'relative',
+          width: 150,
+          height: 150,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          filter: 'drop-shadow(0 0 25px rgba(0, 229, 255, 0.35)) drop-shadow(0 0 15px rgba(123, 97, 255, 0.2))'
+        }}>
+          {/* Rotating Squircle Loader Ring */}
+          <motion.svg 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            style={{ position: 'absolute', width: 136, height: 136 }}
+            viewBox="0 0 100 100"
+          >
+            <defs>
+              <linearGradient id="react-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00E5FF" />
+                <stop offset="50%" stopColor="#7B61FF" />
+                <stop offset="100%" stopColor="#00E5FF" />
+              </linearGradient>
+            </defs>
+            <path 
+              d="M 6,50 C 6,6 6,6 50,6 S 94,6 94,50 94,94 50,94 6,94 6,50" 
+              fill="none" 
+              stroke="url(#react-ring-grad)" 
+              strokeWidth="3.5" 
+              strokeLinecap="round" 
+            />
+          </motion.svg>
 
+          {/* Logo with pulsing scale */}
+          <motion.img
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="Nexify Connect"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              width: 106, height: 106, objectFit: 'contain',
+              clipPath: 'url(#squircleClip)',
+              borderRadius: '26%',
+              zIndex: 2
+            }}
+          />
+        </div>
       </motion.div>
 
       {/* Loading dots */}
