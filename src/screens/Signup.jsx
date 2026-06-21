@@ -25,9 +25,13 @@ const Signup = () => {
 
     try {
       setLoading(true);
+      console.log("[NexifyAuth] Initiating registration...");
       await registerUser(email, password, username);
-      navigate('/home');
+      console.log("LOGIN SUCCESS");
+      console.log("NAVIGATION START");
+      navigate('/home', { replace: true });
     } catch (error) {
+      console.error("ERROR: " + (error.message || "Registration failed"));
       showToast(error.message);
     } finally {
       setLoading(false);
@@ -37,11 +41,18 @@ const Signup = () => {
   const handleGoogleSignup = async () => {
     try {
       setLoading(true);
-      await loginWithGoogle();
-      navigate('/home');
+      console.log("[NexifyAuth] Initiating Google registration...");
+      const user = await loginWithGoogle();
+      if (user) {
+        console.log("LOGIN SUCCESS");
+        console.log("NAVIGATION START");
+        navigate('/home', { replace: true });
+      } else {
+        console.log("[NexifyAuth] Redirect flow active, waiting for page redirect...");
+      }
     } catch (error) {
+      console.error("ERROR: " + (error.message || "Google registration failed"));
       showToast(error.message);
-    } finally {
       setLoading(false);
     }
   };

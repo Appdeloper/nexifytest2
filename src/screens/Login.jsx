@@ -26,9 +26,13 @@ const Login = () => {
 
     try {
       setLoading(true);
+      console.log("[NexifyAuth] Initiating email login...");
       await loginUser(email, password);
-      navigate('/home');
+      console.log("LOGIN SUCCESS");
+      console.log("NAVIGATION START");
+      navigate('/home', { replace: true });
     } catch (error) {
+      console.error("ERROR: " + (error.message || "Login failed"));
       showToast(error.message);
     } finally {
       setLoading(false);
@@ -41,14 +45,14 @@ const Login = () => {
       console.log("[NexifyAuth] Initiating Google login...");
       const user = await loginWithGoogle();
       if (user) {
-        console.log("[NexifyAuth] LOGIN SUCCESS");
-        console.log("[NexifyAuth] NAVIGATING TO HOME");
-        navigate('/home');
+        console.log("LOGIN SUCCESS");
+        console.log("NAVIGATION START");
+        navigate('/home', { replace: true });
       } else {
         console.log("[NexifyAuth] Redirect flow active, waiting for page redirect...");
       }
     } catch (error) {
-      console.error("[NexifyAuth] Google login failed:", error);
+      console.error("ERROR: " + (error.message || "Google login failed"));
       showToast(error.message || "Google login failed.");
       setLoading(false);
     }

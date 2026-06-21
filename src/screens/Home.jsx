@@ -211,7 +211,7 @@ const Home = () => {
   };
 
   useEffect(() => {
-    console.log("[NexifyHome] HOME SCREEN LOADED");
+    console.log("HOME LOADED");
   }, []);
 
   // Safe data extraction with fallbacks to prevent crashes
@@ -238,7 +238,7 @@ const Home = () => {
       }
     }
   } catch (err) {
-    console.error("[NexifyHome] Error processing rank/xp values:", err);
+    console.error("ERROR: " + (err.message || "Error processing rank/xp values"));
   }
 
   // If currentUser is null (still loading), show the Welcome fallback UI to prevent blank screens

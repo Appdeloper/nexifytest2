@@ -1,14 +1,28 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../hooks/useAuth';
 
 const Splash = () => {
   const navigate = useNavigate();
+  const { currentUser, loading } = useAuth();
 
   useEffect(() => {
-    const timer = setTimeout(() => { navigate('/login'); }, 1800);
+    if (loading) return;
+
+    const timer = setTimeout(() => {
+      console.log("NAVIGATION START");
+      if (currentUser) {
+        console.log("[NexifySplash] User already logged in. Routing directly to Home.");
+        navigate('/home', { replace: true });
+      } else {
+        console.log("[NexifySplash] No active session. Routing to Login.");
+        navigate('/login', { replace: true });
+      }
+    }, 1200);
+
     return () => clearTimeout(timer);
-  }, [navigate]);
+  }, [currentUser, loading, navigate]);
 
   return (
     <div style={{
