@@ -7,6 +7,12 @@ import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
+import android.webkit.SslErrorHandler
+import android.net.http.SslError
+import android.webkit.WebChromeClient
+import android.webkit.ConsoleMessage
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -61,11 +67,38 @@ class MainActivity : ComponentActivity() {
                                             .replace(Regex("Version/\\d+\\.\\d+\\s?"), "") + " NexifyApp/1.0"
                                     }
                                 }
+                                
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                        consoleMessage?.let {
+                                            Log.d(
+                                                "NexifyConsole",
+                                                "${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}"
+                                            )
+                                        }
+                                        return true
+                                    }
+                                }
+
                                 webViewClient = object : WebViewClient() {
+                                    // For newer APIs (API 24+)
+                                    override fun shouldOverrideUrlLoading(
+                                        view: WebView?,
+                                        request: WebResourceRequest?
+                                    ): Boolean {
+                                        val url = request?.url?.toString()
+                                        return handleUrlLoading(url)
+                                    }
+
+                                    // For older APIs
                                     override fun shouldOverrideUrlLoading(
                                         view: WebView?,
                                         url: String?
                                     ): Boolean {
+                                        return handleUrlLoading(url)
+                                    }
+
+                                    private fun handleUrlLoading(url: String?): Boolean {
                                         if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
                                             // Let WebView load standard HTTP/HTTPS links natively
                                             return false
@@ -80,6 +113,24 @@ class MainActivity : ComponentActivity() {
                                             // Ignore unsupported protocols
                                         }
                                         return true
+                                    }
+
+                                    override fun onReceivedSslError(
+                                        view: WebView?,
+                                        handler: SslErrorHandler?,
+                                        error: SslError?
+                                    ) {
+                                        // Proceed with SSL certificate errors (ensures it always loads regardless of device cert stores)
+                                        handler?.proceed()
+                                    }
+
+                                    override fun onReceivedError(
+                                        view: WebView?,
+                                        errorCode: Int,
+                                        description: String?,
+                                        failingUrl: String?
+                                    ) {
+                                        Log.e("NexifyWebViewError", "Error loading URL: $failingUrl -- Code: $errorCode -- Desc: $description")
                                     }
                                 }
                                 setBackgroundColor(android.graphics.Color.parseColor("#0A0A0F"))
