@@ -463,7 +463,6 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
             textContentColor = Color.LightGray
         )
     }
-    }
 }
 
 // ── SIGN UP SCREEN ────────────────────────────────────────────
@@ -820,7 +819,6 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
             containerColor = Color(0xFF161128),
             textContentColor = Color.LightGray
         )
-    }
     }
 }
 
