@@ -1,7 +1,9 @@
 package com.nexify.connect
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -18,6 +20,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Enable WebView debugging via Chrome DevTools (chrome://inspect)
+        WebView.setWebContentsDebuggingEnabled(true)
+        
+        // Enable third-party cookies for Firebase OAuth cross-origin redirects
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(this@MainActivity, true)
         
         setContent {
             NexifyConnectTheme {
@@ -40,6 +50,8 @@ class MainActivity : ComponentActivity() {
                                     useWideViewPort = true
                                     loadWithOverviewMode = true
                                     setSupportZoom(false)
+                                    allowFileAccess = true
+                                    allowContentAccess = true
                                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                     
                                     // Bypass Google OAuth disallowed_useragent block inside WebViews
@@ -47,7 +59,7 @@ class MainActivity : ComponentActivity() {
                                     if (defaultUserAgent != null) {
                                         userAgentString = defaultUserAgent
                                             .replace("; wv", "")
-                                            .replace(Regex("Version/\\d+\\.\\d+\\s?"), "")
+                                            .replace(Regex("Version/\\d+\\.\\d+\\s?"), "") + " NexifyApp/1.0"
                                     }
                                 }
                                 webViewClient = object : WebViewClient() {
@@ -55,7 +67,19 @@ class MainActivity : ComponentActivity() {
                                         view: WebView?,
                                         url: String?
                                     ): Boolean {
-                                        url?.let { view?.loadUrl(it) }
+                                        if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                                            // Let WebView load standard HTTP/HTTPS links natively
+                                            return false
+                                        }
+                                        // Handle custom intent or other app protocol schemes securely
+                                        try {
+                                            url?.let {
+                                                val intent = Intent.parseUri(it, Intent.URI_INTENT_SCHEME)
+                                                context.startActivity(intent)
+                                            }
+                                        } catch (e: Exception) {
+                                            // Ignore unsupported protocols
+                                        }
                                         return true
                                     }
                                 }
