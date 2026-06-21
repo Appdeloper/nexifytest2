@@ -104,6 +104,7 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var showTermsDialog by remember { mutableStateOf(false) }
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -331,9 +332,9 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = CyanNeon,
+                                painter = painterResource(id = com.nexify.connect.R.drawable.ic_google),
+                                contentDescription = "Google Icon",
+                                tint = Color.Unspecified,
                                 modifier = Modifier.size(18.dp).padding(end = 6.dp)
                             )
                             Text(
@@ -371,9 +372,97 @@ fun LoginScreen(navController: NavController, repository: FirebaseRepository) {
                 fontSize = 11.sp,
                 color = TextMuted,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp).fillMaxWidth(0.85f)
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .fillMaxWidth(0.85f)
+                    .clickable { showTermsDialog = true }
             )
         }
+    }
+
+    if (showTermsDialog) {
+        AlertDialog(
+            onDismissRequest = { showTermsDialog = false },
+            title = {
+                Text(
+                    text = "Terms & Privacy Policy",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Welcome to Nexify Connect! By using our platform, you agree to these Terms and Conditions and understand our Privacy Policy.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "1. Service Eligibility & Passcode Gate",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Nexify Connect is currently in early-access beta. Access to this build requires entering the authorized passcode. You agree not to distribute this passcode to unauthorized third parties.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "2. Acceptable Use",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "You agree to use our social and workspace features (chats, rooms, fitness trackers) for lawful purposes. Abuse or exploitation of our neural AI core or messaging servers will result in immediate ban.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "3. Data Privacy & Local Storage",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Your fitness activity, profiles, and chats are encrypted and securely synchronized with Firebase. We use local caching on your device to ensure smooth offline access and fast performance.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "4. Disclaimer of Warranty",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "This is a Beta test build. We provide these services \"as is\" and do not guarantee uninterrupted uptime or data preservation during structural upgrades.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTermsDialog = false }) {
+                    Text("I Accept", color = CyanNeon, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            textContentColor = Color.LightGray
+        )
+    }
     }
 }
 
@@ -387,6 +476,7 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var showTermsDialog by remember { mutableStateOf(false) }
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -600,9 +690,9 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = PurpleNeon,
+                                painter = painterResource(id = com.nexify.connect.R.drawable.ic_google),
+                                contentDescription = "Google Icon",
+                                tint = Color.Unspecified,
                                 modifier = Modifier.size(18.dp).padding(end = 6.dp)
                             )
                             Text(
@@ -640,9 +730,97 @@ fun SignUpScreen(navController: NavController, repository: FirebaseRepository) {
                 fontSize = 11.sp,
                 color = TextMuted,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp).fillMaxWidth(0.85f)
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .fillMaxWidth(0.85f)
+                    .clickable { showTermsDialog = true }
             )
         }
+    }
+
+    if (showTermsDialog) {
+        AlertDialog(
+            onDismissRequest = { showTermsDialog = false },
+            title = {
+                Text(
+                    text = "Terms & Privacy Policy",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Welcome to Nexify Connect! By using our platform, you agree to these Terms and Conditions and understand our Privacy Policy.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "1. Service Eligibility & Passcode Gate",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Nexify Connect is currently in early-access beta. Access to this build requires entering the authorized passcode. You agree not to distribute this passcode to unauthorized third parties.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "2. Acceptable Use",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "You agree to use our social and workspace features (chats, rooms, fitness trackers) for lawful purposes. Abuse or exploitation of our neural AI core or messaging servers will result in immediate ban.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "3. Data Privacy & Local Storage",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Your fitness activity, profiles, and chats are encrypted and securely synchronized with Firebase. We use local caching on your device to ensure smooth offline access and fast performance.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "4. Disclaimer of Warranty",
+                        fontWeight = FontWeight.Bold,
+                        color = CyanNeon,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "This is a Beta test build. We provide these services \"as is\" and do not guarantee uninterrupted uptime or data preservation during structural upgrades.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTermsDialog = false }) {
+                    Text("I Accept", color = CyanNeon, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = Color(0xFF161128),
+            textContentColor = Color.LightGray
+        )
+    }
     }
 }
 
