@@ -24,6 +24,78 @@ import { subscribeLeaderboard } from '../services/admin';
 import { useFitness } from '../hooks/useFitnessContext';
 import { subscribeNotifications } from '../services/notifications';
 
+/* ── Animated Waving Hand Component ── */
+const WavingHand = () => (
+  <motion.span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: '10px',
+      verticalAlign: 'middle',
+      cursor: 'default',
+      userSelect: 'none',
+      WebkitTextFillColor: 'initial'
+    }}
+    animate={{
+      rotate: [0, 15, -10, 15, 0]
+    }}
+    transition={{
+      duration: 1.8,
+      repeat: Infinity,
+      repeatDelay: 0.5,
+      ease: "easeInOut"
+    }}
+  >
+    <svg
+      width="32"
+      height="32"
+      viewBox="0 0 36 36"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="handGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFE082" />
+          <stop offset="60%" stopColor="#FFB300" />
+          <stop offset="100%" stopColor="#FF6F00" />
+        </linearGradient>
+        <linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#00E5FF" />
+          <stop offset="100%" stopColor="#8E24AA" />
+        </linearGradient>
+      </defs>
+
+      {/* Wave 1 */}
+      <motion.path
+        d="M 4,14 C 2.5,16 2.5,20 4,22"
+        stroke="url(#waveGrad)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        animate={{ opacity: [0.3, 1, 0.3], scale: [0.9, 1.1, 0.9] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Wave 2 */}
+      <motion.path
+        d="M 8,10 C 5.5,13.5 5.5,22.5 8,26"
+        stroke="url(#waveGrad)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        animate={{ opacity: [0.3, 1, 0.3], scale: [0.9, 1.1, 0.9] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+      />
+
+      {/* Hand */}
+      <g transform="translate(10, 2)">
+        <path
+          d="M19.6,9.1c0-0.9-0.7-1.6-1.6-1.6s-1.6,0.7-1.6,1.6v6.2c0,0.3-0.2,0.5-0.5,0.5s-0.5-0.2-0.5-0.5V5.5c0-0.9-0.7-1.6-1.6-1.6S12.2,4.6,12.2,5.5v9.8c0,0.3-0.2,0.5-0.5,0.5s-0.5-0.2-0.5-0.5V2.4C11.2,1.5,10.5,0.8,9.6,0.8S8,1.5,8,2.4v12.9c0,0.3-0.2,0.5-0.5,0.5s-0.5-0.2-0.5-0.5V6.2C7,5.3,6.3,4.6,5.4,4.6S3.8,5.3,3.8,6.2v14.4c0,5.7,4.6,10.3,10.3,10.3c3.4,0,6.5-1.7,8.3-4.5c1.1-1.7,1.8-3.7,1.8-5.8V17.3c0-0.9-0.7-1.6-1.6-1.6s-1.6,0.7-1.6,1.6v2c0,0.3-0.2,0.5-0.5,0.5s-0.5-0.2-0.5-0.5V9.1z"
+          fill="url(#handGrad)"
+        />
+      </g>
+    </svg>
+  </motion.span>
+);
+
 /* ── Ultra-Premium Particle System ── */
 const ParticleSystem = () => (
   <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
@@ -231,8 +303,11 @@ const Home = () => {
              new Date().getHours() < 21 ? 'Good Evening Citizen' : 'Good Night Citizen'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
-            <h1 style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1, background: 'linear-gradient(135deg, #ffffff, #8F9CAE)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              {currentUser?.displayName?.split(' ')[0] || 'Citizen'} 👋
+            <h1 style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1, display: 'flex', alignItems: 'center' }}>
+              <span style={{ background: 'linear-gradient(135deg, #ffffff, #8F9CAE)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                {currentUser?.displayName?.split(' ')[0] || 'Citizen'}
+              </span>
+              <WavingHand />
             </h1>
             {currentUser && (
               <div style={{ display: 'flex', gap: 8 }}>
